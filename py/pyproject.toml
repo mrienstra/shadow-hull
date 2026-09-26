@@ -1,0 +1,22 @@
+[project]
+name = "shadow_hull"
+version = "0.1.0"
+description = "Generate trip-lets: solids whose shadows along three axes are three different letters (Python port of the JS core)."
+requires-python = ">=3.12"
+dependencies = [
+    "manifold3d",
+    "fonttools",
+    "numpy",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["shadow_hull*"]
