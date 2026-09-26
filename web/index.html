@@ -21,9 +21,10 @@
           <label>Right <input name="right" value="E" maxlength="12" autocomplete="off"></label>
           <label>Top <input name="top" value="B" maxlength="12" autocomplete="off"></label>
         </div>
+        <label>Font <select name="fontChoice" id="font-choice"></select></label>
         <details>
           <summary>Options</summary>
-          <label>Font <input type="file" name="font" accept=".ttf,.otf"></label>
+          <label>…or upload a font <input type="file" name="font" accept=".ttf,.otf"></label>
           <label>Size (mm) <input type="number" name="size" value="40" min="5" max="500"></label>
           <label>Fit
             <select name="fit">
@@ -62,7 +63,8 @@
 
     <section class="panel shadows" aria-label="Shadows">
       <h2>Shadows</h2>
-      <p class="legend"><span class="sw shadow"></span>shadow <span class="sw missing"></span>missing from letter</p>
+      <label class="check toggle"><input type="checkbox" id="show-missing" checked> Show missing parts</label>
+      <p class="legend"><span><span class="sw shadow"></span>shadow</span> <span class="extra"><span class="sw missing"></span>missing from letter</span> <span class="extra"><span class="sw target"></span>letter outline</span></p>
       <p id="print-check"></p>
       <div id="shadow-panels"></div>
     </section>

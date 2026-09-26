@@ -18,8 +18,17 @@ export function loadFont(data) {
 export function textContours(font, text, { tolerance = 0.01 } = {}) {
   const em = font.unitsPerEm;
   const maxSeg = tolerance * em;
+  // Lay glyphs out ourselves (advance width + pair kerning) rather than via
+  // font.getPath: its GSUB shaping throws on lookup types opentype.js doesn't
+  // support, which some display fonts use. Ligatures are not applied.
   // opentype paths are y-down (canvas); negate y to get y-up.
-  const path = font.getPath(text, 0, 0, em, { kerning: true });
+  const glyphs = [...text].map((ch) => font.charToGlyph(ch));
+  const path = { commands: [] };
+  let pen = 0;
+  glyphs.forEach((g, i) => {
+    path.commands.push(...g.getPath(pen, 0, em).commands);
+    pen += g.advanceWidth + (i + 1 < glyphs.length ? font.getKerningValue(g, glyphs[i + 1]) : 0);
+  });
   const contours = [];
   let cur = null;
   let x = 0, y = 0;

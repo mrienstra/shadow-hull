@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-09-26 (fonts, missing-parts toggle)
+
+- Benchmark set: `test/fixtures/benchmark-words.json`, 16 triples using all 26
+  letters (includes the hard L+T pair, round/straight/diagonal groups, a
+  repeated letter, real words). `scripts/benchmark-fonts.js` scores fonts on it.
+- Benchmarked 24 heavy Google Fonts plus Arial / Arial Black. Bundled 9 (OFL, unmodified)
+  for score and variety of style. The default is now **Bungee** (16/16 sturdy, 99.9%
+  mean worst-letter coverage). Archivo Black was mid-table (14/16, 97.1%) and
+  stays for the parity fixtures. Details in `fonts/README.md`.
+- Font picker on the page (outside Options); `--font <id>` and `--list-fonts` in the CLI.
+- Fixed a crash: opentype.js `getPath` throws on some GSUB lookups (Black Ops One,
+  Paytone One) for multi-character text. `textContours` now lays out glyphs
+  itself (advance width + pair kerning; no ligatures).
+- Page: a "Show missing parts" toggle hides the red areas and dashed outlines
+  (remembered per browser). The e2e test covers the toggle and switching fonts.
+- Noted: stretch-to-square fit turns condensed faces (Anton, Passion One) into wide ones.
+- No subagents used.
+
 ## 2026-09-26 (Python port, printability, glyph symmetry)
 
 - `py/`: Python port (manifold3d + fontTools). 26 tests pass, including

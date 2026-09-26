@@ -36,6 +36,23 @@ test('page generates GEB with complete shadows', async () => {
   assert.equal(await page.isDisabled('#download'), false);
   assert.equal(await page.textContent('#print-check'), 'One piece · no part thinner than 1 mm');
 
+  // The "Show missing parts" toggle hides the red areas and outlines.
+  assert.equal(await page.isVisible('#shadow-panels .target'), true);
+  await page.uncheck('#show-missing');
+  assert.equal(await page.isVisible('#shadow-panels .target'), false);
+  assert.equal(await page.isVisible('#shadow-panels .shadow'), true);
+  await page.check('#show-missing');
+
+  // Switching the bundled font regenerates with that font.
+  assert.equal(await page.$$eval('#font-choice option', (o) => o.length) > 1, true);
+  const before = await page.getAttribute('#shadow-panels path.shadow', 'd');
+  await page.selectOption('#font-choice', 'anton');
+  await page.waitForFunction((d) => {
+    const p = document.querySelector('#shadow-panels path.shadow');
+    return p && p.getAttribute('d') !== d && !document.querySelector('#go').disabled;
+  }, before, { timeout: 60_000 });
+  assert.match(await page.textContent('#status'), /Tried \d+ arrangements/);
+
   // Snap to a view and make sure rendering doesn't throw.
   await page.click('.toolbar [data-view="front"]');
   if (process.env.SCREENSHOT) await page.screenshot({ path: process.env.SCREENSHOT });

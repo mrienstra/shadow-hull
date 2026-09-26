@@ -10,7 +10,7 @@ const wasmReady = getManifold({ locateFile: () => wasmUrl });
 let font = null;
 
 async function ensureFont(data) {
-  if (data) font = loadFont(data);
+  if (data) font = loadFont(data instanceof ArrayBuffer ? data : await (await fetch(data)).arrayBuffer());
   else if (!font) font = loadFont(await (await fetch(defaultFontUrl)).arrayBuffer());
   return font;
 }
@@ -53,7 +53,7 @@ self.onmessage = async ({ data: msg }) => {
   try {
     const wasm = await wasmReady;
     if (msg.type === 'font') {
-      await ensureFont(msg.data);
+      await ensureFont(msg.data ?? msg.url);
       self.postMessage({ id: msg.id, ok: true });
     } else if (msg.type === 'search') {
       await ensureFont();

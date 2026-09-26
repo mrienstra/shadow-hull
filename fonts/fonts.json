@@ -1,0 +1,11 @@
+[
+  { "id": "bungee", "name": "Bungee", "file": "Bungee-Regular.ttf", "license": "Bungee-OFL.txt", "note": "blocky signage (default)" },
+  { "id": "passion-one", "name": "Passion One Black", "file": "PassionOne-Black.ttf", "license": "PassionOne-OFL.txt", "note": "heavy condensed" },
+  { "id": "chango", "name": "Chango", "file": "Chango-Regular.ttf", "license": "Chango-OFL.txt", "note": "ultra-fat, wide" },
+  { "id": "sigmar-one", "name": "Sigmar One", "file": "SigmarOne-Regular.ttf", "license": "SigmarOne-OFL.txt", "note": "playful, heavy" },
+  { "id": "kanit-black", "name": "Kanit Black", "file": "Kanit-Black.ttf", "license": "Kanit-OFL.txt", "note": "clean geometric sans" },
+  { "id": "anton", "name": "Anton", "file": "Anton-Regular.ttf", "license": "Anton-OFL.txt", "note": "tall condensed grotesque" },
+  { "id": "rubik-mono-one", "name": "Rubik Mono One", "file": "RubikMonoOne-Regular.ttf", "license": "RubikMonoOne-OFL.txt", "note": "wide geometric, monospaced" },
+  { "id": "alfa-slab-one", "name": "Alfa Slab One", "file": "AlfaSlabOne-Regular.ttf", "license": "AlfaSlabOne-OFL.txt", "note": "slab serif" },
+  { "id": "archivo-black", "name": "Archivo Black", "file": "ArchivoBlack-Regular.ttf", "license": "ArchivoBlack-OFL.txt", "note": "heavy grotesque" }
+]

@@ -78,10 +78,11 @@ button:disabled { opacity: 0.5; cursor: default; }
 .toolbar span { color: var(--muted); font-size: 13px; }
 #download { margin-left: auto; }
 
-.legend { margin: 0 0 8px; font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+.legend { margin: 0 0 8px; font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; align-items: center; }
 .sw { display: inline-block; width: 12px; height: 12px; border-radius: 2px; }
 .sw.shadow { background: var(--shadow-fill); }
-.sw.missing { background: var(--missing); margin-left: 8px; }
+.sw.missing { background: var(--missing); }
+.legend > span { display: inline-flex; align-items: center; gap: 5px; margin-right: 8px; }
 #shadow-panels { display: grid; gap: 10px; }
 figure { margin: 0; }
 figure svg { width: 100%; aspect-ratio: 1; display: block; background: var(--bg); border-radius: 6px; }
@@ -97,3 +98,7 @@ svg .missing { fill: var(--missing); }
 }
 #print-check { margin: 0 0 8px; font-size: 13px; }
 #print-check.warn { color: var(--missing); }
+label.toggle { margin: 0 0 6px; font-size: 13px; }
+.sw.target { border: 1px dashed var(--target); }
+#shadow-panels.plain .missing, #shadow-panels.plain .target { display: none; }
+.shadows:has(#shadow-panels.plain) .legend .extra { display: none; }

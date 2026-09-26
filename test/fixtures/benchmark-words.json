@@ -1,0 +1,21 @@
+{
+  "about": "Benchmark letter triples for comparing fonts and search/ranking changes. Together they use all 26 capital letters. Each is [texts, why].",
+  "triples": [
+    [["G", "E", "B"], "the GEB cover; mixed round and straight"],
+    [["A", "M", "Y"], "diagonals, wide M"],
+    [["X", "Y", "Z"], "all diagonal; tends to fall apart into pieces"],
+    [["L", "T", "A"], "L + T is the known hardest pair (little shared material)"],
+    [["O", "Q", "C"], "all round"],
+    [["H", "I", "E"], "all straight, narrow I"],
+    [["M", "W", "N"], "wide diagonals"],
+    [["K", "R", "S"], "mixed strokes"],
+    [["J", "U", "P"], "open bottoms and bowls"],
+    [["D", "F", "V"], "bowl, open straight, point"],
+    [["B", "O", "X"], "word"],
+    [["C", "A", "T"], "word"],
+    [["Z", "I", "G"], "word"],
+    [["S", "K", "Y"], "word"],
+    [["W", "H", "O"], "word"],
+    [["A", "A", "A"], "one repeated letter (symmetry/dedupe path)"]
+  ]
+}

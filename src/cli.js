@@ -6,7 +6,15 @@ import {
   getManifold, loadFont, silhouette, buildTriplet, search, toBinarySTL, viewingGuide, thicknessCheck, VIEW_NAMES,
 } from './core/index.js';
 
-const DEFAULT_FONT = fileURLToPath(new URL('../fonts/ArchivoBlack-Regular.ttf', import.meta.url));
+const FONTS_DIR = new URL('../fonts/', import.meta.url);
+const FONTS = JSON.parse(await readFile(new URL('fonts.json', FONTS_DIR), 'utf8'));
+
+/** A bundled font id/name (case-insensitive), or else a file path. */
+function fontPath(arg) {
+  const key = (arg ?? FONTS[0].id).toLowerCase();
+  const hit = FONTS.find((f) => f.id === key || f.name.toLowerCase() === key);
+  return hit ? fileURLToPath(new URL(hit.file, FONTS_DIR)) : arg;
+}
 
 const USAGE = `Usage: shadow-hull <ABC | A B C> [options]
 
@@ -16,7 +24,8 @@ or empty strings ('' = no constraint on that view).
 
 Options:
   -o, --out FILE          write the best candidate as binary STL
-  -f, --font FILE         TTF/OTF font (default: Archivo Black)
+  -f, --font NAME|FILE    bundled font id/name, or a TTF/OTF path (default: archivo-black)
+      --list-fonts        list bundled fonts
   -s, --size MM           cube edge length (default 40)
       --fit MODE          stretch | contain (default stretch)
       --transforms MODE   upright | any | none (default upright)
@@ -43,16 +52,21 @@ async function main() {
       'min-thickness': { type: 'string', short: 't', default: '1' },
       top: { type: 'string', short: 'n', default: '5' },
       json: { type: 'boolean' },
+      'list-fonts': { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
     },
   });
+  if (o['list-fonts']) {
+    for (const f of FONTS) console.log(`${f.id.padEnd(20)}${f.name.padEnd(22)}${f.note ?? ''}`);
+    return;
+  }
   if (o.help || !positionals.length) { console.log(USAGE); return; }
   const texts = positionals.length === 1 ? [...positionals[0]] : positionals;
   if (texts.length !== 3) throw new Error(`Need three texts, got ${texts.length}. ${USAGE}`);
 
   const size = Number(o.size);
   const wasm = await getManifold();
-  const font = loadFont(await readFile(o.font ?? DEFAULT_FONT));
+  const font = loadFont(await readFile(fontPath(o.font)));
   const t0 = performance.now();
   const ranked = search(wasm, font, texts, {
     size, fit: o.fit, transforms: o.transforms, permute: !o['no-permute'], preferConnected: !o['allow-pieces'],

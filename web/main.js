@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import FONTS from '../fonts/fonts.json';
+
+// Bundled fonts: URLs resolved by Vite; list and notes from fonts/fonts.json.
+const FONT_URLS = import.meta.glob('../fonts/*.ttf', { query: '?url', import: 'default', eager: true });
 
 const VIEW_NAMES = ['front', 'right', 'top'];
 const $ = (s) => document.querySelector(s);
@@ -144,6 +148,16 @@ function showPrintCheck(metrics, t) {
   el.className = metrics.pieces !== 1 || (t && t.erodedPieces !== metrics.pieces) ? 'warn' : '';
 }
 
+// "Show missing parts" toggle; remembered per browser when storage is available.
+const showMissing = $('#show-missing');
+try { showMissing.checked = localStorage.getItem('showMissing') !== 'false'; } catch {}
+const applyShowMissing = () => $('#shadow-panels').classList.toggle('plain', !showMissing.checked);
+showMissing.addEventListener('change', () => {
+  applyShowMissing();
+  try { localStorage.setItem('showMissing', String(showMissing.checked)); } catch {}
+});
+applyShowMissing();
+
 // ---- Form / candidates -----------------------------------------------------
 const form = $('#form');
 const status = $('#status');
@@ -177,12 +191,23 @@ async function select(candidate, button) {
   snap('iso');
 }
 
+const fontChoice = $('#font-choice');
+for (const f of FONTS) fontChoice.append(new Option(`${f.name} — ${f.note}`, f.id));
+fontChoice.addEventListener('change', async () => {
+  const f = FONTS.find((x) => x.id === fontChoice.value);
+  await call({ type: 'font', url: FONT_URLS[`../fonts/${f.file}`] });
+  form.font.value = '';
+  status.textContent = `Font: ${f.name}`;
+  form.requestSubmit();
+});
+
 form.font.addEventListener('change', async () => {
   const file = form.font.files[0];
   if (!file) return;
   const data = await file.arrayBuffer();
   await call({ type: 'font', data }, [data]);
   status.textContent = `Font: ${file.name}`;
+  form.requestSubmit();
 });
 
 form.addEventListener('submit', async (e) => {

@@ -23,7 +23,10 @@ and/or web) before deciding which to keep.
   changes, and review the diff. `test/e2e/` drives the built page in local
   Chrome (playwright-core, no browser download).
   `npm run check` runs JS, e2e and Python suites.
-- `fonts/` — bundled OFL font (Archivo Black) + its license.
+- `fonts/` — bundled OFL fonts from Google Fonts + licenses; `fonts.json` lists
+  them (first = default); `fonts/README.md` has the benchmark behind the choice.
+- `scripts/benchmark-fonts.js` — score fonts on `test/fixtures/benchmark-words.json`
+  (16 triples covering all 26 letters); reuse it when changing ranking/search.
 - `resources/communication/external/` — original research write-ups (as received).
 - `resources/research/` — research notes gathered while working; add to these
   when a finding is likely to be referred to again.
