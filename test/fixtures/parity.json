@@ -1,0 +1,157 @@
+{
+  "about": "Reference results from the JS core (scripts/make-fixtures.js). Implementations must match within tolerance.",
+  "font": "fonts/ArchivoBlack-Regular.ttf",
+  "size": 40,
+  "fit": "stretch",
+  "tolerance": {
+    "area_rel": 0.005,
+    "coverage_abs": 0.005,
+    "volume_rel": 0.005
+  },
+  "silhouettes": {
+    "G": {
+      "area": 1118.331116,
+      "components": 1
+    },
+    "E": {
+      "area": 1263.938036,
+      "components": 1
+    },
+    "B": {
+      "area": 1331.810039,
+      "components": 1
+    },
+    "A": {
+      "area": 933.209241,
+      "components": 1
+    },
+    "M": {
+      "area": 1338.725875,
+      "components": 1
+    },
+    "Y": {
+      "area": 716.251638,
+      "components": 1
+    },
+    "F": {
+      "area": 1057.499582,
+      "components": 1
+    },
+    "": {
+      "area": 1600,
+      "components": 1
+    },
+    "X": {
+      "area": 926.953008,
+      "components": 1
+    },
+    "Z": {
+      "area": 1068.874865,
+      "components": 1
+    }
+  },
+  "fixed": [
+    {
+      "texts": {
+        "front": "G",
+        "right": "E",
+        "top": "B"
+      },
+      "transforms": {
+        "front": 0,
+        "right": 0,
+        "top": 0
+      },
+      "coverage": {
+        "front": 1,
+        "right": 0.990484,
+        "top": 0.99449
+      },
+      "pieces": 1,
+      "volume": 30193.651
+    },
+    {
+      "texts": {
+        "front": "A",
+        "right": "M",
+        "top": "Y"
+      },
+      "transforms": {
+        "front": 4,
+        "right": 0,
+        "top": 3
+      },
+      "coverage": {
+        "front": 1,
+        "right": 0.770591,
+        "top": 0.941504
+      },
+      "pieces": 1,
+      "volume": 12418.581
+    },
+    {
+      "texts": {
+        "front": "F",
+        "right": "",
+        "top": ""
+      },
+      "transforms": {
+        "front": 0,
+        "right": 0,
+        "top": 0
+      },
+      "coverage": {
+        "front": 1,
+        "right": 1,
+        "top": 1
+      },
+      "pieces": 1,
+      "volume": 42299.983
+    },
+    {
+      "texts": {
+        "front": "X",
+        "right": "Y",
+        "top": "Z"
+      },
+      "transforms": {
+        "front": 1,
+        "right": 6,
+        "top": 2
+      },
+      "coverage": {
+        "front": 0.782243,
+        "right": 0.82016,
+        "top": 0.711871
+      },
+      "pieces": 1,
+      "volume": 7492.49
+    }
+  ],
+  "searches": [
+    {
+      "texts": [
+        "G",
+        "E",
+        "B"
+      ],
+      "candidates": 96,
+      "best": {
+        "minCoverage": 0.999658,
+        "pieces": 1
+      }
+    },
+    {
+      "texts": [
+        "A",
+        "M",
+        "Y"
+      ],
+      "candidates": 96,
+      "best": {
+        "minCoverage": 0.948065,
+        "pieces": 1
+      }
+    }
+  ]
+}
