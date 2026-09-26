@@ -1,0 +1,119 @@
+import { test, before } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import {
+  getManifold, loadFont, silhouette, buildTriplet, measure, search, toBinarySTL, howToView, d4, VIEW_NAMES,
+} from '../src/core/index.js';
+
+const SIZE = 40, H = SIZE / 2;
+let wasm, font;
+before(async () => {
+  wasm = await getManifold();
+  font = loadFont(await readFile(new URL('../fonts/ArchivoBlack-Regular.ttf', import.meta.url)));
+});
+
+const shapesFor = (texts) =>
+  Object.fromEntries(VIEW_NAMES.map((v) => [v, silhouette(wasm, font, texts[v] ?? '', { size: SIZE })]));
+const free = (shapes, ...more) => { for (const s of [...Object.values(shapes), ...more]) s.delete(); };
+
+/** Extent of the solid along `upAxis` within a thin slab at `axis` = `at`. */
+function slabExtent(solid, axis, at, upAxis) {
+  const dims = [SIZE * 2, SIZE * 2, SIZE * 2];
+  dims[axis] = 1;
+  const pos = [0, 0, 0];
+  pos[axis] = at;
+  const box = wasm.Manifold.cube(dims, true).translate(pos);
+  const cut = solid.intersect(box);
+  const { min, max } = cut.boundingBox();
+  const res = cut.isEmpty() ? null : [min[upAxis], max[upAxis]];
+  box.delete(); cut.delete();
+  return res;
+}
+
+/**
+ * An "F" reads correctly when, in the viewer's frame, its stem is on the left
+ * (spans full height) and its right edge has material only in the upper half.
+ * `right`/`up` are world axis indices and signs for the viewer's right/up.
+ */
+function assertReadsAsF(solid, right, up) {
+  const [ra, rs] = right, [ua, us] = up;
+  const left = slabExtent(solid, ra, -rs * (H - 1), ua);
+  const farRight = slabExtent(solid, ra, rs * (H - 1), ua);
+  assert.ok(left && left[1] - left[0] > SIZE * 0.95, `stem on the left spans full height: ${left}`);
+  assert.ok(farRight, 'top bar reaches the right edge');
+  const lowest = us > 0 ? farRight[0] : -farRight[1];
+  assert.ok(lowest > 0, `right edge has material only in the upper half (lowest ${lowest.toFixed(2)})`);
+}
+
+// Viewer frames, stated independently of views.js: [axis index, sign].
+const X = 0, Y = 1, Z = 2;
+const FRAMES = {
+  'front/-Y': { right: [X, +1], up: [Z, +1] }, // standing at -Y, facing +Y
+  'front/+Y': { right: [X, -1], up: [Z, +1] },
+  'right/+X': { right: [Y, +1], up: [Z, +1] }, // standing at +X, facing -X
+  'right/-X': { right: [Y, -1], up: [Z, +1] },
+  'top/+Z': { right: [X, +1], up: [Y, +1] },   // above, front edge toward you
+};
+
+for (const view of VIEW_NAMES) {
+  for (const index of [0, 4]) {
+    const { from, rotation } = howToView(view, index);
+    const key = `${view}/${from}`;
+    if (!FRAMES[key]) continue;
+    test(`"F" on ${view} with transform ${index} reads correctly from ${from}`, () => {
+      assert.equal(rotation, 0);
+      const shapes = shapesFor({ [view]: 'F' });
+      const solid = buildTriplet(wasm, shapes, { [view]: index }, { size: SIZE });
+      try {
+        assertReadsAsF(solid, FRAMES[key].right, FRAMES[key].up);
+      } finally { free(shapes, solid); }
+    });
+  }
+}
+
+test('d4 matrices form the square symmetries (orthogonal, det ±1, mirror iff index >= 4)', () => {
+  for (let i = 0; i < 8; i++) {
+    const [a, b, c, d] = d4(i);
+    assert.equal(a * a + c * c, 1);
+    assert.equal(a * b + c * d, 0);
+    assert.equal(a * d - b * c, i >= 4 ? -1 : 1);
+  }
+});
+
+test('shadows never extend outside their targets, for every transform', () => {
+  const shapes = shapesFor({ front: 'G', right: 'E', top: 'B' });
+  try {
+    for (let i = 0; i < 8; i++) {
+      const tf = { front: i, right: (i + 3) % 8, top: (i + 5) % 8 };
+      const solid = buildTriplet(wasm, shapes, tf, { size: SIZE });
+      const m = measure(wasm, solid, shapes, tf);
+      solid.delete();
+      for (const v of VIEW_NAMES) assert.ok(m.views[v].outside < 1e-3, `${v} outside ${m.views[v].outside} (tf ${JSON.stringify(tf)})`);
+    }
+  } finally { free(shapes); }
+});
+
+test('an unconstrained view casts the full square', () => {
+  const shapes = shapesFor({});
+  const solid = buildTriplet(wasm, shapes, {}, { size: SIZE });
+  try {
+    assert.ok(Math.abs(solid.volume() - SIZE ** 3) < 1e-6 * SIZE ** 3);
+  } finally { free(shapes, solid); }
+});
+
+test('search finds a complete, one-piece GEB', () => {
+  const [best] = search(wasm, font, ['G', 'E', 'B'], { size: SIZE });
+  assert.equal(best.metrics.pieces, 1);
+  assert.ok(best.metrics.minCoverage > 0.99, `worst coverage ${best.metrics.minCoverage}`);
+});
+
+test('binary STL has the right header count and length', () => {
+  const shapes = shapesFor({ front: 'G', right: 'E', top: 'B' });
+  const solid = buildTriplet(wasm, shapes, {}, { size: SIZE });
+  try {
+    const stl = toBinarySTL(solid);
+    const n = new DataView(stl.buffer).getUint32(80, true);
+    assert.equal(n, solid.numTri());
+    assert.equal(stl.length, 84 + 50 * n);
+  } finally { free(shapes, solid); }
+});

@@ -1,0 +1,20 @@
+{
+  "name": "shadow-hull",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Generate trip-lets: solids whose shadows along three axes are three different letters.",
+  "bin": {
+    "shadow-hull": "src/cli.js"
+  },
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "manifold-3d": "^3.5.4",
+    "opentype.js": "^2.0.0"
+  }
+}

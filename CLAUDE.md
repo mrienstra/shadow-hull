@@ -7,10 +7,23 @@ and/or web) before deciding which to keep.
 
 ## Layout
 
+- `src/core/` — environment-neutral JS core (Node + browser; fonts passed in as
+  ArrayBuffers, no fs). Build → project shadows → measure → search.
+  View frames and the D4 glyph transforms are defined once in `views.js`;
+  build and measure both use them.
+- `src/cli.js` — Node CLI (`node src/cli.js GEB -o out.stl`, `--help`).
+- `test/` — `npm test` (node:test). The "F" tests check reading orientation
+  against viewer frames written independently of `views.js`; keep them independent.
+- `fonts/` — bundled OFL font (Archivo Black) + its license.
 - `resources/communication/external/` — original research write-ups (as received).
 - `resources/research/` — research notes gathered while working; add to these
   when a finding is likely to be referred to again.
 - `CHANGELOG.md` — dated log of what changed and why.
+
+## Environment
+
+Node via fnm; in non-interactive shells first run
+`eval "$(/opt/homebrew/bin/brew shellenv)" && eval "$(fnm env)"`.
 
 ## Working rules
 
