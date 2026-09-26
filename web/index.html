@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shadow Hull</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 5l6-3 6 3v6l-6 3-6-3z' fill='%23c8a27a'/%3E%3Cpath d='M2 5l6 3 6-3M8 8v6' stroke='%231d1d1f' fill='none'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <header>
+    <h1>Shadow Hull</h1>
+    <p>A solid whose shadows along three axes read as three different letters, like the carved block on the cover of <i>Gödel, Escher, Bach</i>.</p>
+  </header>
+
+  <main>
+    <section class="panel controls" aria-label="Settings">
+      <form id="form">
+        <div class="texts">
+          <label>Front <input name="front" value="G" maxlength="12" autocomplete="off"></label>
+          <label>Right <input name="right" value="E" maxlength="12" autocomplete="off"></label>
+          <label>Top <input name="top" value="B" maxlength="12" autocomplete="off"></label>
+        </div>
+        <details>
+          <summary>Options</summary>
+          <label>Font <input type="file" name="font" accept=".ttf,.otf"></label>
+          <label>Size (mm) <input type="number" name="size" value="40" min="5" max="500"></label>
+          <label>Fit
+            <select name="fit">
+              <option value="stretch">Stretch to fill square</option>
+              <option value="contain">Keep proportions</option>
+            </select>
+          </label>
+          <label>Orientations
+            <select name="transforms">
+              <option value="upright">Upright (sits on a table)</option>
+              <option value="any">Any (slower)</option>
+              <option value="none">As given</option>
+            </select>
+          </label>
+          <label class="check"><input type="checkbox" name="permute" checked> Try every letter-to-side assignment</label>
+          <label class="check"><input type="checkbox" name="preferConnected" checked> Prefer one-piece solids</label>
+        </details>
+        <button type="submit" id="go">Generate</button>
+        <p id="status" role="status"></p>
+      </form>
+      <ol id="candidates" aria-label="Candidates, best first"></ol>
+    </section>
+
+    <section class="panel viewer" aria-label="3D view">
+      <div id="viewport"></div>
+      <div class="toolbar">
+        <span>Look at:</span>
+        <button data-view="front">Front</button>
+        <button data-view="right">Right</button>
+        <button data-view="top">Top</button>
+        <button data-view="iso">3/4</button>
+        <button id="download" disabled>Download STL</button>
+      </div>
+    </section>
+
+    <section class="panel shadows" aria-label="Shadows">
+      <h2>Shadows</h2>
+      <p class="legend"><span class="sw shadow"></span>shadow <span class="sw missing"></span>missing from letter</p>
+      <div id="shadow-panels"></div>
+    </section>
+  </main>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

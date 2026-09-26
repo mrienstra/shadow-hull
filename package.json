@@ -8,13 +8,25 @@
     "shadow-hull": "src/cli.js"
   },
   "scripts": {
-    "test": "node --test"
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node --test test/*.test.js",
+    "test:e2e": "vite build && node --test test/e2e/*.test.js",
+    "test:py": "cd py && uv run --extra dev pytest -q",
+    "fixtures": "node scripts/make-fixtures.js",
+    "check": "npm test && npm run test:e2e && npm run test:py"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
     "manifold-3d": "^3.5.4",
-    "opentype.js": "^2.0.0"
+    "opentype.js": "^2.0.0",
+    "three": "^0.186.1"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.63.0",
+    "vite": "^8.3.1"
   }
 }

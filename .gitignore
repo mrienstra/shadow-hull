@@ -2,3 +2,4 @@ node_modules/
 *.stl
 !test/fixtures/*.stl
 .DS_Store
+dist/

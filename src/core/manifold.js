@@ -2,9 +2,13 @@ import Module from 'manifold-3d';
 
 let ready;
 
-/** Load and initialise the Manifold WASM module once; returns { Manifold, CrossSection, ... }. */
-export function getManifold() {
-  ready ??= Module().then((wasm) => {
+/**
+ * Load and initialise the Manifold WASM module once; returns { Manifold, CrossSection, ... }.
+ * `moduleOptions` (first call only) is passed to the Emscripten loader, e.g.
+ * `{ locateFile: () => wasmUrl }` when a bundler relocates manifold.wasm.
+ */
+export function getManifold(moduleOptions) {
+  ready ??= Module(moduleOptions).then((wasm) => {
     wasm.setup();
     return wasm;
   });
