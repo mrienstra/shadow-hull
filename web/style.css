@@ -95,3 +95,5 @@ svg .missing { fill: var(--missing); }
   #viewport { min-height: 360px; }
   #shadow-panels { grid-template-columns: repeat(3, 1fr); }
 }
+#print-check { margin: 0 0 8px; font-size: 13px; }
+#print-check.warn { color: var(--missing); }

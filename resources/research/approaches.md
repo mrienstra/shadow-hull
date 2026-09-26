@@ -79,3 +79,19 @@ use a monospaced/block font.
    perhaps glyph adjustments (Mitra & Pauly deform the images).
 3. Candidate architecture: a manifold-3d JS core (Node CLI + browser), or a
    Python manifold3d core with build123d for STEP export.
+
+## Font matters a lot (measured 2026-09-26, JS core, 40 mm cube, best of search)
+
+| Font | GEB | AMY | XYZ | KWS | survives 1 mm min thickness? |
+|---|---|---|---|---|---|
+| Archivo Black | 100% · 1 pc | 94.8% · 1 | 98.3% · 1 | 97.2% · 1 | yes, all four |
+| Arial (regular) | 99.9% · 1 | 52.5% · 4 | 77.9% · 5 | 73.7% · 1 | no (necks < 0.5 mm) |
+| Times New Roman | 91.3% · 1 | 62.5% · 8 | 80.9% · 6 | 87.0% · 9 | no |
+
+Cells show worst-letter coverage and number of pieces. Heavy, blocky faces work much better. Thin or serif
+faces lose coverage, break into pieces, and leave thin necks.
+
+Also: Archivo Black's diagonal letters (A, M, V, W, X, Y) are drawn slightly
+asymmetric on purpose (e.g. M stems are 203 vs 219 units wide). Mirroring one
+of them changes the result a little, so the search doesn't treat it as a
+symmetry.

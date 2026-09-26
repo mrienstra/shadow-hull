@@ -2,7 +2,7 @@
 import wasmUrl from 'manifold-3d/manifold.wasm?url';
 import defaultFontUrl from '../fonts/ArchivoBlack-Regular.ttf?url';
 import {
-  getManifold, loadFont, search, silhouette, buildTriplet, measure, toBinarySTL, viewingGuide, Scope, VIEW_NAMES,
+  getManifold, loadFont, search, silhouette, buildTriplet, measure, thicknessCheck, toBinarySTL, viewingGuide, Scope, VIEW_NAMES,
   d4, d4Mat3, worldToLocal,
 } from '../src/core/index.js';
 
@@ -18,7 +18,7 @@ async function ensureFont(data) {
 const polys = (cs) => cs.toPolygons().map((p) => p.map(([x, y]) => [x, y]));
 
 /** Geometry for one candidate: mesh, STL and per-view target/shadow/missing outlines. */
-function buildCandidate(wasm, { assignment, transforms }, { size, fit }) {
+function buildCandidate(wasm, { assignment, transforms }, { size, fit, minThickness }) {
   const scope = new Scope();
   try {
     const shapes = Object.fromEntries(VIEW_NAMES.map((v) => [v, scope.add(silhouette(wasm, font, assignment[v], { size, fit }))]));
@@ -34,13 +34,14 @@ function buildCandidate(wasm, { assignment, transforms }, { size, fit }) {
       const upright = (cs) => polys(scope.add(cs.transform([a, b, 0, c, d, 0, 0, 0, 1])));
       views[v] = { target: upright(target), shadow: upright(shadow), missing: upright(missing) };
     }
+    const thickness = minThickness > 0 ? thicknessCheck(wasm, shapes, transforms, { size, minThickness }) : null;
     const mesh = solid.getMesh();
     return {
       numProp: mesh.numProp,
       vertProperties: mesh.vertProperties.slice(),
       triVerts: mesh.triVerts.slice(),
       stl: toBinarySTL(solid),
-      views, metrics,
+      views, metrics, thickness,
       guide: viewingGuide(assignment, transforms),
     };
   } finally {

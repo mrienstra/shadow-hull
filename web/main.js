@@ -131,6 +131,19 @@ function showShadows(views, metrics) {
   }
 }
 
+function showPrintCheck(metrics, t) {
+  const el = $('#print-check');
+  const pieces = metrics.pieces === 1 ? 'One piece' : `${metrics.pieces} separate pieces`;
+  let thick = '';
+  if (t) {
+    thick = t.erodedPieces === metrics.pieces
+      ? ` · no part thinner than ${t.minThickness} mm`
+      : ` · has parts thinner than ${t.minThickness} mm`;
+  }
+  el.textContent = pieces + thick;
+  el.className = metrics.pieces !== 1 || (t && t.erodedPieces !== metrics.pieces) ? 'warn' : '';
+}
+
 // ---- Form / candidates -----------------------------------------------------
 const form = $('#form');
 const status = $('#status');
@@ -146,6 +159,7 @@ function readForm() {
       transforms: f.get('transforms'),
       permute: f.get('permute') === 'on',
       preferConnected: f.get('preferConnected') === 'on',
+      minThickness: Number(f.get('minThickness')) || 0,
     },
   };
 }
@@ -159,6 +173,7 @@ async function select(candidate, button) {
   $('#download').disabled = false;
   showMesh(r);
   showShadows(r.views, r.metrics);
+  showPrintCheck(r.metrics, r.thickness);
   snap('iso');
 }
 

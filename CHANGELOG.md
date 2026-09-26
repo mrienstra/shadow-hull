@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-09-26 (Python port, printability, glyph symmetry)
+
+- `py/`: Python port (manifold3d + fontTools). 26 tests pass, including
+  the shared parity fixtures and its own "F" orientation tests; breaking its
+  front view on purpose makes both fail. Symmetry dedupe not ported yet.
+  GEB search: ~1.4 s (96 configs) vs JS ~3 s for the same 96.
+- `thicknessCheck`: exact erosion by a ball (offset each silhouette by -r
+  and rebuild), which reports whether a minimum wall thickness splits the solid.
+  Shown in the CLI (`-t`, default 1 mm) and on the page. It's reported, not
+  used for ranking, so the parity fixtures stay unchanged. Tested with a synthetic dumbbell.
+- The search also folds each glyph's own D4 symmetries into the dedupe (I, H,
+  O, D...). XOH: 96 → 11, best unchanged.
+- Research: font choice dominates (table in `resources/research/approaches.md`).
+- Subagent ledger: one Sonnet agent ported the core to Python. **Earned its
+  cost**: it ran in parallel with the web and symmetry work, delivered a clean
+  port on the first pass, and found real API differences (no centred extrude,
+  row-major transforms, CrossSection's default fill rule). I re-ran its tests,
+  reviewed the view/build/test code, and broke its front view on purpose to
+  confirm the tests catch it. The shared fixtures turned "is the port right?"
+  into a check I could run myself.
+
 ## 2026-09-26 (web, symmetry, test infra)
 
 - Web app (`web/`): Vite + Three.js, search in a Web Worker. It shows the solid,

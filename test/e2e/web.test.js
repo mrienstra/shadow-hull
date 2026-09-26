@@ -34,6 +34,7 @@ test('page generates GEB with complete shadows', async () => {
   assert.equal(captions.length, 3);
   for (const c of captions) assert.match(c, /100\.0%/, c);
   assert.equal(await page.isDisabled('#download'), false);
+  assert.equal(await page.textContent('#print-check'), 'One piece · no part thinner than 1 mm');
 
   // Snap to a view and make sure rendering doesn't throw.
   await page.click('.toolbar [data-view="front"]');
