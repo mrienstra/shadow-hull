@@ -11,9 +11,18 @@ and/or web) before deciding which to keep.
   ArrayBuffers, no fs). Build → project shadows → measure → search.
   View frames and the D4 glyph transforms are defined once in `views.js`;
   build and measure both use them.
+  `symmetry.js` reduces the search to one config per cube-symmetry orbit.
 - `src/cli.js` — Node CLI (`node src/cli.js GEB -o out.stl`, `--help`).
+- `web/` — Vite + Three.js page; geometry runs in `worker.js` on the same core.
+  `npm run dev` / `npm run build` (→ `dist/`).
+- `py/` — Python port (manifold3d + fontTools), kept in parity with the JS core.
 - `test/` — `npm test` (node:test). The "F" tests check reading orientation
   against viewer frames written independently of `views.js`; keep them independent.
+  `test/fixtures/parity.json` holds reference numbers that every implementation
+  must reproduce; regenerate with `npm run fixtures` only for intentional
+  changes, and review the diff. `test/e2e/` drives the built page in local
+  Chrome (playwright-core, no browser download).
+  `npm run check` runs JS, e2e and Python suites.
 - `fonts/` — bundled OFL font (Archivo Black) + its license.
 - `resources/communication/external/` — original research write-ups (as received).
 - `resources/research/` — research notes gathered while working; add to these

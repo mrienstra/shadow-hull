@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-26 (web, symmetry, test infra)
+
+- Web app (`web/`): Vite + Three.js, search in a Web Worker. It shows the solid,
+  snaps the camera so each letter reads upright (checked by screenshot for
+  a 270°-turned top letter), draws each shadow over its target with missing
+  area in red, and downloads STL.
+- Search keeps one config per orbit of the 48 cube symmetries: upright
+  96 → 24 configs, any 3072 → 64 (GEB 98 s → 2 s). The best result is unchanged
+  in all 9 mode/word combinations tried. A test checks `applySymmetry` against
+  actual transformed geometry for all 48.
+- Test infra: shared parity fixtures (`test/fixtures/parity.json`, JS test +
+  Python test), browser smoke test (`npm run test:e2e`), `npm run check`.
+  There's no git remote yet, so no CI workflow; add one when there is.
+
 ## 2026-09-26 (JS core)
 
 - `src/core/`: glyph outlines (opentype.js, curves flattened), view frames and
