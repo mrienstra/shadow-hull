@@ -117,3 +117,33 @@ test('binary STL has the right header count and length', () => {
     assert.equal(stl.length, 84 + 50 * n);
   } finally { free(shapes, solid); }
 });
+
+test('applySymmetry matches transforming the actual solid (all 48 symmetries)', async () => {
+  const { CUBE_SYMMETRIES, applySymmetry } = await import('../src/core/symmetry.js');
+  const config = { assignment: { front: 'F', right: 'G', top: 'R' }, transforms: { front: 0, right: 5, top: 3 } };
+  const cache = new Map();
+  const shape = (t) => cache.get(t) ?? cache.set(t, silhouette(wasm, font, t, { size: SIZE })).get(t);
+  const build = (c) => buildTriplet(wasm, Object.fromEntries(VIEW_NAMES.map((v) => [v, shape(c.assignment[v])])), c.transforms, { size: SIZE });
+  const original = build(config);
+  try {
+    for (const R of CUBE_SYMMETRIES) {
+      const mat4 = [R[0][0], R[1][0], R[2][0], 0, R[0][1], R[1][1], R[2][1], 0, R[0][2], R[1][2], R[2][2], 0, 0, 0, 0, 1];
+      const moved = original.transform(mat4);
+      const rebuilt = build(applySymmetry(R, config));
+      const diff = wasm.Manifold.union(moved.subtract(rebuilt), rebuilt.subtract(moved));
+      assert.ok(diff.volume() < 1e-6 * SIZE ** 3, `R=${JSON.stringify(R)}: symmetric difference ${diff.volume()}`);
+      for (const m of [moved, rebuilt, diff]) m.delete();
+    }
+  } finally {
+    original.delete();
+    for (const s of cache.values()) s.delete();
+  }
+});
+
+test('dedupe keeps the best result and one config per orbit', () => {
+  const all = search(wasm, font, ['A', 'M', 'Y'], { size: SIZE, dedupe: false });
+  const reps = search(wasm, font, ['A', 'M', 'Y'], { size: SIZE });
+  assert.equal(all.length, 96);
+  assert.equal(reps.length, 24);
+  assert.ok(Math.abs(all[0].metrics.minCoverage - reps[0].metrics.minCoverage) < 1e-9);
+});

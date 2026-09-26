@@ -17,7 +17,12 @@ const FIXED = [
   { front: 'F', right: '', top: '', transforms: { front: 0, right: 0, top: 0 } },
   { front: 'X', right: 'Y', top: 'Z', transforms: { front: 1, right: 6, top: 2 } },
 ];
-const SEARCHES = [['G', 'E', 'B'], ['A', 'M', 'Y']];
+// Searches record their options explicitly; `dedupe: false` until every
+// implementation supports symmetry reduction.
+const SEARCHES = [
+  { texts: ['G', 'E', 'B'], opts: { dedupe: false } },
+  { texts: ['A', 'M', 'Y'], opts: { dedupe: false } },
+];
 
 const wasm = await getManifold();
 const font = loadFont(await readFile(FONT));
@@ -47,10 +52,10 @@ for (const c of FIXED) {
   for (const s of Object.values(shapes)) s.delete();
 }
 
-for (const texts of SEARCHES) {
-  const ranked = search(wasm, font, texts, { size: SIZE });
+for (const { texts, opts } of SEARCHES) {
+  const ranked = search(wasm, font, texts, { size: SIZE, ...opts });
   out.searches.push({
-    texts, candidates: ranked.length,
+    texts, opts, candidates: ranked.length,
     best: { minCoverage: round(ranked[0].metrics.minCoverage), pieces: ranked[0].metrics.pieces },
   });
 }

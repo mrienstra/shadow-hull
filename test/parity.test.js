@@ -38,7 +38,7 @@ for (const c of fx.fixed) {
 
 for (const s of fx.searches) {
   test(`search ${s.texts.join('')}`, () => {
-    const ranked = search(wasm, font, s.texts, opts);
+    const ranked = search(wasm, font, s.texts, { ...opts, ...s.opts });
     assert.equal(ranked.length, s.candidates);
     assert.equal(ranked[0].metrics.pieces, s.best.pieces);
     assert.ok(Math.abs(ranked[0].metrics.minCoverage - s.best.minCoverage) <= tol.coverage_abs);

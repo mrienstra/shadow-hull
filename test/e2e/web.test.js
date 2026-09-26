@@ -29,7 +29,7 @@ test('page generates GEB with complete shadows', async () => {
   await page.waitForSelector('#candidates button[aria-pressed="true"]', { timeout: 60_000 });
   await page.waitForSelector('#shadow-panels figure:nth-child(3)');
 
-  assert.match(await page.textContent('#status'), /Tried 96 arrangements/);
+  assert.match(await page.textContent('#status'), /Tried 24 arrangements/);
   const captions = await page.$$eval('#shadow-panels figcaption', (els) => els.map((e) => e.textContent));
   assert.equal(captions.length, 3);
   for (const c of captions) assert.match(c, /100\.0%/, c);

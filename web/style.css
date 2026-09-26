@@ -48,7 +48,8 @@ input, select, button { font: inherit; color: inherit; }
 input:not([type]), input[type="number"], select {
   padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); min-width: 0; width: 100%;
 }
-.texts input { font-size: 22px; font-weight: 700; text-align: center; }
+.texts input { font-size: 22px; font-weight: 700; text-align: center; background: var(--surface); border-color: var(--target); }
+.texts input:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
 details { display: grid; gap: 8px; }
 details[open] > :not(summary) { margin-top: 8px; }
 summary { cursor: pointer; color: var(--muted); font-size: 13px; }
@@ -68,6 +69,7 @@ button:disabled { opacity: 0.5; cursor: default; }
 #candidates button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
 #candidates .letters { font-weight: 700; letter-spacing: 0.05em; }
 #candidates .meta { color: var(--muted); font-size: 12px; }
+#candidates .note { display: block; font-weight: 400; letter-spacing: 0; color: var(--muted); font-size: 11px; }
 
 .viewer { display: grid; grid-template-rows: 1fr auto; padding: 0; overflow: hidden; }
 #viewport { min-height: 420px; position: relative; }

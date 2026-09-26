@@ -9,4 +9,5 @@ export {
 } from './views.js';
 export { silhouette, buildTriplet, measure, viewingGuide } from './triplet.js';
 export { search, compareCandidates } from './search.js';
+export { CUBE_SYMMETRIES, applySymmetry, orbitRepresentatives, configKey } from './symmetry.js';
 export { toBinarySTL } from './stl.js';

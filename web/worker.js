@@ -59,7 +59,9 @@ self.onmessage = async ({ data: msg }) => {
       const t0 = performance.now();
       const ranked = search(wasm, font, msg.texts, msg.opts);
       const ms = performance.now() - t0;
-      self.postMessage({ id: msg.id, ok: true, tried: ranked.length, ms, candidates: ranked.slice(0, msg.top ?? 12) });
+      self.postMessage({
+        id: msg.id, ok: true, tried: ranked.length, ms, candidates: ranked.slice(0, msg.top ?? 12).map((c) => ({ ...c, guide: viewingGuide(c.assignment, c.transforms) })),
+      });
     } else if (msg.type === 'build') {
       await ensureFont();
       const r = buildCandidate(wasm, msg.candidate, msg.opts);

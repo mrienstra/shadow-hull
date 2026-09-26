@@ -135,6 +135,9 @@
         "E",
         "B"
       ],
+      "opts": {
+        "dedupe": false
+      },
       "candidates": 96,
       "best": {
         "minCoverage": 0.999658,
@@ -147,6 +150,9 @@
         "M",
         "Y"
       ],
+      "opts": {
+        "dedupe": false
+      },
       "candidates": 96,
       "best": {
         "minCoverage": 0.948065,

@@ -190,6 +190,13 @@ form.addEventListener('submit', async (e) => {
       const pieces = c.metrics.pieces === 1 ? '1 piece' : `${c.metrics.pieces} pieces`;
       b.innerHTML = `<span class="meta">${i + 1}</span><span class="letters"></span><span class="meta"></span>`;
       b.children[1].textContent = letters;
+      // How to view each letter: 'back' = from the far side; ↺ = turned.
+      const note = VIEW_NAMES.map((v) => {
+        const { from, rotation } = c.guide[v];
+        const back = from !== { front: '-Y', right: '+X', top: '+Z' }[v];
+        return `${back ? 'back' : ''}${rotation ? `↺${rotation}` : ''}` || '·';
+      }).join(' ');
+      if (note !== '· · ·') b.children[1].append(Object.assign(document.createElement('span'), { className: 'note', textContent: note }));
       b.children[2].textContent = `${(c.metrics.minCoverage * 100).toFixed(1)}% · ${pieces}`;
       b.title = 'Worst-letter coverage · pieces';
       b.addEventListener('click', () => select(c, b));

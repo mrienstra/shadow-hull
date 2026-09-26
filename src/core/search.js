@@ -1,5 +1,6 @@
 import { silhouette, buildTriplet, measure } from './triplet.js';
 import { VIEW_NAMES, transformChoices } from './views.js';
+import { orbitRepresentatives } from './symmetry.js';
 
 /** Distinct permutations of `items`. */
 function permutations(items) {
@@ -38,9 +39,13 @@ export function compareCandidates(a, b, { preferConnected = true } = {}) {
  * @param texts three strings (a letter, a word, or '' for "no constraint").
  * @param opts.permute try all assignments of texts to views (default true).
  * @param opts.transforms 'upright' | 'any' | 'none' (see views.js).
+ * @param opts.dedupe skip configurations that are rotations/reflections of
+ *   another one in the search (same shadows; see symmetry.js). Default true.
  */
 export function search(wasm, font, texts, opts = {}) {
-  const { size = 40, fit = 'stretch', tolerance, permute = true, transforms = 'upright', preferConnected = true } = opts;
+  const {
+    size = 40, fit = 'stretch', tolerance, permute = true, transforms = 'upright', preferConnected = true, dedupe = true,
+  } = opts;
   if (texts.length !== 3) throw new Error('Need exactly three texts');
   const shapes = new Map();
   const shapeOf = (t) => {
@@ -48,19 +53,24 @@ export function search(wasm, font, texts, opts = {}) {
     return shapes.get(t);
   };
   const choices = transformChoices(transforms);
+  let configs = [];
+  for (const order of permute ? permutations(texts) : [texts]) {
+    const assignment = Object.fromEntries(VIEW_NAMES.map((v, i) => [v, order[i]]));
+    for (const combo of product(VIEW_NAMES.map((v) => choices[v]))) {
+      configs.push({ assignment, transforms: Object.fromEntries(VIEW_NAMES.map((v, i) => [v, combo[i]])) });
+    }
+  }
+  if (dedupe) configs = orbitRepresentatives(configs);
+
   const candidates = [];
   try {
-    for (const order of permute ? permutations(texts) : [texts]) {
-      const assignment = Object.fromEntries(VIEW_NAMES.map((v, i) => [v, order[i]]));
+    for (const { assignment, transforms: tf } of configs) {
       const viewShapes = Object.fromEntries(VIEW_NAMES.map((v) => [v, shapeOf(assignment[v])]));
-      for (const combo of product(VIEW_NAMES.map((v) => choices[v]))) {
-        const tf = Object.fromEntries(VIEW_NAMES.map((v, i) => [v, combo[i]]));
-        const solid = buildTriplet(wasm, viewShapes, tf, { size });
-        try {
-          candidates.push({ assignment, transforms: tf, metrics: measure(wasm, solid, viewShapes, tf) });
-        } finally {
-          solid.delete();
-        }
+      const solid = buildTriplet(wasm, viewShapes, tf, { size });
+      try {
+        candidates.push({ assignment, transforms: tf, metrics: measure(wasm, solid, viewShapes, tf) });
+      } finally {
+        solid.delete();
       }
     }
   } finally {
