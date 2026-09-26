@@ -1,0 +1,30 @@
+# shadow-hull
+
+Generating "trip-lets" (GEB-cover solids): the intersection of three orthogonal
+extruded silhouettes, so the solid casts a different letter/shape along each
+axis. Several implementation approaches may be tried side by side (non-web
+and/or web) before deciding which to keep.
+
+## Layout
+
+- `resources/communication/external/` — original research write-ups (as received).
+- `resources/research/` — research notes gathered while working; add to these
+  when a finding is likely to be referred to again.
+- `CHANGELOG.md` — dated log of what changed and why.
+
+## Working rules
+
+- **Commit your own work at stopping points; don't ask first** unless
+  something is uncertain, or you are waiting for a quiet moment while other
+  sessions are mid-edit. A subagent reports; the session that spawned it
+  checks the diff and commits.
+- **You may use subagents without being asked.** Delegate breadth (a read
+  across many files or sources where only the conclusion matters) and keep
+  judgment and writing. Mechanical work you can verify from the diff doesn't
+  need one. Before a claim lands in a reader-facing edit or outward artifact,
+  have a fresh top-tier subagent check it against the sources, facts not
+  judgement: re-running your own method reproduces your own blind spot. A
+  subagent's finding, especially a count or a "zero hits", is a claim to
+  re-measure, never a result. When you used one, say in your CHANGELOG entry
+  whether it earned its cost and why — that ledger is how this default gets
+  revised.
