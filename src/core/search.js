@@ -1,6 +1,6 @@
 import { silhouette, buildTriplet, measure } from './triplet.js';
 import { VIEW_NAMES, transformChoices } from './views.js';
-import { orbitRepresentatives } from './symmetry.js';
+import { orbitRepresentatives, stabilizer } from './symmetry.js';
 
 /** Distinct permutations of `items`. */
 function permutations(items) {
@@ -60,7 +60,10 @@ export function search(wasm, font, texts, opts = {}) {
       configs.push({ assignment, transforms: Object.fromEntries(VIEW_NAMES.map((v, i) => [v, combo[i]])) });
     }
   }
-  if (dedupe) configs = orbitRepresentatives(configs);
+  if (dedupe) {
+    const stabilizers = Object.fromEntries([...new Set(texts)].map((t) => [t, stabilizer(shapeOf(t))]));
+    configs = orbitRepresentatives(configs, stabilizers);
+  }
 
   const candidates = [];
   try {

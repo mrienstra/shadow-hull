@@ -90,3 +90,33 @@ export function measure(wasm, solid, shapes, transforms = {}) {
 export function viewingGuide(texts, transforms = {}) {
   return Object.fromEntries(VIEW_NAMES.map((v) => [v, { text: texts[v] ?? '', ...howToView(v, transforms[v] ?? 0) }]));
 }
+
+/**
+ * Printability check: does the solid survive a minimum wall thickness?
+ *
+ * Eroding the solid by a ball of radius r (= minThickness / 2) is exact and
+ * cheap here: each prism is infinite along its own axis, so its erosion is the
+ * prism of its silhouette offset by -r (round joins), and erosion distributes
+ * over intersection. If the eroded solid has more pieces than the original,
+ * some neck is thinner than minThickness; if it is empty, the whole thing is.
+ *
+ * @returns { minThickness, erodedPieces, erodedVolumeFraction }
+ */
+export function thicknessCheck(wasm, shapes, transforms = {}, { size = 40, minThickness = 1 } = {}) {
+  const scope = new Scope();
+  try {
+    const r = minThickness / 2;
+    const eroded = Object.fromEntries(VIEW_NAMES.map((v) => [v, scope.add(shapes[v].offset(-r, 'Round', 2, 64))]));
+    const solid = scope.add(buildTriplet(wasm, shapes, transforms, { size }));
+    const thin = scope.add(buildTriplet(wasm, eroded, transforms, { size }));
+    const parts = thin.decompose();
+    for (const p of parts) p.delete();
+    return {
+      minThickness,
+      erodedPieces: thin.isEmpty() ? 0 : parts.length,
+      erodedVolumeFraction: thin.volume() / solid.volume(),
+    };
+  } finally {
+    scope.dispose();
+  }
+}

@@ -50,12 +50,50 @@ export function applySymmetry(R, { assignment, transforms }) {
 export const configKey = ({ assignment, transforms }) =>
   JSON.stringify(VIEW_NAMES.map((v) => [assignment[v], transforms[v] ?? 0]));
 
+/** D4 index of d4(i) * d4(j) (apply j first). */
+export function d4Compose(i, j) {
+  const [a, b, c, d] = d4(i), [e, f, g, h] = d4(j);
+  return D4_BY_KEY.get([a * e + b * g, a * f + b * h, c * e + d * g, c * f + d * h].join(','));
+}
+
+/**
+ * D4 indices that map a silhouette onto itself (within `tolerance` of its
+ * area): e.g. [0, 4] for a mirror-symmetric "A". Transforms that differ by
+ * one of these build the same prism.
+ */
+export function stabilizer(shape, tolerance = 1e-4) {
+  const area = shape.area(), out = [];
+  for (let k = 0; k < 8; k++) {
+    const [a, b, c, d] = d4(k);
+    const moved = shape.transform([a, c, 0, b, d, 0, 0, 0, 1]);
+    const x = moved.subtract(shape), y = shape.subtract(moved);
+    if (x.area() + y.area() <= tolerance * area) out.push(k);
+    for (const o of [moved, x, y]) o.delete();
+  }
+  return out;
+}
+
+/** Configs that build the same solid because of the glyphs' own symmetries. */
+function glyphEquivalents(config, stabilizers) {
+  let out = [config];
+  for (const v of VIEW_NAMES) {
+    const stab = stabilizers?.[config.assignment[v]] ?? [0];
+    out = out.flatMap((c) => stab.map((s) => ({
+      assignment: c.assignment,
+      transforms: { ...c.transforms, [v]: d4Compose(c.transforms[v] ?? 0, s) },
+    })));
+  }
+  return out;
+}
+
 /**
  * Keep one representative per symmetry orbit, restricted to `configs` (so the
- * search's constraints, e.g. upright-only, still hold). The representative is
- * the one with the fewest non-identity transforms, then earliest in `configs`.
+ * search's constraints, e.g. upright-only, still hold). Orbits combine the
+ * cube's symmetries with each glyph's own (`stabilizers`: text -> D4 indices,
+ * optional). The representative is the one with the fewest non-identity
+ * transforms, then earliest in `configs`.
  */
-export function orbitRepresentatives(configs) {
+export function orbitRepresentatives(configs, stabilizers) {
   const rank = new Map();
   configs.forEach((c, i) => {
     const nonIdentity = VIEW_NAMES.filter((v) => (c.transforms[v] ?? 0) !== 0).length;
@@ -63,9 +101,9 @@ export function orbitRepresentatives(configs) {
   });
   return configs.filter((c) => {
     const mine = rank.get(configKey(c));
-    return CUBE_SYMMETRIES.every((R) => {
-      const r = rank.get(configKey(applySymmetry(R, c)));
+    return glyphEquivalents(c, stabilizers).every((e) => CUBE_SYMMETRIES.every((R) => {
+      const r = rank.get(configKey(applySymmetry(R, e)));
       return r === undefined || r >= mine;
-    });
+    }));
   });
 }

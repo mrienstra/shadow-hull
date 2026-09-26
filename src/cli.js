@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import {
-  getManifold, loadFont, silhouette, buildTriplet, search, toBinarySTL, viewingGuide, VIEW_NAMES,
+  getManifold, loadFont, silhouette, buildTriplet, search, toBinarySTL, viewingGuide, thicknessCheck, VIEW_NAMES,
 } from './core/index.js';
 
 const DEFAULT_FONT = fileURLToPath(new URL('../fonts/ArchivoBlack-Regular.ttf', import.meta.url));
@@ -22,6 +22,7 @@ Options:
       --transforms MODE   upright | any | none (default upright)
       --no-permute        keep the given text-to-view order (front, right, top)
       --allow-pieces      don't rank one-piece solids first
+  -t, --min-thickness MM  printability check for listed candidates (default 1; 0 = off)
   -n, --top N             candidates to list (default 5)
       --json              print results as JSON
   -h, --help`;
@@ -39,6 +40,7 @@ async function main() {
       transforms: { type: 'string', default: 'upright' },
       'no-permute': { type: 'boolean' },
       'allow-pieces': { type: 'boolean' },
+      'min-thickness': { type: 'string', short: 't', default: '1' },
       top: { type: 'string', short: 'n', default: '5' },
       json: { type: 'boolean' },
       help: { type: 'boolean', short: 'h' },
@@ -57,19 +59,32 @@ async function main() {
   });
   const ms = performance.now() - t0;
   const top = ranked.slice(0, Number(o.top));
+  const minThickness = Number(o['min-thickness']);
+  if (minThickness > 0) {
+    for (const c of top) {
+      const shapes = Object.fromEntries(VIEW_NAMES.map((v) => [v, silhouette(wasm, font, c.assignment[v], { size, fit: o.fit })]));
+      c.thickness = thicknessCheck(wasm, shapes, c.transforms, { size, minThickness });
+      c.thickness.sturdy = c.thickness.erodedPieces === c.metrics.pieces;
+      for (const s of Object.values(shapes)) s.delete();
+    }
+  }
 
   if (o.json) {
     console.log(JSON.stringify({ texts, tried: ranked.length, ms, candidates: top.map((c) => ({ ...c, guide: viewingGuide(c.assignment, c.transforms) })) }, null, 2));
   } else {
-    console.log(`Tried ${ranked.length} candidates in ${ms.toFixed(0)} ms. Coverage = share of each letter the shadow actually shows.\n`);
-    console.log('  #  ' + VIEW_NAMES.map((v) => v.padEnd(16)).join('') + 'worst  pieces');
+    console.log(`Tried ${ranked.length} candidates in ${ms.toFixed(0)} ms. Coverage = share of each letter the shadow actually shows.`);
+    if (minThickness > 0) console.log(`≥${minThickness}mm: THIN = some part or neck is thinner than ${minThickness} mm.`);
+    console.log();
+    const thick = minThickness > 0 ? `  ≥${minThickness}mm` : '';
+    console.log('  #  ' + VIEW_NAMES.map((v) => v.padEnd(16)).join('') + 'worst  pieces' + thick);
     top.forEach((c, i) => {
       const g = viewingGuide(c.assignment, c.transforms);
       const cells = VIEW_NAMES.map((v) => {
         const r = g[v].rotation ? `↺${g[v].rotation}` : '';
         return `${JSON.stringify(g[v].text)} ${fmt(c.metrics.views[v].coverage)} ${r}`.padEnd(16);
       });
-      console.log(`${String(i + 1).padStart(3)}  ${cells.join('')}${fmt(c.metrics.minCoverage)}  ${c.metrics.pieces}`);
+      const t = c.thickness ? `       ${c.thickness.sturdy ? 'ok' : 'THIN'}` : '';
+      console.log(`${String(i + 1).padStart(3)}  ${cells.join('')}${fmt(c.metrics.minCoverage)}  ${c.metrics.pieces}${t}`);
     });
     const g = viewingGuide(top[0].assignment, top[0].transforms);
     console.log('\nBest: ' + VIEW_NAMES.map((v) => `${JSON.stringify(g[v].text)} seen from ${g[v].from}${g[v].rotation ? ` (rotated ${g[v].rotation}° CCW)` : ''}`).join(', '));

@@ -147,3 +147,33 @@ test('dedupe keeps the best result and one config per orbit', () => {
   assert.equal(reps.length, 24);
   assert.ok(Math.abs(all[0].metrics.minCoverage - reps[0].metrics.minCoverage) < 1e-9);
 });
+
+test('thicknessCheck finds a neck thinner than the minimum (synthetic dumbbell)', async () => {
+  const { thicknessCheck } = await import('../src/core/triplet.js');
+  const { CrossSection } = wasm;
+  // Two 15x40 blocks joined by a 0.6 mm-tall bar at mid-height, filling the square's width.
+  const rect = (x0, y0, x1, y1) => [[x0, y0], [x1, y0], [x1, y1], [x0, y1]];
+  const dumbbell = new CrossSection([rect(-H, -H, -5, H), rect(5, -H, H, H), rect(-5.5, -0.3, 5.5, 0.3)], 'NonZero');
+  const shapes = { front: dumbbell, right: CrossSection.square([SIZE, SIZE], true), top: CrossSection.square([SIZE, SIZE], true) };
+  try {
+    const solid = buildTriplet(wasm, shapes, {}, { size: SIZE });
+    assert.equal(solid.decompose().length, 1);
+    solid.delete();
+    assert.equal(thicknessCheck(wasm, shapes, {}, { size: SIZE, minThickness: 0.4 }).erodedPieces, 1);
+    assert.equal(thicknessCheck(wasm, shapes, {}, { size: SIZE, minThickness: 1 }).erodedPieces, 2);
+    assert.equal(thicknessCheck(wasm, shapes, {}, { size: SIZE, minThickness: 45 }).erodedPieces, 0);
+  } finally { free(shapes); }
+});
+
+test('glyph self-symmetries are detected and folded into the dedupe', async () => {
+  const { stabilizer } = await import('../src/core/symmetry.js');
+  const stab = (t) => { const s = silhouette(wasm, font, t, { size: SIZE }); try { return stabilizer(s); } finally { s.delete(); } };
+  assert.deepEqual(stab('I'), [0, 1, 2, 3, 4, 5, 6, 7]);
+  assert.deepEqual(stab('H'), [0, 4]);
+  // Archivo Black's M is drawn slightly asymmetric (stems 203 vs 219 units): not folded.
+  assert.deepEqual(stab('M'), [0]);
+  const all = search(wasm, font, ['X', 'O', 'H'], { size: SIZE, dedupe: false });
+  const reps = search(wasm, font, ['X', 'O', 'H'], { size: SIZE });
+  assert.equal(reps.length, 11);
+  assert.ok(Math.abs(all[0].metrics.minCoverage - reps[0].metrics.minCoverage) < 1e-9);
+});
