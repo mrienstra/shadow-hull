@@ -185,6 +185,16 @@ test('swing: pauses on exactly the front view, then the side view; controls stop
   assert.equal(await frame(), front, 'first pause is the exact front view');
   await page.waitForTimeout(5500); // front pause 0–3 s, swing 3–5 s, side pause 5–8 s: now ≈ 6.5 s
   assert.equal(await frame(), side, 'second pause is the exact side view');
+  // Bounding box: off by default; turning it on changes the picture.
+  assert.equal(await page.isChecked('#show-box'), false);
+  await page.click('.toolbar [data-view="iso"]');
+  await page.waitForTimeout(300);
+  const without = await frame();
+  await page.check('#show-box');
+  await page.waitForTimeout(300);
+  assert.notEqual(await frame(), without, 'box drawn when checked');
+  await page.uncheck('#show-box');
+  await page.click('#swing');
   // Pressing a view button stops the swing.
   await page.click('.toolbar [data-view="iso"]');
   assert.equal(await page.getAttribute('#swing', 'aria-pressed'), 'false');

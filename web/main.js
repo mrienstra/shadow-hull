@@ -123,6 +123,7 @@ function showMesh({ numProp, vertProperties, triVerts, runs = [] }) {
     new THREE.EdgesGeometry(new THREE.BoxGeometry(dims.x, dims.y, dims.z)),
     new THREE.LineBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.35 }),
   );
+  box.visible = $('#show-box').checked;
   scene.add(box);
   fitFrustum();
 }
@@ -361,6 +362,13 @@ form.addEventListener('submit', async (e) => {
 for (const b of document.querySelectorAll('.toolbar [data-view]')) b.addEventListener('click', () => { setSwing(false); snap(b.dataset.view); });
 $('#swing').addEventListener('click', () => setSwing(!swing));
 $('#colour-faces').addEventListener('change', applyColour);
+// Bounding box toggle (off by default); remembered per browser when storage is available.
+const showBox = $('#show-box');
+try { showBox.checked = localStorage.getItem('showBox') === 'true'; } catch {}
+showBox.addEventListener('change', () => {
+  if (box) box.visible = showBox.checked;
+  try { localStorage.setItem('showBox', String(showBox.checked)); } catch {}
+});
 
 $('#download').addEventListener('click', () => {
   const name = mode === 'words' ? wordDownloadName : VIEW_NAMES.map((v) => guide[v].text || '_').join('-') + '.stl';

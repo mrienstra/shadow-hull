@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-09-27 (bounding box toggle)
+
+- Viewer: "Bounding box" checkbox, off by default (the box was always drawn).
+  Remembered per browser. e2e: off by default; checking it changes the picture.
+
 ## 2026-09-27 (swing animation)
 
 - Viewer: "Swing ⇄" ping-pongs the camera around the vertical axis between the
