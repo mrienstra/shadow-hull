@@ -1,0 +1,60 @@
+// Stage 1 of the UI reorganisation: every look in resources/design/ui-map.md
+// must stay reachable as a look + knob values (nothing lost in the shuffle).
+import { test, before } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { getManifold, loadFont } from '../src/core/index.js';
+import { LOOK, LOOKS, lookKnobs, generateLook } from '../src/core/looks.js';
+import { buildRecipe } from '../src/core/gallery.js';
+
+let ctx;
+before(async () => {
+  const wasm = await getManifold();
+  ctx = {
+    wasm, height: 20,
+    font: loadFont(await readFile(new URL('../fonts/Kanit-Black.ttf', import.meta.url))),
+    shapeFont: loadFont(await readFile(new URL('../fonts/shapes/NotoEmoji.ttf', import.meta.url))),
+  };
+});
+
+test('every look has a label, blurb and knobs with defaults', () => {
+  assert.deepEqual(LOOKS.map((l) => l.id), ['cube', 'row', 'rows', 'grid', 'tower', 'block']);
+  for (const l of LOOKS) {
+    assert.ok(l.label && l.blurb, l.id);
+    for (const [k, def] of Object.entries(l.knobs)) assert.ok('default' in def, `${l.id}.${k}`);
+  }
+  assert.deepEqual(lookKnobs('row', { spacing: 'touching' }), { spacing: 'touching', case: 'upper', stretch: false, stand: true, turn: true });
+});
+
+// The ui-map's list of looks → how each is reached now, and what it must produce.
+const REACHABLE = [
+  ['pairs in a row on a stand', 'row', {}, (r) => r.kind === 'chain' && r.layout.rows.length === 1 && r.stand && r.turn],
+  ['pairs on a diagonal (no turn)', 'row', { turn: false, stand: false }, (r) => r.kind === 'chain' && !r.turn && !r.stand],
+  ['two rows of pairs', 'rows', { rows: 2 }, (r) => r.kind === 'chain' && r.layout.rows.length === 2],
+  ['three rows of pairs', 'rows', { rows: 3 }, (r) => r.kind === 'chain' && r.layout.rows.length === 3],
+  ['grid', 'grid', {}, (r) => r.spacing === 'grid'],
+  ['grid, monospaced', 'grid', { mono: true }, (r) => r.spacing === 'grid-mono'],
+  ['tower: one pair per level', 'tower', { style: 'pairs' }, (r) => r.kind === 'chain' && r.spacing.startsWith('column')],
+  ['tower: one tall letter', 'tower', { style: 'tall' }, (r) => r.kind === 'span'],
+  ['tower: stacked', 'tower', { style: 'stacked' }, (r) => r.kind === 'stacked'],
+  ['heart-shaped tower', 'tower', { style: 'stacked', shape: '❤' }, (r) => r.kind === 'stacked' && r.top?.char === '❤'],
+  ['whole-word block', 'block', {}, (r) => r.kind === 'block' && !r.top && (r.angle ?? 90) === 90],
+  ['heart slab', 'block', { shape: '❤' }, (r) => r.kind === 'block' && r.top?.char === '❤'],
+  ['angled block', 'block', { angle: 45 }, (r) => r.kind === 'block' && r.angle === 45],
+];
+for (const [name, lookId, knobs, check] of REACHABLE) {
+  test(`reachable: ${name}`, () => {
+    const [first] = generateLook(ctx, 'Finola', 'Bryan', lookId, knobs);
+    assert.ok(first, 'at least one design');
+    assert.ok(check(first.recipe), JSON.stringify(first.recipe).slice(0, 200));
+    const d = buildRecipe(ctx, 'Finola', 'Bryan', first.recipe);
+    try {
+      assert.equal(d.metrics.finalPieces, 1, 'one printable piece');
+      assert.ok(d.metrics.coverage > 0.85, `coverage ${d.metrics.coverage}`);
+    } finally { d.dispose(); }
+  });
+}
+
+test('the letter cube is a look too (three letters)', () => {
+  assert.equal(LOOK.cube.inputs, 'letters');
+});

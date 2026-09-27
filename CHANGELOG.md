@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-09-27 (UI reorganisation, stage 1: looks in core)
+
+- `src/core/looks.js`: six looks (letter cube, pairs in a row, pairs in rows,
+  grid, tower, word block), each with only its own knobs in one vocabulary
+  (spacing gapped/touching, case, stretch, shape, angle, stand, turn).
+  `generateLook` gives a fast first result (0.1–2.4 s; a shape on a tower ~6 s),
+  with `more` widening it (every case, runner-up layouts, all tower styles, all
+  angles). Items are gallery recipes, and the recipe includes the finish, so
+  the same builder, viewer and share links work.
+- `designWordPair`: a family's own rows (grid 2/3, column) are now only a
+  default; an explicit `rows` wins.
+- Tests (`test/looks.test.js`): every look in `ui-map.md` is reachable as
+  look + knobs and builds into one piece with ≥85% coverage.
+- No subagents used.
+
 ## 2026-09-27 (UI lay of the land)
 
 - `resources/design/ui-map.md`: an inventory before reorganising the web UI.

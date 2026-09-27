@@ -147,13 +147,16 @@ export const styleOf = (p) => `${p.caseMode}, ${p.rows.length} row${p.rows.lengt
 export function designWordPair(wasm, font, wordA, wordB, opts = {}) {
   const {
     spacing = 'spaced', join = 'hull+bridges', height = 20, candidates = 3,
-    cases = ['upper', 'lower', 'title', 'mixed'], rows = [1, 2, 3], fits = ['shared', 'fill'], maxChunk = 3,
+    cases = ['upper', 'lower', 'title', 'mixed'], rows, fits = ['shared', 'fill'], maxChunk = 3,
   } = opts;
   const fam = SPACING[spacing];
   const search = { ...fam.search };
+  // A family's rows (e.g. grid: 2 and 3; column: one per letter) are only a
+  // default: an explicit `rows` wins.
   if (search.rows === 'column') search.rows = [Math.min([...wordA].length, [...wordB].length)];
+  search.rows = rows ?? search.rows ?? [1, 2, 3];
   const all = exploreWordPair(wasm, font, wordA, wordB, {
-    cases, rows, fits, maxChunk, byStyle: true, height, kiss: fam.layout.kiss, ...search,
+    cases, fits, maxChunk, byStyle: true, height, kiss: fam.layout.kiss, ...search,
   });
   const groups = new Map();
   for (const p of all) {

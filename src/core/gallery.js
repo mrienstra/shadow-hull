@@ -43,7 +43,7 @@ export const DEFAULT_GALLERY = {
  * font top-view shapes come from (Noto Emoji); needed only for recipes with a
  * top shape. Silhouettes are cached on the context; call disposeContext when done.
  */
-function topShape(ctx, ch) {
+export function topShape(ctx, ch) {
   ctx.shapes ??= new Map();
   if (!ctx.shapes.has(ch)) {
     if (!ctx.shapeFont) throw new Error(`Top shape ${ch} needs a shape font`);
