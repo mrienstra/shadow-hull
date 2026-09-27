@@ -81,6 +81,13 @@ test('look menu: every two-word look makes a one-piece design; knobs and finish 
     // A thumbnail is rendered for the listed design.
     await page.waitForSelector('#designs img.thumb[src^="data:image/png"]', { timeout: 60_000 });
   }
+  // Supports: none. Pairs in a row keep their stand by default, so still one piece, no rods.
+  await page.click('#looks button[data-look="row"]');
+  await wordsDone(page);
+  await page.locator('.seg[data-knob="supports"] button', { hasText: 'None' }).click();
+  await page.waitForFunction(() => JSON.parse(new URLSearchParams(location.hash.slice(1)).get('k') ?? '{}').supports === 'none');
+  await wordsDone(page);
+  await page.waitForFunction(() => /One piece/.test(document.querySelector('#print-check').textContent) && !/rod/.test(document.querySelector('#print-check').textContent), null, { timeout: 60_000 });
   // Word block with a heart from above: three views.
   await page.click('#looks button[data-look="block"]');
   await wordsDone(page);

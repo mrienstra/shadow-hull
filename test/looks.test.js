@@ -23,7 +23,7 @@ test('every look has a label, blurb and knobs with defaults', () => {
     assert.ok(l.label && l.blurb, l.id);
     for (const [k, def] of Object.entries(l.knobs)) assert.ok('default' in def, `${l.id}.${k}`);
   }
-  assert.deepEqual(lookKnobs('row', { spacing: 'touching' }), { spacing: 'touching', case: 'upper', stretch: false, stand: true, turn: true });
+  assert.deepEqual(lookKnobs('row', { spacing: 'touching' }), { spacing: 'touching', case: 'upper', stretch: false, supports: 'allowed', stand: true, turn: true });
 });
 
 // The ui-map's list of looks → how each is reached now, and what it must produce.
@@ -57,4 +57,27 @@ for (const [name, lookId, knobs, check] of REACHABLE) {
 
 test('the letter cube is a look too (three letters)', () => {
   assert.equal(LOOK.cube.inputs, 'letters');
+});
+
+test('supports: none means no rods; a stand or touching letters still make one piece', () => {
+  const build = (knobs) => {
+    const [first] = generateLook(ctx, 'Finola', 'Bryan', 'row', knobs);
+    const d = buildRecipe(ctx, 'Finola', 'Bryan', first.recipe);
+    try { return d.metrics; } finally { d.dispose(); }
+  };
+  const gappedAlone = build({ supports: 'none', stand: false });
+  assert.equal(gappedAlone.rods, 0);
+  assert.ok(gappedAlone.finalPieces > 1, 'gapped letters stay separate without supports');
+  const withStand = build({ supports: 'none', stand: true });
+  assert.equal(withStand.rods, 0);
+  assert.equal(withStand.finalPieces, 1, 'the stand joins them');
+  const withRods = build({ stand: false });
+  assert.ok(withRods.rods > 0 && withRods.finalPieces === 1, 'supports allowed: rods join them');
+});
+
+test('prefer compact adds a compactness term to the quality', async () => {
+  const { designQuality, QUALITY_WEIGHTS } = await import('../src/core/design.js');
+  const m = { coverage: 1, visibleMin: 1, contactMax: 0, stretch: 0, strayMax: 0, finalPieces: 1, imbalance: 0, compactness: 0.5 };
+  assert.equal(designQuality(m), 1);
+  assert.ok(Math.abs(designQuality(m, { ...QUALITY_WEIGHTS, compact: 0.3 }) - 0.85) < 1e-12);
 });

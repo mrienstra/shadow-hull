@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-09-27 (no-supports option; prefer compact)
+
+- "Support rods" knob on every word look: allowed where needed (default) or
+  none. With none, only hidden hull joins and the stand may connect pieces
+  (recipe `supports: 'none'` drops the rods), and designs that stay in pieces
+  rank lower. Finola × Bryan, pairs in a row: gapped + no supports + no stand
+  = 6 pieces (gapped letters can't connect by themselves); add the stand → one
+  piece, no rods. The checklist says so and suggests touching spacing, a stand,
+  or allowing supports.
+- "Prefer compact" (rows, grid, tower): adds 0.3 × (1 − shortest/longest side)
+  to the quality penalty, so squarer layouts win ties (`weights.compact`).
+- Tests: supports none → no rods; stand or rods → one piece; compact term. e2e:
+  the Supports knob on the row look.
+- No subagents used.
+
 ## 2026-09-27 (UI reorganisation: status)
 
 - Stage 5 (taste controls): "Allow stretching letters" is a knob on every look

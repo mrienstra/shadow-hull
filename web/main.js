@@ -337,8 +337,8 @@ function renderLookMenu() {
 }
 
 // Knob widgets, generated from the look's definition.
-const BOOL_LABELS = { stretch: 'Allow stretching letters', stand: 'Display stand', turn: 'Turn 45° for display', mono: 'Monospaced (letters widened to their column)' };
-const KNOB_LABELS = { spacing: 'Spacing', case: 'Letters', rows: 'Rows', style: 'Style', shape: 'Shape seen from above', angle: 'Angle between the two words' };
+const BOOL_LABELS = { stretch: 'Allow stretching letters', compact: 'Prefer compact', stand: 'Display stand', turn: 'Turn 45° for display', mono: 'Monospaced (letters widened to their column)' };
+const KNOB_LABELS = { spacing: 'Spacing', case: 'Letters', rows: 'Rows', style: 'Style', shape: 'Shape seen from above', angle: 'Angle between the two words', supports: 'Support rods (thin joins between pieces)' };
 const SHAPES = ['❤', '♥', '⭐', '☀', '♣', '♠', '♦', '♪', '😀', '🐱'];
 let knobValues = {};
 function renderKnobs(lookId) {
@@ -554,6 +554,9 @@ function designChecks(m) {
   add(m.contactMax <= 0.3, m.contactMax <= 0.3 ? 'Letters don’t merge into each other' : `${m.mostContact} touches its neighbours along a whole stroke (can read as one letter)`);
   if (m.stretch > 0.005) add(m.stretch <= 0.25, `Letters stretched up to ${Math.round(m.stretch * 100)}%`);
   add(m.finalPieces === 1, m.finalPieces === 1 ? `One piece${m.rods ? ` (${m.rods} small support rod${m.rods === 1 ? '' : 's'})` : ''}` : `${m.finalPieces} separate pieces`);
+  if (m.finalPieces > 1 && knobValues.supports === 'none') {
+    add(false, 'Without supports, gapped letters can’t connect: try touching spacing, a display stand, or allow supports');
+  }
   return checks;
 }
 function checkBadge(m) {

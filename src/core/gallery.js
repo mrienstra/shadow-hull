@@ -60,10 +60,15 @@ export function disposeContext(ctx) {
 export function buildRecipe(ctx, wordA, wordB, r) {
   const { wasm, font, height = 20 } = ctx;
   const top = r.top ? { shape: topShape(ctx, r.top.char), rotate: r.top.rotate ?? 0, scale: r.top.scale ?? 1, fit: 'stretch' } : null;
-  // r.stand adds a display stand (after hidden joins, before rods).
-  const withStand = (join) => (r.stand ? join.replace('bridges', 'stand+bridges') : join);
+  // r.stand adds a display stand (after hidden joins, before rods);
+  // r.supports === 'none' drops the rods ('bridges').
+  const withStand = (join) => {
+    let j = r.stand ? join.replace('bridges', 'stand+bridges') : join;
+    if (r.supports === 'none') j = j.replace(/\+?bridges/, '') || 'none';
+    return j;
+  };
   switch (r.kind) {
-    case 'chain': return realizeDesign(wasm, font, r.layout, { spacing: r.spacing, join: withStand(r.join ?? 'hull+bridges'), height });
+    case 'chain': return realizeDesign(wasm, font, r.layout, { spacing: r.spacing, join: withStand(r.join ?? 'hull+bridges'), height, weights: r.weights });
     case 'block': return realizeBlock(wasm, font, wordA, wordB, { caseMode: r.caseMode, spacing: 'touching', top, join: withStand('bridges'), height, angle: r.angle ?? 90 });
     case 'span': return realizeSpanColumn(wasm, font, wordA, wordB, r.spans, { spacing: r.spacing, fit: r.fit, height, top, join: withStand('hull+bridges') });
     case 'stacked': return realizeStackedColumn(wasm, font, wordA, wordB, { fit: r.fit, height, top, join: withStand('bridges') });

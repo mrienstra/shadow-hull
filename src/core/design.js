@@ -60,6 +60,7 @@ export const SPACING = {
  * (contact ~1.3) cost ~0.3 (enough to prefer a less-merged layout within the
  * touching family, not enough to abandon it); 79% vertical stretch costs ~0.08;
  * 3% extra shadow costs 0.03; an unjoined extra piece costs 0.5.
+ * Optional `compact` (used by "prefer compact"): × (1 − shortest/longest side).
  */
 export const QUALITY_WEIGHTS = {
   hidden: 1, hiddenFree: 0.05, // visible share below 95% is penalised
@@ -70,6 +71,7 @@ export const QUALITY_WEIGHTS = {
 /** One number to rank designs (higher is better); see QUALITY_WEIGHTS. */
 export function designQuality(m, w = QUALITY_WEIGHTS) {
   return m.coverage
+    - (w.compact ?? 0) * (1 - (m.compactness ?? 1))
     - w.hidden * Math.max(0, 1 - w.hiddenFree - m.visibleMin)
     - w.contact * Math.max(0, m.contactMax - w.contactFree)
     - w.stretch * m.stretch
@@ -83,7 +85,7 @@ export function designQuality(m, w = QUALITY_WEIGHTS) {
  * and blocks). Takes ownership of `solid` and `cells` via dispose().
  * @returns { cells, solid (letters only), joined, metrics, dispose() }
  */
-export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods = {}, height = 20, stretch = 0, imbalance = 0, frames } = {}) {
+export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods = {}, height = 20, stretch = 0, imbalance = 0, frames, weights } = {}) {
   const base = measureComposition(wasm, solid, cells, { frames });
   const vis = letterVisibility(wasm, cells, { height });
   let joined = solid, bridges = [], blocks = [];
@@ -107,7 +109,7 @@ export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods =
     stray, strayMax: Math.max(0, ...Object.values(stray)),
     size, compactness: Math.min(...size) / Math.max(...size),
   };
-  metrics.quality = designQuality(metrics);
+  metrics.quality = designQuality(metrics, weights);
   return {
     cells, solid, joined, metrics, frames,
     dispose: () => { if (joined !== solid) joined.delete(); solid.delete(); disposeCells(cells); },
@@ -115,12 +117,12 @@ export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods =
 }
 
 /** Build one chain layout with a spacing family, join it, and measure everything. */
-export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = 'hull+bridges', height = 20 } = {}) {
+export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = 'hull+bridges', height = 20, weights } = {}) {
   const fam = SPACING[spacing];
   const cells = layoutCells(wasm, font, { rows: layout.rows }, { height, ...fam.layout });
   const solid = buildComposition(wasm, cells);
   return finishDesign(wasm, cells, solid, {
-    join, rods: fam.rods, height, stretch: layout.score?.distortion ?? 0, imbalance: layout.imbalance ?? 0,
+    join, rods: fam.rods, height, stretch: layout.score?.distortion ?? 0, imbalance: layout.imbalance ?? 0, weights,
   });
 }
 
@@ -147,7 +149,7 @@ export const styleOf = (p) => `${p.caseMode}, ${p.rows.length} row${p.rows.lengt
 export function designWordPair(wasm, font, wordA, wordB, opts = {}) {
   const {
     spacing = 'spaced', join = 'hull+bridges', height = 20, candidates = 3,
-    cases = ['upper', 'lower', 'title', 'mixed'], rows, fits = ['shared', 'fill'], maxChunk = 3,
+    cases = ['upper', 'lower', 'title', 'mixed'], rows, fits = ['shared', 'fill'], maxChunk = 3, weights,
   } = opts;
   const fam = SPACING[spacing];
   const search = { ...fam.search };
@@ -168,7 +170,7 @@ export function designWordPair(wasm, font, wordA, wordB, opts = {}) {
   for (const [style, ps] of groups) {
     ps.sort(rankLayouts);
     const tried = ps.slice(0, candidates).map((layout) => {
-      const d = realizeDesign(wasm, font, layout, { spacing, join, height });
+      const d = realizeDesign(wasm, font, layout, { spacing, join, height, weights });
       const m = d.metrics;
       d.dispose();
       return { style, layout, metrics: m };

@@ -16,6 +16,11 @@ import { buildRecipe, topShape } from './gallery.js';
 import { describeLayout } from './wordpair.js';
 
 import { LOOKS, LOOK, CASES, lookKnobs } from './look-defs.js';
+import { QUALITY_WEIGHTS } from './design.js';
+
+// "Prefer compact": also reward squarer overall shapes when ranking layouts
+// (compactness = shortest side / longest side of the letters' bounding box).
+const COMPACT_WEIGHTS = { ...QUALITY_WEIGHTS, compact: 0.3 };
 
 export { LOOKS, LOOK, lookKnobs };
 
@@ -38,14 +43,20 @@ export function* generateLook(ctx, wordA, wordB, lookId, given = {}, { more = fa
   const fits = k.stretch ? ['shared', 'fill'] : ['shared'];
   // Looks without a case knob use capitals (more: every case).
   const cases = more ? ['upper', 'mixed', 'lower', 'title'] : [k.case ?? 'upper'];
-  const out = (title, text, recipe, metrics, note = '') => ({ look: lookId, title, text, note, recipe: { ...recipe, ...finish(k) }, metrics });
+  // Supports: with 'none', joins may only use hidden hull blocks (and the
+  // stand); designs that stay in pieces then rank lower (quality −0.5 per piece).
+  const join = k.supports === 'none' ? 'hull' : 'hull+bridges';
+  const extra = { ...(k.supports === 'none' ? { supports: 'none' } : {}), ...(k.compact ? { weights: COMPACT_WEIGHTS } : {}) };
+  const out = (title, text, recipe, metrics, note = '') => ({ look: lookId, title, text, note, recipe: { ...recipe, ...extra, ...finish(k) }, metrics });
 
   const chainRecipe = (famName, l) => ({
-    kind: 'chain', spacing: famName, join: 'hull+bridges',
+    kind: 'chain', spacing: famName, join: 'hull+bridges',  // supports/weights come from `extra`
     layout: { rows: l.rows.map(({ a, b, fit, frame }) => ({ a, b, fit, frame })), score: l.score, imbalance: l.imbalance, caseMode: l.caseMode },
   });
   const chains = function* (rows, famName, titlePrefix = '') {
-    const designs = designWordPair(wasm, font, wordA, wordB, { spacing: famName, join: 'hull+bridges', height, candidates, cases, rows: [rows], fits });
+    const designs = designWordPair(wasm, font, wordA, wordB, {
+      spacing: famName, join, height, candidates, cases, rows: [rows], fits, weights: k.compact ? COMPACT_WEIGHTS : undefined,
+    });
     for (const { layout, metrics, runnersUp } of designs) {
       yield out(`${titlePrefix}${titleCase(layout.caseMode)}`, describeLayout(layout), chainRecipe(famName, layout), metrics);
       if (more) for (const r of runnersUp) yield out(`${titlePrefix}${titleCase(r.layout.caseMode)} (alternative)`, describeLayout(r.layout), chainRecipe(famName, r.layout), r.metrics);
@@ -68,7 +79,7 @@ export function* generateLook(ctx, wordA, wordB, lookId, given = {}, { more = fa
         const fit = k.stretch ? 'stretch' : 'uniform';
         let base, label;
         if (style === 'tall') {
-          const [best] = designSpanColumn(wasm, font, wordA, wordB, { spacing: k.spacing === 'touching' ? 'touching' : 'spaced', fit, height });
+          const [best] = designSpanColumn(wasm, font, wordA, wordB, { spacing: k.spacing === 'touching' ? 'touching' : 'spaced', fit, height, join });
           const shorter = [...wordA].length >= [...wordB].length ? wordB : wordA;
           label = `One tall letter (${[...shorter.toUpperCase()].map((c, i) => (best.spans[i] > 1 ? `${c}×${best.spans[i]}` : c)).join('')})`;
           base = { kind: 'span', spacing: k.spacing === 'touching' ? 'touching' : 'spaced', fit, spans: best.spans };
