@@ -19,8 +19,11 @@ test('designQuality: perfect design scores 1; each defect lowers it', () => {
   }
   // Small amounts are free: 97% visible, contact 0.1 row heights.
   assert.equal(designQuality({ ...base, visibleMin: 0.97, contactMax: 0.1 }), 1);
-  // Merged stems cost less than a 30%-hidden letter (see QUALITY_WEIGHTS).
-  assert.ok(designQuality({ ...base, contactMax: 1.3 }) > designQuality({ ...base, visibleMin: 0.7 }));
+  // The costs documented in QUALITY_WEIGHTS.
+  const cost = (m) => 1 - designQuality({ ...base, ...m });
+  assert.ok(Math.abs(cost({ visibleMin: 0.7 }) - 0.25) < 1e-9, 'a letter 30% hidden costs 0.25');
+  assert.ok(Math.abs(cost({ contactMax: 1.3 }) - 0.275) < 1e-9, 'stems merged along a letter height cost ~0.3');
+  assert.ok(Math.abs(cost({ strayMax: 0.03 }) - 0.03) < 1e-9, '3% extra shadow costs 0.03');
   assert.ok(QUALITY_WEIGHTS.pieces > 0);
 });
 
