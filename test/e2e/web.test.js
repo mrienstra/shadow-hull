@@ -77,7 +77,7 @@ test('look menu: every two-word look makes a one-piece design; knobs and finish 
     assert.equal(await page.isVisible('#form'), false, 'cube form hidden');
     assert.equal(await page.isVisible('#words-form'), true);
     await wordsDone(page);
-    assert.match(await page.textContent('#print-check'), /^One piece/, look);
+    assert.match(await page.textContent('#print-check'), /One piece/, look);
   }
   // Word block with a heart from above: three views.
   await page.click('#looks button[data-look="block"]');
@@ -85,7 +85,7 @@ test('look menu: every two-word look makes a one-piece design; knobs and finish 
   await page.click('.shape-row button[title="Use ❤"]');
   await page.waitForFunction(() => document.querySelectorAll('#shadow-panels figure').length === 3, null, { timeout: 120_000 });
   const captions = await page.$$eval('#shadow-panels figcaption', (els) => els.map((e) => e.textContent.split(' ·')[0]));
-  assert.deepEqual(captions, ['front', 'right', 'top']);
+  assert.deepEqual(captions, ['front', 'side', 'top']);
   // Finish options go into the share link's knobs.
   await page.check('input[name="stand"]');
   await page.waitForFunction(() => JSON.parse(new URLSearchParams(location.hash.slice(1)).get('k') ?? '{}').stand === true);
@@ -131,6 +131,7 @@ test('shared links restore the page state (cube, word looks, and old-format link
   assert.equal(await p2.inputValue('input[name="wordA"]'), 'Ada');
   assert.equal(await p2.inputValue('.shape-row input'), '❤');
   assert.match(await p2.textContent('#word-stats'), /❤/);
+  assert.ok(await p2.$$eval('ul.checks li', (li) => li.length) >= 4, 'plain-language checks shown');
 
   await p2.goto('about:blank');
   await p2.goto(cubeUrl);

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-27 (UI stage 4: plain-language checks)
+
+- Each design's panel shows a checklist: every letter fully shows / which
+  letter is cut; no letter hidden by neighbours / which is covered; letters
+  don't merge / which touches along a whole stroke; how much letters are
+  stretched; one piece (and how many support rods); approximate size. Raw numbers
+  are under a "Numbers" expander. List items show "all good" or "N to note",
+  with the checklist as a tooltip. Shadow captions say "side", not "right".
+- No subagents used.
+
 ## 2026-09-27 (UI reorganisation, stages 2 and 6: look-first page)
 
 - The tabs are replaced by a look menu (six cards with small drawings):

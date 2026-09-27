@@ -480,8 +480,8 @@ function generateWords(more = false) {
       b.innerHTML = '<span class="title"></span><span class="q"></span><span class="text"></span>';
       b.children[0].textContent = item.title;
       const mm = item.metrics;
-      b.children[1].textContent = `${pct1(mm.coverage)} · q ${mm.quality.toFixed(2)}`;
-      b.children[1].title = 'Worst-letter coverage · quality score';
+      b.children[1].textContent = checkBadge(mm);
+      b.children[1].title = designChecks(mm).map((c) => `${c.ok ? '✓' : '•'} ${c.text}`).join('\n');
       b.children[2].textContent = item.text + (item.note ? ` · ${item.note}` : '');
       b.addEventListener('click', () => selectWordDesign(item, b));
       designsHost.append(b);
@@ -537,21 +537,49 @@ function selectWordDesign(item, button) {
   builder.postMessage({ type: 'build', id, wordA: currentWords[0], wordB: currentWords[1], recipe: { ...item.recipe, ...finish }, ...fontSource() });
 }
 
+// Plain-language checks for a design (numbers go under "Numbers").
+function designChecks(m) {
+  const checks = [];
+  const add = (ok, text) => checks.push({ ok, text });
+  add(m.coverage >= 0.995, m.coverage >= 0.995 ? 'Every letter fully shows in its shadow' : `The least complete letter shows ${pct1(m.coverage)} (red in the shadows)`);
+  add(m.visibleMin >= 0.97, m.visibleMin >= 0.97 ? 'No letter is hidden by its neighbours' : `${m.leastVisible} is ${pct1(1 - m.visibleMin)} covered by neighbouring letters`);
+  add(m.contactMax <= 0.3, m.contactMax <= 0.3 ? 'Letters don’t merge into each other' : `${m.mostContact} touches its neighbours along a whole stroke (can read as one letter)`);
+  if (m.stretch > 0.005) add(m.stretch <= 0.25, `Letters stretched up to ${Math.round(m.stretch * 100)}%`);
+  add(m.finalPieces === 1, m.finalPieces === 1 ? `One piece${m.rods ? ` (${m.rods} small support rod${m.rods === 1 ? '' : 's'})` : ''}` : `${m.finalPieces} separate pieces`);
+  return checks;
+}
+function checkBadge(m) {
+  const bad = designChecks(m).filter((c) => !c.ok).length;
+  return bad ? `${bad} to note` : 'all good';
+}
+
 function showWordShadows(view, item) {
   const host = $('#shadow-panels');
   host.replaceChildren();
   const m = view.metrics;
   const el = $('#print-check');
-  el.textContent = `${m.finalPieces === 1 ? 'One piece' : `${m.finalPieces} pieces`}`
-    + (m.rods ? ` · ${m.rods} rod${m.rods === 1 ? '' : 's'} (longest ${m.longestRod.toFixed(1)} mm)` : '')
-    + (m.blocks ? ` · ${m.blocks} hidden join${m.blocks === 1 ? '' : 's'}` : '')
-    + ` · ${m.size.map((x) => x.toFixed(0)).join(' × ')} mm`;
-  el.className = m.finalPieces !== 1 ? 'warn' : '';
-  const stats = document.createElement('p');
-  stats.id = 'word-stats';
-  stats.textContent = `${item.title} — worst letter ${pct1(m.coverage)} · least visible ${m.visibleMin < 1 ? `${m.leastVisible} ${pct1(m.visibleMin)}` : 'all 100%'}`
-    + ` · most contact ${m.contactMax > 0 ? `${m.mostContact} ${pct1(m.contactMax)}` : 'none'} · stretch ${(m.stretch * 100).toFixed(0)}% · quality ${m.quality.toFixed(3)}`;
-  host.append(stats);
+  el.className = '';
+  el.replaceChildren();
+  const list = document.createElement('ul');
+  list.className = 'checks';
+  for (const c of designChecks(m)) {
+    const li = document.createElement('li');
+    li.className = c.ok ? 'ok' : 'note';
+    li.textContent = c.text;
+    list.append(li);
+  }
+  const size = document.createElement('li');
+  size.className = 'info';
+  size.textContent = `About ${m.size.map((x) => x.toFixed(0)).join(' × ')} mm (letters 20 mm tall)`;
+  list.append(size);
+  el.append(list);
+  const nums = document.createElement('details');
+  nums.id = 'word-stats';
+  nums.innerHTML = '<summary>Numbers</summary><p></p>';
+  nums.querySelector('p').textContent = `${item.title} — worst letter ${pct1(m.coverage)} · least visible ${m.visibleMin < 1 ? `${m.leastVisible} ${pct1(m.visibleMin)}` : 'all 100%'}`
+    + ` · most contact ${m.contactMax > 0 ? `${m.mostContact} ${pct1(m.contactMax)}` : 'none'} · stretch ${(m.stretch * 100).toFixed(0)}% · pieces ${m.pieces} → ${m.finalPieces}`
+    + `${m.rods ? ` · ${m.rods} rods (longest ${m.longestRod.toFixed(1)} mm)` : ''}${m.blocks ? ` · ${m.blocks} hidden joins` : ''} · quality ${m.quality.toFixed(3)}`;
+  host.append(nums);
   for (const [v, x] of Object.entries(view.views)) {
     const fig = document.createElement('figure');
     const svg = document.createElementNS(SVGNS, 'svg');
@@ -570,7 +598,7 @@ function showWordShadows(view, item) {
       svg.append(p);
     }
     const cap = document.createElement('figcaption');
-    cap.textContent = `${x.label} · ${pct1(m.views[v].coverage)}`;
+    cap.textContent = `${x.label === 'right' ? 'side' : x.label} · ${pct1(m.views[v].coverage)}`;
     fig.append(svg, cap);
     host.append(fig);
   }
