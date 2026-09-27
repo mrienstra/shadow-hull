@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-09-26 (grid style)
+
+- Grid layouts: `gridLines` splits each word into equal lines (FIN/OLA ×
+  BRY/AN; FI/NO/LA × BR/YA/N), and `layoutCells({ grid })` puts every letter in
+  a fixed column slot (the word's widest letter), so letters line up in columns
+  in both views. `grid.fit 'stretch'` widens letters towards the slot width,
+  capped at `maxStretch` (1.5×): full stretch turned an I into a solid block.
+- Report gains two families: Grid, and Grid monospaced. Finola × Bryan: uppercase
+  and mixed grids are 100% with every letter fully visible. Lowercase and title
+  grids are 74%, because the fixed rows force i to pair with r, which has no ink
+  at dot height.
+- Notes: the only distortions so far are scaling (per-letter width/height to the
+  square for trip-lets; vertical stretch to row height for word pairs; capped
+  horizontal stretch in mono grids). The only monospaced bundled font is Rubik
+  Mono One.
+- No subagents used.
+
 ## 2026-09-26 (report rendering, grid tie-break)
 
 - Report: one shared WebGL canvas draws every on-screen 3D view into its card

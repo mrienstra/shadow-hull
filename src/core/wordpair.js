@@ -72,6 +72,52 @@ function vertical(g, frame, height, fit) {
 }
 
 /**
+ * Grid placement (pass 1 of layoutCells): every letter gets a column slot of
+ * the same width in every row (the word's widest letter), so letters line up
+ * in columns in each view. Chunks still pair as given; a merged chunk spans
+ * several slots. Slots are `width - overlap` apart (overlap < 0 = visible
+ * gap). grid.fit 'stretch' scales each letter horizontally towards its slot
+ * width, at most grid.maxStretch (default 1.5) times, then centres it: a
+ * monospaced look with any font, without turning an I into a block.
+ * 'center' keeps natural widths.
+ */
+function gridRows(font, layout, { height = 20, fit = 'shared', txt, overlap = 0.3, grid }) {
+  const glyphBox = (g) => {
+    const pts = g.contours.flat();
+    return { x0: Math.min(...pts.map((p) => p[0])), x1: Math.max(...pts.map((p) => p[0])) };
+  };
+  // One vertical frame for all rows, so every row has the same scale.
+  let frame = rowFrame(font, layout.rows.flatMap((r) => [...r.a, ...r.b]), txt);
+  for (const r of layout.rows) if (r.frame) frame = [Math.min(frame[0], r.frame[0]), Math.max(frame[1], r.frame[1])];
+  const shared = height / (frame[1] - frame[0]);
+  const letterWidths = (k) => layout.rows.flatMap((r) => r[k].flatMap((t) => ink(font, t, txt).glyphs.map((g) => { const b = glyphBox(g); return (b.x1 - b.x0) * shared; })));
+  const W = { a: Math.max(...letterWidths('a')), b: Math.max(...letterWidths('b')) };
+  const pitch = { a: W.a - overlap, b: W.b - overlap };
+  return layout.rows.map((row) => {
+    const col = { a: 0, b: 0 };
+    return row.a.map((ta, i) => {
+      const f = row.fit?.[i] ?? fit;
+      const side = (k, t) => {
+        const g = ink(font, t, txt);
+        const v = vertical(g, frame, height, f);
+        const start = col[k];
+        const letters = g.glyphs.map((gl) => {
+          const b = glyphBox(gl), w = (b.x1 - b.x0) * shared;
+          // Stretch towards the slot width, capped: an I stretched to a full slot is just a block.
+          const sx = grid.fit === 'stretch' ? shared * Math.min(W[k] / w, grid.maxStretch ?? 1.5) : shared;
+          const centre = col[k] * pitch[k] + W[k] / 2;
+          col[k]++;
+          return { ch: gl.ch, pts: placePoints(gl.contours, [(b.x0 + b.x1) / 2, v.from], [centre, 0], [sx, v.s]), stretch: sx / shared };
+        });
+        return { letters, pos: start * pitch[k], span: (col[k] - start - 1) * pitch[k] + W[k] };
+      };
+      const A = side('a', ta), B = side('b', row.b[i]);
+      return { a: A.letters, b: B.letters, x: A.pos, y: B.pos, wa: A.span, wb: B.span, label: `${ta}/${row.b[i]}` };
+    });
+  });
+}
+
+/**
  * Cells for a fixed layout (for building the 3D solid).
  * @param layout.rows [{ a: [chunk...], b: [chunk...], fit?: ['shared'|'fill', ...], frame?: [y0, y1] }]
  *   top to bottom; a[i] pairs with b[i]. `frame` defaults to the row's own ink.
@@ -81,14 +127,15 @@ function vertical(g, frame, height, fit) {
  *   between rows (mm, or 'kiss' likewise); opts.fit default per-cell fit; opts.tracking / opts.kiss
  *   letter spacing inside chunks (em; see glyphRun); opts.align 'left' |
  *   'center' for rows. A negative opts.overlap with 'kiss' leaves a visible gap
- *   of that size at the closest point instead.
+ *   of that size at the closest point instead. opts.grid ({ fit: 'center' |
+ *   'stretch' }) places every letter in a fixed column slot instead (see gridRows).
  */
 export function layoutCells(wasm, font, layout, opts = {}) {
-  const { height = 20, gap = 0, lineGap = 0, fit = 'shared', tolerance, tracking, kiss, overlap = 0.3, align = 'left' } = opts;
+  const { height = 20, gap = 0, lineGap = 0, fit = 'shared', tolerance, tracking, kiss, overlap = 0.3, align = 'left', grid = null } = opts;
   const txt = { tolerance, tracking, kiss };
   const shiftPts = (pts, du, dv) => pts.map((c) => c.map(([u, v]) => [u + du, v + dv]));
   // Pass 1: each row laid out with its bottom at z = 0 (plain JS geometry).
-  const rows = layout.rows.map((row) => {
+  const rows = grid ? gridRows(font, layout, { ...opts, txt }) : layout.rows.map((row) => {
     if (row.a.length !== row.b.length) throw new Error('Each row needs the same number of chunks in both words');
     // Never clip: widen a given frame to cover this row's own ink.
     const own = rowFrame(font, [...row.a, ...row.b], txt);
@@ -119,7 +166,7 @@ export function layoutCells(wasm, font, layout, opts = {}) {
   });
   // Centre each row's chain on the widest row, in both views, so short rows
   // don't sit under the start of the row above.
-  if (align === 'center' && rows.length > 1) {
+  if (align === 'center' && rows.length > 1 && !grid) {
     const extent = (row, k, pos, w) => Math.max(...row.map((c) => c[pos] + c[w])) - Math.min(...row.map((c) => c[pos]));
     const wa = Math.max(...rows.map((r) => extent(r, 'a', 'x', 'wa'))), wb = Math.max(...rows.map((r) => extent(r, 'b', 'y', 'wb')));
     for (const row of rows) {
@@ -251,6 +298,12 @@ export function cellFragmentsScan(font, ta, tb, frame0, fit, { height = 20, tole
 }
 
 // ---- Search -----------------------------------------------------------------
+
+/** Cut `s` into `r` lines of ceil(n / r) letters (the last may be shorter): FINOLA, 2 -> FIN / OLA. */
+export function gridLines(s, r) {
+  const chars = [...s], c = Math.ceil(chars.length / r);
+  return Array.from({ length: r }, (_, j) => chars.slice(j * c, (j + 1) * c).join('')).filter(Boolean);
+}
 
 /** All ways to cut `s` into `k` non-empty contiguous pieces. */
 export function splits(s, k) {
@@ -392,6 +445,7 @@ export function alignLines(wasm, font, lineA, lineB, opts = {}) {
  * @param opts.cases 'upper' | 'lower' | 'title' | 'mixed' (per-letter case)
  * @param opts.fits per-cell vertical fit choices: 'shared' and/or 'fill'
  * @param opts.rows row counts to try
+ * @param opts.grid only equal-length line splits (see gridLines), for grid layouts
  * @param opts.byStyle return every non-dominated layout per (case, line split)
  *   instead of only the global front, so styles that lose on these objectives
  *   (e.g. stacked rows, which win on compactness) stay visible.
@@ -411,8 +465,10 @@ export function exploreWordPair(wasm, font, wordA, wordB, opts = {}) {
       : letters.map((c) => (CASES[lineMode] ?? CASES.as)(c)), { tolerance: opts.tolerance, tracking: opts.tracking, kiss: opts.kiss });
     for (const r of rowCounts) {
       if (r > Math.min([...wa].length, [...wb].length)) continue;
-      for (const la of splits(wa, r)) {
-        for (const lb of splits(wb, r)) {
+      const lineSplits = (w) => (opts.grid ? [gridLines(w, r)] : splits(w, r));
+      for (const la of lineSplits(wa)) {
+        for (const lb of lineSplits(wb)) {
+          if (la.length !== r || lb.length !== r) continue;
           let partial = [{ score: ZERO, rows: [] }];
           for (let j = 0; j < r; j++) {
             const aligned = alignLines(wasm, font, la[j], lb[j], { ...opts, caseMode: lineMode, frontLimit, frame, cache });

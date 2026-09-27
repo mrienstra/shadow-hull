@@ -86,3 +86,23 @@ test('equal-scoring layouts prefer balanced (grid) line splits', async () => {
   assert.equal(all[0].imbalance, Math.min(...tied.map((p) => p.imbalance)));
   assert.deepEqual(all[0].lines[0].map((x) => x.length), [3, 3]); // FIN / OLA
 });
+
+test('grid: equal lines, and letters in a column share a centre across rows', async () => {
+  const { gridLines, layoutCells } = await import('../src/core/wordpair.js');
+  const { disposeCells } = await import('../src/core/compose.js');
+  assert.deepEqual(gridLines('FINOLA', 2), ['FIN', 'OLA']);
+  assert.deepEqual(gridLines('BRYAN', 3), ['BR', 'YA', 'N']);
+  const layout = { rows: [{ a: ['F', 'I', 'N'], b: ['B', 'R', 'Y'] }, { a: ['O', 'LA'], b: ['A', 'N'] }] };
+  for (const fit of ['center', 'stretch']) {
+    const cells = layoutCells(wasm, font, layout, { grid: { fit }, overlap: -1.2 });
+    try {
+      const centres = (row) => cells.filter((c) => c.box.max[2] === row).flatMap((c) => c.letters.front)
+        .map((l) => { const xs = l.pts.flat().map((p) => p[0]); return (Math.min(...xs) + Math.max(...xs)) / 2; });
+      const tops = [...new Set(cells.map((c) => c.box.max[2]))].sort((a, b) => b - a);
+      const [r1, r2] = tops.map(centres);
+      assert.equal(r1.length, 3);
+      assert.equal(r2.length, 3); // O, L, A
+      for (let k = 0; k < 3; k++) assert.ok(Math.abs(r1[k] - r2[k]) < 1e-6, `${fit} column ${k}: ${r1[k]} vs ${r2[k]}`);
+    } finally { disposeCells(cells); }
+  }
+});

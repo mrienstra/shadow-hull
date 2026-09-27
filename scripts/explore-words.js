@@ -18,7 +18,7 @@ const { values: o, positionals: [wordA, wordB] } = parseArgs({
     font: { type: 'string', default: 'kanit-black' }, rows: { type: 'string', default: '1,2,3' },
     cases: { type: 'string', default: 'upper,lower,title,mixed' }, fits: { type: 'string', default: 'shared,fill' },
     // Spacing families shown side by side (see PRESETS below).
-    presets: { type: 'string', default: 'touching,spaced' },
+    presets: { type: 'string', default: 'touching,spaced,grid,grid-mono' },
     'max-chunk': { type: 'string', default: '3' },
     join: { type: 'string', default: 'hull+bridges' }, // none | hull | plate | bridges, combined with '+'
 
@@ -39,6 +39,11 @@ const H = 20;
 const PRESETS = {
   touching: { label: 'Touching', layout: { gap: 'kiss', lineGap: 'kiss', overlap: 0.3, kiss: 0.01, align: 'left' }, rods: {} },
   spaced: { label: 'Spaced', layout: { gap: 'kiss', lineGap: 'kiss', overlap: -1.2, kiss: -0.06, align: 'center' }, rods: { lowWeight: 1, levelWeight: 3 } },
+  // Grid: equal-length rows, every letter in a fixed column slot (letters line
+  // up in columns in both views); slots 1.2 mm apart. "Mono" also stretches each
+  // letter to fill its slot, for a monospaced look with any font.
+  grid: { label: 'Grid', search: { grid: true, rows: [2, 3] }, layout: { grid: { fit: 'center' }, lineGap: 'kiss', overlap: -1.2, kiss: -0.06 }, rods: { lowWeight: 1, levelWeight: 3 } },
+  'grid-mono': { label: 'Grid, monospaced (letters stretched towards their slot width, at most 1.5×)', search: { grid: true, rows: [2, 3] }, layout: { grid: { fit: 'stretch' }, lineGap: 'kiss', overlap: -1.2, kiss: -0.06 }, rods: { lowWeight: 1, levelWeight: 3 } },
 };
 const entries = [];
 for (const presetName of o.presets.split(',')) {
@@ -46,7 +51,7 @@ const preset = PRESETS[presetName];
 const t0 = performance.now();
 const all = exploreWordPair(wasm, font, wordA, wordB, {
   cases: o.cases.split(','), rows: o.rows.split(',').map(Number), fits: o.fits.split(','),
-  maxChunk: Number(o['max-chunk']), byStyle: true, height: H, kiss: preset.layout.kiss,
+  maxChunk: Number(o['max-chunk']), byStyle: true, height: H, kiss: preset.layout.kiss, ...preset.search,
 });
 console.error(`${presetName}: ${all.length} layouts in ${((performance.now() - t0) / 1000).toFixed(0)} s`);
 
