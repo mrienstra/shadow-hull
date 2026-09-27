@@ -84,6 +84,11 @@ test('two-words mode streams designs and shows a heart block with three views', 
   assert.equal(await page.isDisabled('#download'), false);
   await page.check('#colour-faces');
   await page.click('.toolbar [data-view="top"]');
+  // Finish options rebuild the selected design and go into the share link.
+  await page.check('input[name="stand"]');
+  await page.check('input[name="turn"]');
+  await page.waitForFunction(() => ['stand', 'turn'].every((k) => new URLSearchParams(location.hash.slice(1)).get(k) === '1'));
+  await page.waitForFunction(() => document.querySelectorAll('#shadow-panels figure').length === 3, null, { timeout: 60_000 });
   // Switching back to three letters still works, and hides the words controls.
   await page.click('#tab-letters');
   await page.waitForSelector('#candidates button[aria-pressed="true"]', { timeout: 60_000 });

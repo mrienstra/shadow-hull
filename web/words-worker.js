@@ -37,8 +37,9 @@ self.onmessage = async ({ data: msg }) => {
       await ensureFonts({ ...msg, needShapes: !!msg.recipe.top });
       const d = buildRecipe(ctx, msg.wordA, msg.wordB, msg.recipe);
       try {
-        const view = designView(ctx.wasm, d);
-        const stl = toBinarySTL(d.joined);
+        const { solid, ...view } = designView(ctx.wasm, d, { turn: msg.recipe.turn ? -45 : 0 });
+        const stl = toBinarySTL(solid);
+        if (solid !== d.joined) solid.delete();
         self.postMessage({ id: msg.id, type: 'built', view, stl }, [view.mesh.vertProperties.buffer, view.mesh.triVerts.buffer, stl.buffer]);
       } finally {
         d.dispose();

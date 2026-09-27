@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-09-27 (display stand; any Google Font)
+
+- `displayStand` (join.js): a rounded base from the convex hull of the design's
+  footprint, padded with round corners, sunk 0.3 mm into the bottom row. It's a
+  join step ('stand', after hidden joins, before rods). Spaced chain,
+  Finola × Bryan: 5 rods → 0, one piece; the cost is a bar under both shadows
+  (~12–14% extra shadow), so it's opt-in. Recipes take `stand`; `designView`
+  takes `turn` (output-only rotation of mesh, STL and camera frames; -45° so the
+  two words face front-left and front-right, as TextTango does).
+- Web: "Finish" options in Two words (Display stand, Turn 45° for display)
+  rebuild only the selected design and are kept in share links.
+- Web: any Google Font by name (Fontsource catalogue: ~2,100 families; TTF via
+  jsDelivr, CORS-enabled), heaviest weight by default with a weight picker;
+  works in both modes and in share links (`gf`, `gw`). Checked in a browser:
+  load, generate, and restore from a link give identical designs.
+- Tests: the stand joins separate cells under a convex outline; e2e toggles the
+  finish options and checks they reach the share link.
+- No subagents used.
+
 ## 2026-09-27 (prior art: TextTango)
 
 - Studied Lucandia/dual_letter_illusion (notes in

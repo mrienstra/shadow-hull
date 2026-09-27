@@ -61,3 +61,23 @@ test('hullJoin joins pieces through the full hull with zero extra shadow', async
     assert.ok(stray.front < 1e-9 && stray.right < 1e-9, `stray ${JSON.stringify(stray)}`);
   } finally { solid.delete(); H.delete(); joined.delete(); disposeCells(cells); }
 });
+
+test('displayStand joins cells standing on it, under a convex rounded outline', async () => {
+  const { displayStand } = await import('../src/core/join.js');
+  // Two separate 10 mm cells on a diagonal, 2 mm apart.
+  const sq = (x0, z0) => new wasm.CrossSection([[[x0, z0], [x0 + 10, z0], [x0 + 10, z0 + 10], [x0, z0 + 10]]], 'NonZero');
+  const cells = [0, 12].map((x) => ({ box: { min: [x, x, 0], max: [x + 10, x + 10, 10] }, shapes: { front: sq(x, 0), right: sq(x, 0) } }));
+  const solid = buildComposition(wasm, cells);
+  const joined = displayStand(wasm, solid, cells, { height: 2, pad: 3 });
+  try {
+    assert.equal(solid.decompose().length, 2);
+    assert.equal(joined.decompose().length, 1, 'the stand joins both cells');
+    const { min, max } = joined.boundingBox();
+    assert.ok(min[0] < -2.9 && max[0] > 24.9, 'padded beyond the footprint');
+    assert.ok(Math.abs(min[2] - (0.3 - 2)) < 1e-6, 'stand top sunk 0.3 mm into the letters');
+    const plan = joined.project();
+    const hull = plan.hull();
+    assert.ok(Math.abs(hull.area() - plan.area()) < 1e-6 * hull.area(), 'outline is convex');
+    plan.delete(); hull.delete();
+  } finally { solid.delete(); joined.delete(); disposeCells(cells); }
+});

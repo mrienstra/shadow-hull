@@ -12,7 +12,7 @@ import { letterVisibility, buildComposition, measureComposition, disposeCells } 
 import { exploreWordPair, layoutCells, rankLayouts } from './wordpair.js';
 import { blockCells } from './block.js';
 import { compositions, spanColumnCells, stackedColumnCells } from './column.js';
-import { basePlate, bridgePieces, strayShadow, hullJoin } from './join.js';
+import { basePlate, bridgePieces, strayShadow, hullJoin, displayStand } from './join.js';
 
 /**
  * Spacing families. Each has search options, layout options and rod options.
@@ -90,6 +90,7 @@ export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods =
   const replace = (next) => { if (joined !== solid) joined.delete(); joined = next; };
   if (join.includes('hull') && cells.length > 1) { const h = hullJoin(wasm, joined, cells); replace(h.solid); blocks = h.blocks; }
   if (join.includes('plate')) replace(basePlate(wasm, joined, cells));
+  if (join.includes('stand')) replace(displayStand(wasm, joined, cells));
   if (join.includes('bridges')) { const b = bridgePieces(wasm, joined, rods); replace(b.solid); bridges = b.bridges; }
   const stray = strayShadow(wasm, solid, joined, cells, { frames });
   const parts = joined.decompose();

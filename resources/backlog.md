@@ -4,11 +4,6 @@ Ideas and requests not yet started, newest first. Move items to CHANGELOG.md
 when done. Owner requests are marked (owner).
 
 ## Ideas from TextTango (Lucandia/dual_letter_illusion; GPL, so reimplement)
-- **Display stand**: a rounded base along the chain (convex hull of the cell
-  footprints, offset with round joins), with the object turned 45° so both
-  words face the front. Reads as a finished object, unlike the staircase plate.
-- **Any Google Font on demand** in the web page: fetch the TTF by family name
-  (google/fonts raw files) instead of vendoring the catalog (they ship 1.9 GB).
 - Quick-insert buttons for symbols (♥ ⭐ ♪ …) next to the top-shape field.
 - Manual reinforcement override per letter pair (pillar / rod), alongside the
   automatic joining.

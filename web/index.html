@@ -20,6 +20,11 @@
         <button type="button" role="tab" id="tab-words" aria-selected="false" aria-controls="words-form">Two words</button>
       </div>
       <label class="font-row">Font <select name="fontChoice" id="font-choice"></select></label>
+      <div class="gfont">
+        <input id="gfont" list="gfont-list" placeholder="…or any Google Font, e.g. Big Shoulders Display" autocomplete="off" aria-label="Google Font family">
+        <select id="gweight" aria-label="Weight" title="Weight (heaviest is usually best)" disabled></select>
+        <datalist id="gfont-list"></datalist>
+      </div>
       <form id="form">
         <div class="texts">
           <label>Front <input name="front" value="G" maxlength="12" autocomplete="off"></label>
@@ -58,6 +63,11 @@
           <label>Side word <input name="wordB" value="Bryan" maxlength="16" autocomplete="off"></label>
           <p class="hint">Example pair: Finola and Bryan, the lead agents in NBC's sci-fi series <i>Debris</i> (2021).</p>
         </div>
+        <fieldset class="inline finish">
+          <legend>Finish (applies to the selected design)</legend>
+          <label class="check" title="A rounded base under the whole design: joins the bottom row without rods, adds a bar under both shadows"><input type="checkbox" name="stand"> Display stand</label>
+          <label class="check" title="Rotate the output 45° so the two words face front-left and front-right"><input type="checkbox" name="turn"> Turn 45° for display</label>
+        </fieldset>
         <fieldset class="sections">
           <legend>Designs to generate</legend>
           <label class="check"><input type="checkbox" name="section" value="blocks" checked> Blocks: whole words, optional shape on top <span class="hint">fast</span></label>

@@ -188,6 +188,7 @@ const status = $('#status');
 let lastOpts = null, stl = null;
 let mode = 'letters';
 let uploadedFont = null; // an uploaded font's bytes, reused by two-words mode
+let googleFont = null; // { id, family, weight, url } when a Google Font is in use
 
 function readForm() {
   const f = new FormData(form);
@@ -228,6 +229,7 @@ for (const f of FONTS) fontChoice.append(new Option(`${f.name} — ${f.note}`, f
 fontChoice.addEventListener('change', async () => {
   const f = FONTS.find((x) => x.id === fontChoice.value);
   uploadedFont = null;
+  clearGoogleFont();
   await call({ type: 'font', url: FONT_URLS[`../fonts/${f.file}`] });
   form.font.value = '';
   status.textContent = `Font: ${f.name}`;
@@ -320,6 +322,7 @@ function wordsCall(msg, onMessage, transfer = []) {
 }
 function fontSource() {
   if (uploadedFont) return { fontData: uploadedFont.slice(0) };
+  if (googleFont) return { fontUrl: googleFont.url };
   const f = FONTS.find((x) => x.id === fontChoice.value);
   return { fontUrl: new URL(FONT_URLS[`../fonts/${f.file}`], location.href).href };
 }
@@ -436,8 +439,11 @@ function selectWordDesign(item, button) {
     showWordShadows(view, item);
     snap('iso');
   });
-  builder.postMessage({ type: 'build', id, wordA: currentWords[0], wordB: currentWords[1], recipe: item.recipe, ...fontSource() });
+  const finish = { stand: wordsForm.stand.checked, turn: wordsForm.turn.checked };
+  builder.postMessage({ type: 'build', id, wordA: currentWords[0], wordB: currentWords[1], recipe: { ...item.recipe, ...finish }, ...fontSource() });
 }
+// Finish options rebuild only the selected design.
+for (const name of ['stand', 'turn']) wordsForm[name].addEventListener('change', () => selectedItem && selectWordDesign(selectedItem, selectedButton));
 
 function showWordShadows(view, item) {
   const host = $('#shadow-panels');
@@ -486,6 +492,56 @@ $('#words-stop').addEventListener('click', () => {
   wordsStatus.textContent = `Stopped · ${designsHost.querySelectorAll('button').length} designs.`;
 });
 
+// ---- Any Google Font (via Fontsource: TTF files on jsDelivr, CORS-enabled) ----
+// The bundled fonts were picked for this job; any Google Font can be loaded by
+// name. Heaviest weight by default — heavy faces cover letters best.
+let googleCatalog = null, pendingGoogleFont = null;
+const gfont = $('#gfont'), gweight = $('#gweight');
+async function loadGoogleCatalog() {
+  if (googleCatalog) return googleCatalog;
+  const list = await (await fetch('https://api.fontsource.org/v1/fonts')).json();
+  googleCatalog = list.filter((f) => f.type === 'google' && f.styles.includes('normal') && f.subsets.includes('latin'));
+  $('#gfont-list').replaceChildren(...googleCatalog.map((f) => new Option(f.family)));
+  return googleCatalog;
+}
+function clearGoogleFont() {
+  googleFont = null;
+  gfont.value = '';
+  gweight.replaceChildren();
+  gweight.disabled = true;
+}
+async function useGoogleFont(idOrFamily, weight, { quiet = false } = {}) {
+  const say = (t) => { status.textContent = t; $('#words-status').textContent = t; };
+  try {
+    const cat = await loadGoogleCatalog();
+    const key = String(idOrFamily).trim().toLowerCase();
+    const f = cat.find((x) => x.id === key || x.family.toLowerCase() === key);
+    if (!f) { say(`No Google Font called “${idOrFamily}”.`); return false; }
+    const w = f.weights.includes(weight) ? weight : Math.max(...f.weights);
+    const url = `https://cdn.jsdelivr.net/fontsource/fonts/${f.id}@latest/latin-${w}-normal.ttf`;
+    say(`Loading ${f.family} ${w}…`);
+    await call({ type: 'font', url });
+    uploadedFont = null;
+    form.font.value = '';
+    googleFont = { id: f.id, family: f.family, weight: w, url };
+    gfont.value = f.family;
+    gweight.replaceChildren(...f.weights.map((x) => new Option(String(x), String(x))));
+    gweight.value = String(w);
+    gweight.disabled = false;
+    say(`Font: ${f.family} ${w} (Google Fonts, OFL)`);
+    writeHash();
+    if (!quiet && mode === 'letters') form.requestSubmit();
+    if (!quiet && mode === 'words') $('#words-status').textContent += ' — Generate to use it.';
+    return true;
+  } catch (e) {
+    say(`Couldn’t load that font: ${e.message}`);
+    return false;
+  }
+}
+gfont.addEventListener('focus', () => { loadGoogleCatalog().catch(() => {}); }, { once: true });
+gfont.addEventListener('change', () => gfont.value.trim() && useGoogleFont(gfont.value));
+gweight.addEventListener('change', () => googleFont && useGoogleFont(googleFont.id, Number(gweight.value)));
+
 // ---- Shareable state in the URL hash -----------------------------------------
 // #m=letters&font=bungee&t=G|E|B&size=40&fit=stretch&tf=upright&perm=1&conn=1&thick=1&pick=[...]
 // #m=words&font=kanit-black&a=Finola&b=Bryan&sec=blocks,stacked&fam=...&case=...&rows=...&tops=❤&angles=...&r={recipe}&ti=title
@@ -494,7 +550,7 @@ const boxes = (name, root) => [...root.querySelectorAll(`input[name="${name}"]`)
 function writeHash() {
   const h = new URLSearchParams();
   h.set('m', mode);
-  if (!uploadedFont) h.set('font', fontChoice.value);
+  if (googleFont) { h.set('gf', googleFont.id); h.set('gw', googleFont.weight); } else if (!uploadedFont) h.set('font', fontChoice.value);
   if (mode === 'letters') {
     const f = new FormData(form);
     h.set('t', VIEW_NAMES.map((v) => f.get(v) ?? '').join('|'));
@@ -507,6 +563,8 @@ function writeHash() {
     h.set('a', f.get('wordA')); h.set('b', f.get('wordB'));
     for (const [key, name] of [['sec', 'section'], ['fam', 'family'], ['case', 'case'], ['rows', 'rows']]) h.set(key, checked(name).join(','));
     h.set('tops', f.get('tops')); h.set('angles', f.get('angles'));
+    if (wordsForm.stand.checked) h.set('stand', '1');
+    if (wordsForm.turn.checked) h.set('turn', '1');
     if (selectedItem) { h.set('r', JSON.stringify(selectedItem.recipe)); h.set('ti', selectedItem.title); }
   }
   history.replaceState(null, '', `#${h}`);
@@ -516,6 +574,7 @@ function readHash() {
   const h = new URLSearchParams(location.hash.slice(1));
   if (!h.has('m')) return null;
   if (h.get('font') && FONTS.some((f) => f.id === h.get('font'))) fontChoice.value = h.get('font');
+  if (h.get('gf')) pendingGoogleFont = { id: h.get('gf'), weight: Number(h.get('gw')) || null };
   if (h.get('m') === 'letters') {
     const t = (h.get('t') ?? '').split('|');
     VIEW_NAMES.forEach((v, i) => { if (t[i] != null) form[v].value = t[i]; });
@@ -533,6 +592,8 @@ function readHash() {
     for (const i of boxes(name, wordsForm)) i.checked = on.has(i.value);
   }
   if (h.has('tops')) wordsForm.tops.value = h.get('tops');
+  wordsForm.stand.checked = h.get('stand') === '1';
+  wordsForm.turn.checked = h.get('turn') === '1';
   if (h.has('angles')) wordsForm.angles.value = h.get('angles');
   if (h.has('r')) sharedRecipe = h.get('r');
   return { mode: 'words', title: h.get('ti') ?? 'Shared design' };
@@ -552,7 +613,8 @@ for (const el of [form, wordsForm]) el.addEventListener('change', () => writeHas
 
 // Start from a shared link, if any: restore the fonts, inputs and mode first.
 const shared = readHash();
-if (shared) await call({ type: 'font', url: FONT_URLS[`../fonts/${FONTS.find((f) => f.id === fontChoice.value).file}`] });
+if (shared && pendingGoogleFont) await useGoogleFont(pendingGoogleFont.id, pendingGoogleFont.weight, { quiet: true });
+else if (shared) await call({ type: 'font', url: FONT_URLS[`../fonts/${FONTS.find((f) => f.id === fontChoice.value).file}`] });
 if (shared?.mode === 'words') {
   setMode('words'); // starts the gallery (and highlights the shared design when it streams in)
   if (sharedRecipe) {

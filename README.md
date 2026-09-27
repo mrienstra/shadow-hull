@@ -26,7 +26,8 @@ silhouettes.
   found by dynamic programming, using an exact 2D shortcut for coverage.
 - **Printability**: it joins loose pieces with zero-shadow blocks taken from
   the full hull, or with short rods, and checks for walls and fins thinner
-  than a minimum thickness.
+  than a minimum thickness. Optionally it adds a rounded **display stand**
+  and turns the object 45° so both words face the front.
 - **Legibility measures**: coverage per letter, how much of each letter is
   hidden by its neighbours, and how much it touches them (merged stems).
 - Faces can be coloured by the view that carved them.
@@ -54,7 +55,8 @@ reopens the same design.
 
 Nine heavy display fonts from Google Fonts, plus Noto Emoji for shapes, all
 under the SIL Open Font License (see `fonts/README.md` for how they were
-chosen). Any TTF/OTF can be used instead.
+chosen). The web page can also load **any Google Font** by name (TTF files via
+[Fontsource](https://fontsource.org/)), and any TTF/OTF can be uploaded.
 
 ## Papers and prior work
 

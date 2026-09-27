@@ -225,3 +225,33 @@ export function hullJoin(wasm, solid, cells, { dustFraction = 1e-3 } = {}) {
     scope.dispose();
   }
 }
+
+/**
+ * A display stand: a rounded base under the whole design, from the convex
+ * hull of its footprint (seen from above) padded with round corners — reads
+ * as a finished object, unlike basePlate's staircase of cell footprints.
+ * Its top sits at the lowest point every bottom-row cell reaches (plus
+ * `embed`, so they fuse rather than touch), like basePlate.
+ */
+export function displayStand(wasm, solid, cells, { height = 2, pad = 3, embed = 0.3 } = {}) {
+  const { Manifold } = wasm;
+  const scope = new Scope();
+  try {
+    const bottom = Math.min(...cells.map((c) => c.box.min[2]));
+    const lowRow = cells.filter((c) => Math.abs(c.box.min[2] - bottom) < 1e-9);
+    let top = bottom;
+    for (const c of lowRow) {
+      const size = c.box.max.map((x, i) => x - c.box.min[i]);
+      const box = scope.add(scope.add(Manifold.cube(size, false)).translate(c.box.min));
+      const part = scope.add(solid.intersect(box));
+      if (!part.isEmpty()) top = Math.max(top, part.boundingBox().min[2]);
+    }
+    top += embed;
+    const footprint = scope.add(solid.project());
+    const outline = scope.add(scope.add(footprint.hull()).offset(pad, 'Round', 2, 64));
+    const slab = scope.add(tagged(scope.add(scope.add(extrudeCentered(wasm, outline, height)).translate([0, 0, top - height / 2])), 'connector'));
+    return Manifold.union(solid, slab);
+  } finally {
+    scope.dispose();
+  }
+}
