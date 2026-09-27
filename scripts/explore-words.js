@@ -113,7 +113,10 @@ h1 { font-size:20px; margin:0 0 4px; } p.sub { margin:0 0 16px; color:var(--mute
 .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px; }
 .card h2 { font-size:14px; margin:0; } h2.preset { font-size:16px; margin:20px 0 8px; } .card .t { font-family:ui-monospace, monospace; font-size:12px; margin:4px 0; }
 .card .s { color:var(--muted); font-size:12px; margin-bottom:8px; }
-canvas { width:100%; height:240px; display:block; background:var(--bg); border-radius:6px; }
+/* One shared WebGL canvas over the page draws into each .view's rectangle
+   (browsers allow only ~16 WebGL contexts per page). */
+#gl { position:fixed; inset:0; width:100vw; height:100vh; pointer-events:none; z-index:1; }
+.view { width:100%; height:240px; background:var(--bg); border-radius:6px; touch-action:none; }
 .shadows { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
 .shadows svg { width:100%; height:70px; background:var(--bg); border-radius:6px; }
 .shadows .cap { font-size:11px; color:var(--muted); }
@@ -122,11 +125,18 @@ path.s { fill:var(--ink); } path.m { fill:var(--miss); }
 <h1>${wordA} × ${wordB}</h1>
 <p class="sub">Best layout per style (${entry?.name ?? o.font}). “·” separates cells, “/” rows, “↕” = letter stretched to row height. Front reads ${wordA}, right reads ${wordB}; red = missing from the letter. “Least visible” = share of a letter not covered by neighbouring letters; “most contact” = outline touching other letters, in row heights (≳30% reads as merged). Joined with ${o.join}. Drag to rotate.</p>
 <div id="grid"></div>
+<canvas id="gl"></canvas>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/" } }</script>
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 const DATA = ${JSON.stringify(entries)};
+const gl = document.getElementById('gl');
+const renderer = new THREE.WebGLRenderer({ canvas: gl, antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(devicePixelRatio);
+renderer.setClearColor(0x000000, 0);
+const material = new THREE.MeshStandardMaterial({ color: 0xc8a27a, roughness: 0.65, flatShading: true });
+const views = [];
 const main = document.getElementById('grid');
 const sections = new Map();
 for (const e of DATA) {
@@ -138,29 +148,45 @@ for (const e of DATA) {
   const grid = sections.get(e.preset);
   const card = document.createElement('div'); card.className = 'card';
   const svg = (v, cap) => '<div><svg viewBox="' + e.views[v].box.join(' ') + '"><path class="s" d="' + e.views[v].shadow + '"/><path class="m" d="' + e.views[v].missing + '"/></svg><div class="cap">' + cap + '</div></div>';
-  card.innerHTML = '<h2></h2><div class="t"></div><div class="s"></div><canvas></canvas><div class="shadows">' + svg('front', 'front') + svg('right', 'right') + '</div>';
+  card.innerHTML = '<h2></h2><div class="t"></div><div class="s"></div><div class="view"></div><div class="shadows">' + svg('front', 'front') + svg('right', 'right') + '</div>';
   card.querySelector('h2').textContent = e.style; card.querySelector('.t').textContent = e.text; card.querySelector('.s').textContent = e.stats;
   grid.append(card);
-  const canvas = card.querySelector('canvas');
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true, preserveDrawingBuffer: true });
-  renderer.setPixelRatio(devicePixelRatio);
+  const view = card.querySelector('.view');
   const scene = new THREE.Scene();
   scene.add(new THREE.HemisphereLight(0xffffff, 0x8888aa, 1.6));
   const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(2, -3, 4); scene.add(sun);
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(e.verts, 3)); geo.setIndex(e.tris);
   geo.computeBoundingSphere();
-  const mesh = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xc8a27a, roughness: 0.65, flatShading: true }));
-  scene.add(mesh);
+  scene.add(new THREE.Mesh(geo, material));
   const c = geo.boundingSphere.center, rad = geo.boundingSphere.radius;
   const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, rad * 20); cam.up.set(0, 0, 1);
   cam.position.set(c.x - rad * 2, c.y - rad * 3, c.z + rad * 2); cam.lookAt(c);
-  const controls = new OrbitControls(cam, canvas); controls.target.copy(c);
-  const fit = () => { const w = canvas.clientWidth, h = canvas.clientHeight; renderer.setSize(w, h, false); const a = w / h, k = rad * 1.05;
-    Object.assign(cam, { left: -k * a, right: k * a, top: k, bottom: -k }); cam.updateProjectionMatrix(); };
-  new ResizeObserver(fit).observe(canvas); fit();
-  renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, cam); });
+  const controls = new OrbitControls(cam, view); controls.target.copy(c);
+  views.push({ view, scene, cam, controls, rad });
 }
+
+// Render every on-screen view into its rectangle of the shared canvas.
+function frame() {
+  const w = gl.clientWidth, h = gl.clientHeight;
+  if (gl.width !== Math.round(w * devicePixelRatio) || gl.height !== Math.round(h * devicePixelRatio)) renderer.setSize(w, h, false);
+  renderer.setScissorTest(false);
+  renderer.clear();
+  renderer.setScissorTest(true);
+  for (const v of views) {
+    const r = v.view.getBoundingClientRect();
+    if (r.bottom < 0 || r.top > h || r.right < 0 || r.left > w) continue;
+    const bottom = h - r.bottom;
+    renderer.setViewport(r.left, bottom, r.width, r.height);
+    renderer.setScissor(r.left, bottom, r.width, r.height);
+    const a = r.width / r.height, k = v.rad * 1.05;
+    Object.assign(v.cam, { left: -k * a, right: k * a, top: k, bottom: -k });
+    v.cam.updateProjectionMatrix();
+    v.controls.update();
+    renderer.render(v.scene, v.cam);
+  }
+}
+renderer.setAnimationLoop(frame);
 </script></body></html>`;
 
 await mkdir(new URL('../reports/', import.meta.url), { recursive: true });
