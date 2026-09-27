@@ -41,3 +41,13 @@ survival). See `CLAUDE.md` and `resources/research/`.
    mixing per letter (`fiNoLa`), per-letter width and height stretch,
    negative letter spacing (overlaps), splitting letters into strokes and
    pairing the strokes (2CATteam), stacking rows, grids.
+
+## Connectivity
+
+6. **Joining word-pair cells into one printable piece.** Neighbouring cells in
+   a diagonal chain only touch where both letters have ink in the overlap
+   corner, so layouts come out in 2–5 pieces even with overlapping cells.
+   Options: a base plate (it adds a bar under both words' shadows), thin
+   connectors hidden inside both shadows, a per-pair overlap chosen to
+   guarantee contact, or making connectivity a search objective. What do
+   makers and the literature do, and which keeps both readings cleanest?

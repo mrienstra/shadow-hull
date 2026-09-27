@@ -2,7 +2,7 @@
 // Explore layouts for a word pair and write an HTML report (3D view + both
 // shadows per layout) to reports/<a>-<b>.html. Exploration tool, not product.
 // Usage: node scripts/explore-words.js Finola Bryan [--font kanit-black] [--rows 1,2,3]
-//        [--cases upper,lower,title,mixed] [--fits shared,fill] [--gap -0.2] [--line-gap -0.05]
+//        [--cases upper,lower,title,mixed] [--fits shared,fill] [--gap=-0.2] [--line-gap=-0.05]
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
