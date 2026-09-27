@@ -11,6 +11,7 @@
 import { letterVisibility, buildComposition, measureComposition, disposeCells } from './compose.js';
 import { exploreWordPair, layoutCells, rankLayouts } from './wordpair.js';
 import { blockCells } from './block.js';
+import { compositions, spanColumnCells } from './column.js';
 import { basePlate, bridgePieces, strayShadow, hullJoin } from './join.js';
 
 /**
@@ -173,3 +174,35 @@ export function designWordPair(wasm, font, wordA, wordB, opts = {}) {
   }
   return out.sort((a, b) => b.metrics.quality - a.metrics.quality);
 }
+
+/**
+ * Column with spanning letters (see column.js): the longer word one letter per
+ * row, the shorter word's letters spanning rows so both fill the same height.
+ * Tries every span assignment (each span ≤ maxSpan), builds, joins and ranks
+ * them by designQuality. spacing 'touching' (rows overlap 0.3 mm) or 'spaced'
+ * (1.2 mm gaps, which cut a line through spanning letters).
+ * @returns [{ spans, metrics }] best first
+ */
+export function designSpanColumn(wasm, font, wordA, wordB, { spacing = 'touching', fit = 'stretch', caseMode = 'upper', maxSpan = 3, height = 20, join = 'hull+bridges' } = {}) {
+  const [n, m] = [[...wordA].length, [...wordB].length];
+  const spansList = compositions(Math.max(n, m), Math.min(n, m), maxSpan);
+  const gap = spacing === 'touching' ? -0.3 : 1.2;
+  const results = spansList.map((spans) => {
+    const d = realizeSpanColumn(wasm, font, wordA, wordB, spans, { spacing, fit, caseMode, height, join, gap });
+    const { metrics } = d;
+    d.dispose();
+    return { spans, metrics };
+  });
+  return results.sort((a, b) => b.metrics.quality - a.metrics.quality);
+}
+
+/** Build one spanning column (see designSpanColumn); caller disposes. */
+export function realizeSpanColumn(wasm, font, wordA, wordB, spans, { spacing = 'touching', fit = 'stretch', caseMode = 'upper', height = 20, join = 'hull+bridges', gap } = {}) {
+  const fam = SPACING[spacing];
+  const cells = spanColumnCells(wasm, font, wordA, wordB, spans, { height, gap: gap ?? (spacing === 'touching' ? -0.3 : 1.2), fit, caseMode });
+  const solid = buildComposition(wasm, cells);
+  // Stretch: how much taller than a normal row the tallest spanning letter is.
+  const stretch = Math.max(...spans) - 1;
+  return finishDesign(wasm, cells, solid, { join, rods: fam.rods, height, stretch: fit === 'stretch' ? stretch : 0 });
+}
+

@@ -4,8 +4,6 @@ Ideas and requests not yet started, newest first. Move items to CHANGELOG.md
 when done. Owner requests are marked (owner).
 
 ## Layouts and shapes
-- Column variant: when words differ in length, let one letter of the shorter
-  word span two rows (tall letter) instead of doubling up letters of the longer one.
 - Other view angles for *chain* layouts and grids (blocks have them now):
   cells' boxes become parallelograms; hull join and the 2D scoring carry over.
 - Top shapes on angled blocks (fit the shape to the parallelogram footprint).

@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-27 (column with spanning letters)
+
+- `column.js`: the longer word one letter per row; the shorter word's letters
+  get row spans (all compositions, each ≤3) and pair with the letters in their
+  span. Spanning letters are stretched or scaled uniformly (drop-cap).
+  `designSpanColumn` builds and ranks every span choice.
+- Row frame snaps to baseline and cap height (within 3% em): using ink extremes
+  left flat letters short of the row edges because round letters overshoot,
+  so "touching" rows didn't touch (6 separate pieces).
+- Finola × Bryan (Kanit Black, upper): touching rows give one piece at 99.9%
+  (stems touch between rows, contact 106–134%). Spaced rows (1.2 mm) cut a line
+  through the spanning letter (97.9%) and need 5 rods. Best spans: Y×2 (touching)
+  and A×2 (spaced); the drop-cap scores highest (0.965 spaced).
+- Report: "Column, tall letter" section.
+- No subagents used.
+
 ## 2026-09-26 (other view angles, blocks)
 
 - `viewAtAzimuth(deg)` gives a vertical view at any azimuth (0 = front, 90 = right,

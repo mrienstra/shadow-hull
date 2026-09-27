@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { getManifold, loadFont, worldToLocal } from '../src/core/index.js';
 import { describeLayout, rankLayouts } from '../src/core/wordpair.js';
-import { SPACING, designWordPair, realizeDesign, realizeBlock } from '../src/core/design.js';
+import { SPACING, designWordPair, realizeDesign, realizeBlock, designSpanColumn, realizeSpanColumn } from '../src/core/design.js';
 import { glyphSilhouette } from '../src/core/block.js';
 
 const { values: o, positionals: [wordA, wordB] } = parseArgs({
@@ -26,6 +26,8 @@ const { values: o, positionals: [wordA, wordB] } = parseArgs({
     tops: { type: 'string', default: 'none,❤' },
     // Blocks at other angles between the two word views (degrees; '' = skip).
     angles: { type: 'string', default: '75,60,45' },
+    // Columns where the shorter word's letters span rows (instead of the longer doubling up).
+    spans: { type: 'boolean', default: true },
     join: { type: 'string', default: 'hull+bridges' }, // none | hull | plate | bridges, combined with '+'
 
   },
@@ -80,6 +82,20 @@ if (o.angles) {
     for (const caseMode of ['upper', 'title']) {
       const d = realizeBlock(wasm, font, wordA, wordB, { caseMode, spacing: 'touching', join: 'bridges', height: H, angle });
       entries.push(card(d, 'Block, other view angles (the side word is read from this many degrees round from the front)', `${caseMode}, ${angle}°`, `${wordA} × ${wordB} at ${angle}°`, 'bridges'));
+      d.dispose();
+    }
+  }
+}
+
+// Columns with spanning letters: best span assignment per spacing × fit.
+if (o.spans) {
+  const shorter = [...wordA].length >= [...wordB].length ? wordB : wordA;
+  for (const spacing of ['touching', 'spaced']) {
+    for (const fit of ['stretch', 'uniform']) {
+      const [best, ...rest] = designSpanColumn(wasm, font, wordA, wordB, { spacing, fit, height: H });
+      const label = [...shorter.toUpperCase()].map((c, i) => (best.spans[i] > 1 ? `${c}×${best.spans[i]}` : c)).join(' ');
+      const d = realizeSpanColumn(wasm, font, wordA, wordB, best.spans, { spacing, fit, height: H });
+      entries.push(card(d, 'Column, tall letter (the shorter word’s letter spans rows instead of the longer word doubling up)', `${spacing}, ${fit === 'stretch' ? 'stretched' : 'drop-cap'}`, `spans: ${label}`, 'hull+bridges', ` · best of ${rest.length + 1} span choices`));
       d.dispose();
     }
   }
