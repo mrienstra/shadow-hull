@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-26 (design pipeline in core; quality ranking)
+
+- `src/core/design.js`: the word-pair pipeline moved out of the report script
+  (so the web page can share it). `SPACING` families, `realizeDesign`,
+  `designQuality`, `designWordPair`.
+- Ranking folds in the measured results: each style's top 3 search layouts are
+  built, joined and scored by `designQuality`. The score is worst-letter coverage
+  minus penalties for hidden letters (<95% visible), merged stems (contact >0.2
+  row heights), stretch, extra shadow, unjoined pieces, and uneven rows
+  (weights in `QUALITY_WEIGHTS`). This changed the winner in 20/40 style ×
+  family cells for Finola × Bryan, e.g. touching upper 2 rows: contact 136% →
+  89%; grid lowercase 3 rows: 92% → 100% coverage.
+- Report: shows quality and flags re-ranked winners; ~2 min with 3 candidates.
+- `resources/backlog.md` collects requests not yet started.
+- No subagents used.
+
 ## 2026-09-26 (grid style)
 
 - Grid layouts: `gridLines` splits each word into equal lines (FIN/OLA ×

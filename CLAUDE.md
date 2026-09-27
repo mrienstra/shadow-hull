@@ -12,6 +12,9 @@ and/or web) before deciding which to keep.
   View frames and the D4 glyph transforms are defined once in `views.js`;
   build and measure both use them.
   `symmetry.js` reduces the search to one config per cube-symmetry orbit.
+- `src/core/design.js` — word-pair pipeline (search → build → join → measure →
+  rank by `designQuality`) and the spacing families; shared by the report
+  script and the web page.
 - `src/cli.js` — Node CLI (`node src/cli.js GEB -o out.stl`, `--help`).
 - `web/` — Vite + Three.js page; geometry runs in `worker.js` on the same core.
   `npm run dev` / `npm run build` (→ `dist/`).
@@ -31,6 +34,7 @@ and/or web) before deciding which to keep.
 - `resources/research/` — research notes gathered while working; add to these
   when a finding is likely to be referred to again.
 - `CHANGELOG.md` — dated log of what changed and why.
+- `resources/backlog.md` — requests and ideas not yet started (owner requests marked).
 
 ## Environment
 

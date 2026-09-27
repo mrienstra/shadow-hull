@@ -8,9 +8,8 @@ import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { getManifold, loadFont, worldToLocal } from '../src/core/index.js';
-import { letterVisibility } from '../src/core/compose.js';
-import { exploreWordPair, realizeLayout, describeLayout, rankLayouts } from '../src/core/wordpair.js';
-import { basePlate, bridgePieces, strayShadow, hullJoin } from '../src/core/join.js';
+import { describeLayout, rankLayouts } from '../src/core/wordpair.js';
+import { SPACING, designWordPair, realizeDesign } from '../src/core/design.js';
 
 const { values: o, positionals: [wordA, wordB] } = parseArgs({
   allowPositionals: true,
@@ -20,6 +19,7 @@ const { values: o, positionals: [wordA, wordB] } = parseArgs({
     // Spacing families shown side by side (see PRESETS below).
     presets: { type: 'string', default: 'touching,spaced,grid,grid-mono' },
     'max-chunk': { type: 'string', default: '3' },
+    candidates: { type: 'string', default: '3' }, // search results per style built and re-ranked by quality
     join: { type: 'string', default: 'hull+bridges' }, // none | hull | plate | bridges, combined with '+'
 
   },
@@ -32,81 +32,46 @@ const entry = fonts.find((f) => f.id === o.font);
 const font = loadFont(await readFile(entry ? fileURLToPath(new URL(entry.file, FONTS_DIR)) : o.font));
 const wasm = await getManifold();
 const H = 20;
-// Spacing families. "touching": neighbours just touch (0.3 mm overlap at the
-// closest point) — solid and clean, but flat stems can merge (I|L reads as a
-// thick L). "spaced": a visible 1.2 mm gap at the closest point, rows centred,
-// pieces joined by level rods biased towards the baseline (they read like ligatures).
-const PRESETS = {
-  touching: { label: 'Touching', layout: { gap: 'kiss', lineGap: 'kiss', overlap: 0.3, kiss: 0.01, align: 'left' }, rods: {} },
-  spaced: { label: 'Spaced', layout: { gap: 'kiss', lineGap: 'kiss', overlap: -1.2, kiss: -0.06, align: 'center' }, rods: { lowWeight: 1, levelWeight: 3 } },
-  // Grid: equal-length rows, every letter in a fixed column slot (letters line
-  // up in columns in both views); slots 1.2 mm apart. "Mono" also stretches each
-  // letter to fill its slot, for a monospaced look with any font.
-  grid: { label: 'Grid', search: { grid: true, rows: [2, 3] }, layout: { grid: { fit: 'center' }, lineGap: 'kiss', overlap: -1.2, kiss: -0.06 }, rods: { lowWeight: 1, levelWeight: 3 } },
-  'grid-mono': { label: 'Grid, monospaced (letters stretched towards their slot width, at most 1.5×)', search: { grid: true, rows: [2, 3] }, layout: { grid: { fit: 'stretch' }, lineGap: 'kiss', overlap: -1.2, kiss: -0.06 }, rods: { lowWeight: 1, levelWeight: 3 } },
-};
-const entries = [];
-for (const presetName of o.presets.split(',')) {
-const preset = PRESETS[presetName];
-const t0 = performance.now();
-const all = exploreWordPair(wasm, font, wordA, wordB, {
-  cases: o.cases.split(','), rows: o.rows.split(',').map(Number), fits: o.fits.split(','),
-  maxChunk: Number(o['max-chunk']), byStyle: true, height: H, kiss: preset.layout.kiss, ...preset.search,
-});
-console.error(`${presetName}: ${all.length} layouts in ${((performance.now() - t0) / 1000).toFixed(0)} s`);
-
-// Best per style (case × rows), by rankScore.
-const groups = new Map();
-for (const p of all) {
-  const k = `${p.caseMode}, ${p.rows.length} row${p.rows.length > 1 ? 's' : ''}`;
-  if (!groups.has(k)) groups.set(k, []);
-  groups.get(k).push(p);
-}
 const pct = (x) => `${(x * 100).toFixed(1)}%`;
 const svgPath = (polys) => polys.map((p) => 'M' + p.map(([x, y]) => `${x.toFixed(2)},${(-y).toFixed(2)}`).join('L') + 'Z').join('');
-for (const [style, ps] of groups) {
-  ps.sort(rankLayouts);
-  const p = ps[0];
-  const r = realizeLayout(wasm, font, p, { height: H, ...preset.layout });
-  const vis = letterVisibility(wasm, r.cells, { height: H });
-  const m = r.metrics;
-  // Join into one piece; the letters-only solid stays in r.solid for coverage.
-  let joined = r.solid, bridges = [], blocks = [];
-  const replace = (next) => { if (joined !== r.solid) joined.delete(); joined = next; };
-  if (o.join.includes('hull')) { const h = hullJoin(wasm, joined, r.cells); replace(h.solid); blocks = h.blocks; }
-  if (o.join.includes('plate')) replace(basePlate(wasm, joined, r.cells));
-  if (o.join.includes('bridges')) {
-    const b = bridgePieces(wasm, joined, preset.rods);
-    replace(b.solid); bridges = b.bridges;
-  }
-  const stray = strayShadow(wasm, r.solid, joined, r.cells);
-  const finalParts = joined.decompose();
-  const finalPieces = finalParts.filter((x) => x.volume() >= 1e-3 * joined.volume()).length;
-  for (const x of finalParts) x.delete();
-  const views = {};
-  for (const v of ['front', 'right']) {
-    const shadow = joined.transform(worldToLocal(v)).project();
-    const target = wasm.CrossSection.union(r.cells.map((c) => c.shapes[v]));
-    const missing = target.subtract(shadow);
-    const { min, max } = target.bounds();
-    views[v] = { shadow: svgPath(shadow.toPolygons()), missing: svgPath(missing.toPolygons()), box: [min[0], -max[1], max[0] - min[0], max[1] - min[1]] };
-    for (const x of [shadow, target, missing]) x.delete();
-  }
-  const mesh = joined.getMesh();
-  const verts = [];
-  for (let i = 0; i < mesh.vertProperties.length; i += mesh.numProp) verts.push(...[0, 1, 2].map((k) => Math.round(mesh.vertProperties[i + k] * 100) / 100));
-  entries.push({
-    preset: preset.label, style, text: describeLayout(p),
-    stats: `worst letter ${pct(m.worstCell)} · least visible ${vis.worst.ch ? `${vis.worst.ch} ${pct(vis.worst.visible)}` : 'all 100%'} · most contact ${vis.worstContact.ch ? `${vis.worstContact.ch} ${pct(vis.worstContact.contact)}` : 'none'} · stretch ${(p.score.distortion * 100).toFixed(0)}% · ${m.pieces} piece${m.pieces > 1 ? 's' : ''}`
-      + (o.join === 'none' ? '' : ` → ${finalPieces} after ${o.join} (${blocks.length ? `${blocks.length} hull block${blocks.length === 1 ? '' : 's'}, ` : ''}${bridges.length} rod${bridges.length === 1 ? '' : 's'}${bridges.length ? `, longest ${Math.max(...bridges.map((b) => b.length)).toFixed(1)} mm` : ''}; extra shadow ${pct(stray.front)} / ${pct(stray.right)})`)
-      + ` · ${m.size.map((x) => x.toFixed(0)).join(' × ')} mm`,
-    views, verts, tris: Array.from(mesh.triVerts),
+const entries = [];
+for (const spacing of o.presets.split(',')) {
+  const t0 = performance.now();
+  const designs = designWordPair(wasm, font, wordA, wordB, {
+    spacing, join: o.join, height: H, candidates: Number(o.candidates),
+    cases: o.cases.split(','), rows: o.rows.split(',').map(Number), fits: o.fits.split(','), maxChunk: Number(o['max-chunk']),
   });
-  if (joined !== r.solid) joined.delete();
-  r.dispose();
+  console.error(`${spacing}: ${designs.length} styles in ${((performance.now() - t0) / 1000).toFixed(0)} s`);
+  // Show styles in a stable order (case, then rows) rather than by quality.
+  const order = ['upper', 'lower', 'title', 'mixed'];
+  designs.sort((a, b) => order.indexOf(a.layout.caseMode) - order.indexOf(b.layout.caseMode) || a.layout.rows.length - b.layout.rows.length);
+  for (const { style, layout, metrics: m, runnersUp } of designs) {
+    const d = realizeDesign(wasm, font, layout, { spacing, join: o.join, height: H });
+    const views = {};
+    for (const v of ['front', 'right']) {
+      const shadow = d.joined.transform(worldToLocal(v)).project();
+      const target = wasm.CrossSection.union(d.cells.map((c) => c.shapes[v]));
+      const missing = target.subtract(shadow);
+      const { min, max } = target.bounds();
+      views[v] = { shadow: svgPath(shadow.toPolygons()), missing: svgPath(missing.toPolygons()), box: [min[0], -max[1], max[0] - min[0], max[1] - min[1]] };
+      for (const x of [shadow, target, missing]) x.delete();
+    }
+    const mesh = d.joined.getMesh();
+    const verts = [];
+    for (let i = 0; i < mesh.vertProperties.length; i += mesh.numProp) verts.push(...[0, 1, 2].map((k) => Math.round(mesh.vertProperties[i + k] * 100) / 100));
+    const rerank = runnersUp.some((r) => rankLayouts(r.layout, layout) < 0) ? ' · re-ranked: search’s first choice scored lower' : '';
+    entries.push({
+      preset: SPACING[spacing].label, style, text: describeLayout(layout),
+      stats: `quality ${m.quality.toFixed(3)} · worst letter ${pct(m.coverage)} · least visible ${m.visibleMin < 1 ? `${m.leastVisible} ${pct(m.visibleMin)}` : 'all 100%'}`
+        + ` · most contact ${m.contactMax > 0 ? `${m.mostContact} ${pct(m.contactMax)}` : 'none'} · stretch ${(m.stretch * 100).toFixed(0)}% · ${m.pieces} piece${m.pieces > 1 ? 's' : ''}`
+        + (o.join === 'none' ? '' : ` → ${m.finalPieces} after ${o.join} (${m.blocks ? `${m.blocks} hull block${m.blocks === 1 ? '' : 's'}, ` : ''}${m.rods} rod${m.rods === 1 ? '' : 's'}${m.rods ? `, longest ${m.longestRod.toFixed(1)} mm` : ''}; extra shadow ${pct(m.stray.front)} / ${pct(m.stray.right)})`)
+        + ` · ${m.size.map((x) => x.toFixed(0)).join(' × ')} mm${rerank}`,
+      views, verts, tris: Array.from(mesh.triVerts),
+    });
+    d.dispose();
+  }
 }
 
-}
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${wordA} × ${wordB}</title>
 <style>
@@ -128,7 +93,7 @@ h1 { font-size:20px; margin:0 0 4px; } p.sub { margin:0 0 16px; color:var(--mute
 path.s { fill:var(--ink); } path.m { fill:var(--miss); }
 </style></head><body>
 <h1>${wordA} × ${wordB}</h1>
-<p class="sub">Best layout per style (${entry?.name ?? o.font}). “·” separates cells, “/” rows, “↕” = letter stretched to row height. Front reads ${wordA}, right reads ${wordB}; red = missing from the letter. “Least visible” = share of a letter not covered by neighbouring letters; “most contact” = outline touching other letters, in row heights (≳30% reads as merged). Joined with ${o.join}. Drag to rotate.</p>
+<p class="sub">Best layout per style (${entry?.name ?? o.font}), chosen by “quality”: worst-letter coverage minus penalties for hidden letters, merged stems, stretch, extra shadow and uneven rows (src/core/design.js). “·” separates cells, “/” rows, “↕” = letter stretched to row height. Front reads ${wordA}, right reads ${wordB}; red = missing from the letter. “Least visible” = share of a letter not covered by neighbouring letters; “most contact” = outline touching other letters, in row heights (≳30% reads as merged). Joined with ${o.join}. Drag to rotate.</p>
 <div id="grid"></div>
 <canvas id="gl"></canvas>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/" } }</script>
