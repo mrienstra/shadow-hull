@@ -40,6 +40,11 @@ let controls = new OrbitControls(camera, renderer.domElement);
 let meshObj = null, box = null, size = 40;
 
 const material = new THREE.MeshStandardMaterial({ color: 0xc8a27a, roughness: 0.65, metalness: 0, flatShading: true });
+// Colour by the view that carved each face (labels from core faceRuns).
+const FACE_COLOURS = { front: 0xe07b53, right: 0x4c9be8, top: 0x9b6fd6, box: 0xb7b1a6, connector: 0x6f6f6f };
+const faceMaterials = Object.fromEntries(Object.entries(FACE_COLOURS).map(([k, color]) => [k, new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0, flatShading: true })]));
+const LABEL_ORDER = [...Object.keys(FACE_COLOURS), null];
+const paletteMaterials = [...Object.values(faceMaterials), material];
 
 function fitFrustum() {
   const w = viewport.clientWidth, h = viewport.clientHeight;
@@ -83,7 +88,11 @@ function snap(view) {
   lookFrom(dir, rolled);
 }
 
-function showMesh({ numProp, vertProperties, triVerts }) {
+function applyColour() {
+  if (meshObj) meshObj.material = $('#colour-faces').checked ? paletteMaterials : material;
+}
+
+function showMesh({ numProp, vertProperties, triVerts, runs = [] }) {
   if (meshObj) { meshObj.geometry.dispose(); scene.remove(meshObj); }
   if (box) { box.geometry.dispose(); scene.remove(box); }
   const geo = new THREE.BufferGeometry();
@@ -93,7 +102,9 @@ function showMesh({ numProp, vertProperties, triVerts }) {
   }
   geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   geo.setIndex(new THREE.BufferAttribute(triVerts, 1));
+  for (const r of runs) geo.addGroup(r.start, r.count, LABEL_ORDER.indexOf(r.label in FACE_COLOURS ? r.label : null));
   meshObj = new THREE.Mesh(geo, material);
+  applyColour();
   scene.add(meshObj);
   box = new THREE.LineSegments(
     new THREE.EdgesGeometry(new THREE.BoxGeometry(size, size, size)),
@@ -253,6 +264,7 @@ form.addEventListener('submit', async (e) => {
 });
 
 for (const b of document.querySelectorAll('.toolbar [data-view]')) b.addEventListener('click', () => snap(b.dataset.view));
+$('#colour-faces').addEventListener('change', applyColour);
 
 $('#download').addEventListener('click', () => {
   const name = VIEW_NAMES.map((v) => guide[v].text || '_').join('-') + '.stl';

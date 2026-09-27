@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-09-27 (colour faces by the view that carved them)
+
+- `manifold.js`: `tagged(m, label)` registers a solid's original ID under a label;
+  `faceRuns(mesh)` returns labelled triangle runs (Manifold keeps per-triangle
+  provenance through booleans). View prisms are tagged by view (trip-lets,
+  compositions, full hull); cell boxes 'box'; rods, plates and hull-join cut
+  faces 'connector'.
+- Cell boxes are padded by 0.05 mm: letters' flat sides lay exactly on box faces,
+  and the coplanar tie credited those faces to the box. With two views the
+  prisms already bound a cell, so no material is added (coverage unchanged).
+- Report and web page colour faces (front orange, side blue, top purple, box
+  grey, connectors dark grey), with a toggle and an explanation: a face follows
+  the outline of its view's letter (the walls of that extrusion), so the flat
+  face seen head-on shows the *other* view's colour.
+- Test: every trip-let face labelled; front-labelled faces are parallel to Y
+  (float32 tolerance 1e-3, slivers skipped).
+- No subagents used.
+
 ## 2026-09-27 (column with spanning letters)
 
 - `column.js`: the longer word one letter per row; the shorter word's letters

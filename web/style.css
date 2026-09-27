@@ -102,3 +102,4 @@ label.toggle { margin: 0 0 6px; font-size: 13px; }
 .sw.target { border: 1px dashed var(--target); }
 #shadow-panels.plain .missing, #shadow-panels.plain .target { display: none; }
 .shadows:has(#shadow-panels.plain) .legend .extra { display: none; }
+.colour-toggle { font-size: 13px; color: var(--ink); margin-left: 8px; }

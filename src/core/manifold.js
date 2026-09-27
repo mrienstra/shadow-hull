@@ -66,3 +66,32 @@ export function extrudeCentered(wasm, cs, height) {
     raw.delete();
   }
 }
+
+// ---- Face provenance ----------------------------------------------------------
+// Manifold keeps, through booleans, which input solid each output triangle came
+// from (mesh.runOriginalID / runIndex). We register a label per input solid
+// (e.g. the view whose prism it is) so faces can be coloured by what carved them.
+const faceLabels = new Map();
+
+/** A copy of `m` with its own original ID registered under `label`. Caller owns both. */
+export function tagged(m, label) {
+  const t = m.asOriginal();
+  faceLabels.set(t.originalID(), label);
+  return t;
+}
+
+/**
+ * Triangle runs of a mesh with their labels: [{ start, count, label }] where
+ * start/count index into triVerts (as three.js geometry groups expect).
+ * Untagged runs get label null.
+ */
+export function faceRuns(mesh) {
+  const out = [];
+  const { runIndex, runOriginalID } = mesh;
+  if (!runIndex || !runOriginalID) return [{ start: 0, count: mesh.triVerts.length, label: null }];
+  for (let r = 0; r < runOriginalID.length; r++) {
+    const start = runIndex[r], count = runIndex[r + 1] - start;
+    if (count > 0) out.push({ start, count, label: faceLabels.get(runOriginalID[r]) ?? null });
+  }
+  return out;
+}

@@ -11,7 +11,7 @@
  *
  * Both return a new Manifold (caller owns it); neither consumes its inputs.
  */
-import { Scope, extrudeCentered } from './manifold.js';
+import { Scope, extrudeCentered, tagged } from './manifold.js';
 import { VIEW_NAMES, localToWorld, worldToLocal } from './views.js';
 
 /** Base plate under the bottom row of `cells`, fitted to `solid`. */
@@ -35,7 +35,7 @@ export function basePlate(wasm, solid, cells, { thickness = 1.5, embed = 0.3 } =
       const w = c.box.max[0] - c.box.min[0], d = c.box.max[1] - c.box.min[1];
       return scope.add(scope.add(Manifold.cube([w, d, thickness], false)).translate([c.box.min[0], c.box.min[1], top - thickness]));
     });
-    const plate = scope.add(Manifold.union(slabs));
+    const plate = scope.add(tagged(scope.add(Manifold.union(slabs)), 'connector'));
     return Manifold.union(solid, plate);
   } finally {
     scope.dispose();
@@ -110,7 +110,7 @@ export function bridgePieces(wasm, solid, { radius = 0.8, dustFraction = 1e-3, l
     for (const [i, j, , p, q, length] of edges) {
       if (find(i) === find(j)) continue;
       parent[find(i)] = find(j);
-      rods.push(scope.add(rod(wasm, p, q, radius)));
+      rods.push(scope.add(tagged(scope.add(rod(wasm, p, q, radius)), 'connector')));
       bridges.push({ from: p, to: q, length });
     }
     return { solid: Manifold.union([...parts, ...rods]), bridges };
@@ -160,7 +160,7 @@ export function fullHull(wasm, cells, { frames } = {}) {
       const own = cells.map((c) => c.shapes[v]).filter(Boolean);
       if (!own.length) continue;
       const word = scope.add(CrossSection.union(own));
-      prisms.push(scope.add(scope.add(extrudeCentered(wasm, word, length)).transform(localToWorld(v, frames))));
+      prisms.push(scope.add(scope.add(tagged(scope.add(extrudeCentered(wasm, word, length)), v)).transform(localToWorld(v, frames))));
     }
     return Manifold.intersection(prisms);
   } finally {
@@ -205,7 +205,8 @@ export function hullJoin(wasm, solid, cells, { dustFraction = 1e-3 } = {}) {
       const a = cells[c.i].box, b = cells[c.j].box;
       const min = [a.min[0], b.min[1], Math.min(a.min[2], b.min[2])];
       const max = [a.max[0], b.max[1], Math.max(a.max[2], b.max[2])];
-      const box = scope.add(scope.add(Manifold.cube(max.map((x, k) => x - min[k]), false)).translate(min));
+      // The block's cut faces are connector faces (it's material added to join pieces).
+      const box = scope.add(tagged(scope.add(scope.add(Manifold.cube(max.map((x, k) => x - min[k]), false)).translate(min)), 'connector'));
       const block = scope.add(H.intersect(box));
       if (block.isEmpty()) continue;
       const next = Manifold.union(current, block);

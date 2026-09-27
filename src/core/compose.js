@@ -8,7 +8,7 @@
  * (see views.js): front = (X, Z), right = (Y, Z), top = (X, Y). A missing shape
  * leaves that view unconstrained inside the box. Shapes are not consumed.
  */
-import { Scope, extrudeCentered } from './manifold.js';
+import { Scope, extrudeCentered, tagged } from './manifold.js';
 import { VIEW_NAMES, localToWorld, worldToLocal } from './views.js';
 
 function extent(cells) {
@@ -26,12 +26,17 @@ export function buildComposition(wasm, cells, { frames } = {}) {
   const scope = new Scope();
   try {
     const length = 4 * extent(cells) + 1; // prisms long enough to cross every box
+    // Boxes are padded slightly: a letter's flat side often lies exactly on
+    // its box face, and the coplanar tie would credit that face to the box
+    // (it matters for colouring faces by the view that carved them). With two
+    // views the prisms already bound the cell, so the pad adds no material.
+    const pad = 0.05;
     const solids = cells.map(({ box, shapes }) => {
-      const size = box.max.map((x, i) => x - box.min[i]);
-      const parts = [scope.add(scope.add(Manifold.cube(size, false)).translate(box.min))];
+      const size = box.max.map((x, i) => x - box.min[i] + 2 * pad);
+      const parts = [scope.add(tagged(scope.add(scope.add(Manifold.cube(size, false)).translate(box.min.map((x) => x - pad))), 'box'))];
       for (const v of VIEW_NAMES) {
         if (!shapes[v]) continue;
-        const prism = scope.add(extrudeCentered(wasm, shapes[v], length));
+        const prism = scope.add(tagged(scope.add(extrudeCentered(wasm, shapes[v], length)), v));
         parts.push(scope.add(prism.transform(localToWorld(v, frames))));
       }
       return scope.add(Manifold.intersection(parts));

@@ -13,9 +13,7 @@ when done. Owner requests are marked (owner).
 - The chain/"jumbled" arrangements stay: they're compelling (owner).
 
 ## Rendering
-- (owner, no rush) **Colour faces by the axis that clipped them** (which
-  view's prism a face lies on). Manifold keeps per-triangle `originalID`/run
-  info through booleans; tag each prism, then colour by run in three.js.
+- Export coloured models (3MF with per-face colours) for multi-colour printing.
 
 ## Earlier plan (synthesis, 2026-09-26)
 - Band-wise vertical warp (baseline / x-height / cap / ascender / descender)

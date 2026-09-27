@@ -7,7 +7,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { getManifold, loadFont, worldToLocal } from '../src/core/index.js';
+import { getManifold, loadFont, worldToLocal, faceRuns } from '../src/core/index.js';
 import { describeLayout, rankLayouts } from '../src/core/wordpair.js';
 import { SPACING, designWordPair, realizeDesign, realizeBlock, designSpanColumn, realizeSpanColumn } from '../src/core/design.js';
 import { glyphSilhouette } from '../src/core/block.js';
@@ -40,6 +40,8 @@ const entry = fonts.find((f) => f.id === o.font);
 const font = loadFont(await readFile(entry ? fileURLToPath(new URL(entry.file, FONTS_DIR)) : o.font));
 const wasm = await getManifold();
 const H = 20;
+// Face colours by what carved them (see faceRuns). Order matters: index into PALETTE in the page.
+const LABELS = ['front', 'right', 'top', 'box', 'connector', null];
 const pct = (x) => `${(x * 100).toFixed(1)}%`;
 const svgPath = (polys) => polys.map((p) => 'M' + p.map(([x, y]) => `${x.toFixed(2)},${(-y).toFixed(2)}`).join('L') + 'Z').join('');
 const entries = [];
@@ -125,6 +127,7 @@ function card(d, preset, style, text, join, note = '') {
       + (join === 'none' ? '' : ` → ${m.finalPieces} after ${join} (${m.blocks ? `${m.blocks} hull block${m.blocks === 1 ? '' : 's'}, ` : ''}${m.rods} rod${m.rods === 1 ? '' : 's'}${m.rods ? `, longest ${m.longestRod.toFixed(1)} mm` : ''}; extra shadow ${pct(m.stray.front)} / ${pct(m.stray.right)})`)
       + ` · ${m.size.map((x) => x.toFixed(0)).join(' × ')} mm${note}`,
     views, verts, tris: Array.from(mesh.triVerts),
+    runs: faceRuns(mesh).map((r) => [r.start, r.count, LABELS.indexOf(r.label)]),
   };
 }
 
@@ -147,9 +150,15 @@ h1 { font-size:20px; margin:0 0 4px; } p.sub { margin:0 0 16px; color:var(--mute
 .shadows svg { width:100%; height:70px; background:var(--bg); border-radius:6px; }
 .shadows .cap { font-size:11px; color:var(--muted); }
 path.s { fill:var(--ink); } path.m { fill:var(--miss); }
+.legend { font-size:13px; color:var(--muted); display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:0 0 12px; }
+.legend .sw { display:inline-block; width:12px; height:12px; border-radius:2px; margin-left:8px; }
 </style></head><body>
 <h1>${wordA} × ${wordB}</h1>
 <p class="sub">Best layout per style (${entry?.name ?? o.font}), chosen by “quality”: worst-letter coverage minus penalties for hidden letters, merged stems, stretch, extra shadow and uneven rows (src/core/design.js). “·” separates cells, “/” rows, “↕” = letter stretched to row height. Front reads ${wordA}, right reads ${wordB}; red = missing from the letter. “Least visible” = share of a letter not covered by neighbouring letters; “most contact” = outline touching other letters, in row heights (≳30% reads as merged). Joined with ${o.join}. Drag to rotate.</p>
+<p class="legend"><label><input type="checkbox" id="colour" checked> Colour faces by the view that carved them:</label>
+  <span class="sw" style="background:#e07b53"></span>front <span class="sw" style="background:#4c9be8"></span>side <span class="sw" style="background:#9b6fd6"></span>top
+  <span class="sw" style="background:#b7b1a6"></span>bounding box <span class="sw" style="background:#6f6f6f"></span>connectors.
+  A face follows the outline of the view it's coloured by (the walls of that letter's extrusion); the flat face you see head-on is cut by the other view's letter.</p>
 <div id="grid"></div>
 <canvas id="gl"></canvas>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/" } }</script>
@@ -162,6 +171,13 @@ const renderer = new THREE.WebGLRenderer({ canvas: gl, antialias: true, alpha: t
 renderer.setPixelRatio(devicePixelRatio);
 renderer.setClearColor(0x000000, 0);
 const material = new THREE.MeshStandardMaterial({ color: 0xc8a27a, roughness: 0.65, flatShading: true });
+// Same order as LABELS in the script: front, right/side, top, box, connector, untagged.
+const PALETTE = [0xe07b53, 0x4c9be8, 0x9b6fd6, 0xb7b1a6, 0x6f6f6f, 0xc8a27a]
+  .map((color) => new THREE.MeshStandardMaterial({ color, roughness: 0.65, flatShading: true }));
+const meshes = [];
+const colour = document.getElementById('colour');
+const applyColour = () => { for (const m of meshes) m.material = colour.checked ? PALETTE : material; };
+colour.addEventListener('change', applyColour);
 const views = [];
 const main = document.getElementById('grid');
 const sections = new Map();
@@ -184,7 +200,10 @@ for (const e of DATA) {
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(e.verts, 3)); geo.setIndex(e.tris);
   geo.computeBoundingSphere();
-  scene.add(new THREE.Mesh(geo, material));
+  for (const [start, count, k] of e.runs) geo.addGroup(start, count, k < 0 ? PALETTE.length - 1 : k);
+  const mesh = new THREE.Mesh(geo, material);
+  meshes.push(mesh);
+  scene.add(mesh);
   const c = geo.boundingSphere.center, rad = geo.boundingSphere.radius;
   const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, rad * 20); cam.up.set(0, 0, 1);
   cam.position.set(c.x - rad * 2, c.y - rad * 3, c.z + rad * 2); cam.lookAt(c);
@@ -212,6 +231,7 @@ function frame() {
     renderer.render(v.scene, v.cam);
   }
 }
+applyColour();
 renderer.setAnimationLoop(frame);
 </script></body></html>`;
 

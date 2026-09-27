@@ -191,3 +191,28 @@ test('extrudeCentered does not leak WASM memory (manifold-3d extrude workaround)
   // The unpatched wrapper leaks ~0.37 MB per call here (~370 MB for 1000 calls).
   assert.ok(grown < 60, `RSS grew ${grown.toFixed(0)} MB over 1000 extrusions`);
 });
+
+test('faceRuns labels every face of a trip-let by the view that carved it', async () => {
+  const { faceRuns } = await import('../src/core/manifold.js');
+  const shapes = shapesFor({ front: 'G', right: 'E', top: 'B' });
+  const solid = buildTriplet(wasm, shapes, {}, { size: SIZE });
+  try {
+    const mesh = solid.getMesh();
+    const runs = faceRuns(mesh);
+    const labels = new Set(runs.map((r) => r.label));
+    assert.deepEqual([...labels].sort(), ['front', 'right', 'top']);
+    assert.equal(runs.reduce((a, r) => a + r.count, 0), mesh.triVerts.length);
+    // A front-prism face contains the front view's extrusion direction (±Y): its normal has no Y part.
+    const v = (i) => [0, 1, 2].map((k) => mesh.vertProperties[i * mesh.numProp + k]);
+    for (const r of runs.filter((x) => x.label === 'front')) {
+      for (let t = r.start; t < r.start + r.count; t += 3) {
+        const [a, b, c] = [0, 1, 2].map((k) => v(mesh.triVerts[t + k]));
+        const u = b.map((x, i) => x - a[i]), w = c.map((x, i) => x - a[i]);
+        const n = [u[1] * w[2] - u[2] * w[1], u[2] * w[0] - u[0] * w[2], u[0] * w[1] - u[1] * w[0]];
+        const len = Math.hypot(...n);
+        // Vertices are float32, so skip slivers (area < 0.001 mm²) and allow 1e-3.
+        if (len / 2 > 1e-3) assert.ok(Math.abs(n[1] / len) < 1e-3, `front faces are parallel to Y (n_y ${n[1] / len})`);
+      }
+    }
+  } finally { free(shapes, solid); }
+});

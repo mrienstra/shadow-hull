@@ -1,4 +1,4 @@
-import { Scope, extrudeCentered } from './manifold.js';
+import { Scope, extrudeCentered, tagged } from './manifold.js';
 import { textContours } from './glyph.js';
 import { VIEW_NAMES, localToWorld, worldToLocal, d4Mat3, howToView } from './views.js';
 
@@ -40,7 +40,7 @@ export function buildTriplet(wasm, shapes, transforms = {}, { size = 40 } = {}) 
     const length = size * 1.5; // overshoot the cube so no faces are coplanar
     const prisms = VIEW_NAMES.map((v) => {
       const cs = scope.add(shapes[v].transform(d4Mat3(transforms[v] ?? 0)));
-      const prism = scope.add(extrudeCentered(wasm, cs, length));
+      const prism = scope.add(tagged(scope.add(extrudeCentered(wasm, cs, length)), v));
       return scope.add(prism.transform(localToWorld(v)));
     });
     return Manifold.intersection(prisms);
