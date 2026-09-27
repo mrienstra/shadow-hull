@@ -9,7 +9,8 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { getManifold, loadFont, worldToLocal } from '../src/core/index.js';
 import { describeLayout, rankLayouts } from '../src/core/wordpair.js';
-import { SPACING, designWordPair, realizeDesign } from '../src/core/design.js';
+import { SPACING, designWordPair, realizeDesign, realizeBlock } from '../src/core/design.js';
+import { glyphSilhouette } from '../src/core/block.js';
 
 const { values: o, positionals: [wordA, wordB] } = parseArgs({
   allowPositionals: true,
@@ -20,6 +21,9 @@ const { values: o, positionals: [wordA, wordB] } = parseArgs({
     presets: { type: 'string', default: 'touching,spaced,grid,grid-mono,column,column-touching' },
     'max-chunk': { type: 'string', default: '3' },
     candidates: { type: 'string', default: '3' }, // search results per style built and re-ranked by quality
+    // Block section: whole words front and side, top view none or a shape
+    // (characters from the Noto Emoji outline font, holes filled). '' = skip.
+    tops: { type: 'string', default: 'none,❤' },
     join: { type: 'string', default: 'hull+bridges' }, // none | hull | plate | bridges, combined with '+'
 
   },
@@ -47,29 +51,51 @@ for (const spacing of o.presets.split(',')) {
   designs.sort((a, b) => order.indexOf(a.layout.caseMode) - order.indexOf(b.layout.caseMode) || a.layout.rows.length - b.layout.rows.length);
   for (const { style, layout, metrics: m, runnersUp } of designs) {
     const d = realizeDesign(wasm, font, layout, { spacing, join: o.join, height: H });
-    const views = {};
-    for (const v of ['front', 'right']) {
-      const shadow = d.joined.transform(worldToLocal(v)).project();
-      const target = wasm.CrossSection.union(d.cells.map((c) => c.shapes[v]));
-      const missing = target.subtract(shadow);
-      const { min, max } = target.bounds();
-      views[v] = { shadow: svgPath(shadow.toPolygons()), missing: svgPath(missing.toPolygons()), box: [min[0], -max[1], max[0] - min[0], max[1] - min[1]] };
-      for (const x of [shadow, target, missing]) x.delete();
-    }
-    const mesh = d.joined.getMesh();
-    const verts = [];
-    for (let i = 0; i < mesh.vertProperties.length; i += mesh.numProp) verts.push(...[0, 1, 2].map((k) => Math.round(mesh.vertProperties[i + k] * 100) / 100));
     const rerank = runnersUp.some((r) => rankLayouts(r.layout, layout) < 0) ? ' · re-ranked: search’s first choice scored lower' : '';
-    entries.push({
-      preset: SPACING[spacing].label, style, text: describeLayout(layout),
-      stats: `quality ${m.quality.toFixed(3)} · worst letter ${pct(m.coverage)} · least visible ${m.visibleMin < 1 ? `${m.leastVisible} ${pct(m.visibleMin)}` : 'all 100%'}`
-        + ` · most contact ${m.contactMax > 0 ? `${m.mostContact} ${pct(m.contactMax)}` : 'none'} · stretch ${(m.stretch * 100).toFixed(0)}% · ${m.pieces} piece${m.pieces > 1 ? 's' : ''}`
-        + (o.join === 'none' ? '' : ` → ${m.finalPieces} after ${o.join} (${m.blocks ? `${m.blocks} hull block${m.blocks === 1 ? '' : 's'}, ` : ''}${m.rods} rod${m.rods === 1 ? '' : 's'}${m.rods ? `, longest ${m.longestRod.toFixed(1)} mm` : ''}; extra shadow ${pct(m.stray.front)} / ${pct(m.stray.right)})`)
-        + ` · ${m.size.map((x) => x.toFixed(0)).join(' × ')} mm${rerank}`,
-      views, verts, tris: Array.from(mesh.triVerts),
-    });
+    entries.push(card(d, SPACING[spacing].label, style, describeLayout(layout), o.join, rerank));
     d.dispose();
   }
+}
+
+// Block layouts: whole words, touching letters, top view none or a shape.
+if (o.tops) {
+  const emoji = loadFont(await readFile(fileURLToPath(new URL('shapes/NotoEmoji.ttf', FONTS_DIR))));
+  for (const top of o.tops.split(',')) {
+    const shape = top === 'none' ? null : glyphSilhouette(wasm, emoji, top);
+    for (const caseMode of ['upper', 'lower', 'title']) {
+      const d = realizeBlock(wasm, font, wordA, wordB, { caseMode, spacing: 'touching', top: shape && { shape, fit: 'stretch' }, join: 'bridges', height: H });
+      const topNote = shape ? ` · top ${top} ${pct(d.metrics.views.top.coverage)} shown` : '';
+      entries.push(card(d, 'Block (whole words, touching; top view: none or a shape)', `${caseMode}, top ${top}`, `${wordA} × ${wordB}${shape ? ' × ' + top : ''}`, 'bridges', topNote));
+      d.dispose();
+    }
+    shape?.delete();
+  }
+}
+
+function card(d, preset, style, text, join, note = '') {
+  const m = d.metrics;
+  const views = {};
+  for (const v of ['front', 'right', 'top']) {
+    const own = d.cells.map((c) => c.shapes[v]).filter(Boolean);
+    if (!own.length) continue;
+    const shadow = d.joined.transform(worldToLocal(v)).project();
+    const target = wasm.CrossSection.union(own);
+    const missing = target.subtract(shadow);
+    const { min, max } = target.bounds();
+    views[v] = { shadow: svgPath(shadow.toPolygons()), missing: svgPath(missing.toPolygons()), box: [min[0], -max[1], max[0] - min[0], max[1] - min[1]] };
+    for (const x of [shadow, target, missing]) x.delete();
+  }
+  const mesh = d.joined.getMesh();
+  const verts = [];
+  for (let i = 0; i < mesh.vertProperties.length; i += mesh.numProp) verts.push(...[0, 1, 2].map((k) => Math.round(mesh.vertProperties[i + k] * 100) / 100));
+  return {
+    preset, style, text,
+    stats: `quality ${m.quality.toFixed(3)} · worst letter ${pct(m.coverage)} · least visible ${m.visibleMin < 1 ? `${m.leastVisible} ${pct(m.visibleMin)}` : 'all 100%'}`
+      + ` · most contact ${m.contactMax > 0 ? `${m.mostContact} ${pct(m.contactMax)}` : 'none'} · stretch ${(m.stretch * 100).toFixed(0)}% · ${m.pieces} piece${m.pieces > 1 ? 's' : ''}`
+      + (join === 'none' ? '' : ` → ${m.finalPieces} after ${join} (${m.blocks ? `${m.blocks} hull block${m.blocks === 1 ? '' : 's'}, ` : ''}${m.rods} rod${m.rods === 1 ? '' : 's'}${m.rods ? `, longest ${m.longestRod.toFixed(1)} mm` : ''}; extra shadow ${pct(m.stray.front)} / ${pct(m.stray.right)})`)
+      + ` · ${m.size.map((x) => x.toFixed(0)).join(' × ')} mm${note}`,
+    views, verts, tris: Array.from(mesh.triVerts),
+  };
 }
 
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -87,7 +113,7 @@ h1 { font-size:20px; margin:0 0 4px; } p.sub { margin:0 0 16px; color:var(--mute
    (browsers allow only ~16 WebGL contexts per page). */
 #gl { position:fixed; inset:0; width:100vw; height:100vh; pointer-events:none; z-index:1; }
 .view { width:100%; height:240px; background:var(--bg); border-radius:6px; touch-action:none; }
-.shadows { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px; }
+.shadows { display:grid; grid-template-columns:repeat(auto-fit, minmax(90px, 1fr)); gap:8px; margin-top:8px; }
 .shadows svg { width:100%; height:70px; background:var(--bg); border-radius:6px; }
 .shadows .cap { font-size:11px; color:var(--muted); }
 path.s { fill:var(--ink); } path.m { fill:var(--miss); }
@@ -118,7 +144,7 @@ for (const e of DATA) {
   const grid = sections.get(e.preset);
   const card = document.createElement('div'); card.className = 'card';
   const svg = (v, cap) => '<div><svg viewBox="' + e.views[v].box.join(' ') + '"><path class="s" d="' + e.views[v].shadow + '"/><path class="m" d="' + e.views[v].missing + '"/></svg><div class="cap">' + cap + '</div></div>';
-  card.innerHTML = '<h2></h2><div class="t"></div><div class="s"></div><div class="view"></div><div class="shadows">' + svg('front', 'front') + svg('right', 'right') + '</div>';
+  card.innerHTML = '<h2></h2><div class="t"></div><div class="s"></div><div class="view"></div><div class="shadows">' + svg('front', 'front') + svg('right', 'right') + (e.views.top ? svg('top', 'top') : '') + '</div>';
   card.querySelector('h2').textContent = e.style; card.querySelector('.t').textContent = e.text; card.querySelector('.s').textContent = e.stats;
   grid.append(card);
   const view = card.querySelector('.view');

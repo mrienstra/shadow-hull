@@ -8,8 +8,9 @@
  * each style keeps its top few search results, builds them, and picks the best
  * by designQuality.
  */
-import { letterVisibility } from './compose.js';
-import { exploreWordPair, realizeLayout, rankLayouts } from './wordpair.js';
+import { letterVisibility, buildComposition, measureComposition, disposeCells } from './compose.js';
+import { exploreWordPair, layoutCells, rankLayouts } from './wordpair.js';
+import { blockCells } from './block.js';
 import { basePlate, bridgePieces, strayShadow, hullJoin } from './join.js';
 
 /**
@@ -77,39 +78,60 @@ export function designQuality(m, w = QUALITY_WEIGHTS) {
 }
 
 /**
- * Build one layout with a spacing family, join it, and measure everything.
+ * Join a built composition and measure everything (shared by chain layouts
+ * and blocks). Takes ownership of `solid` and `cells` via dispose().
  * @returns { cells, solid (letters only), joined, metrics, dispose() }
  */
-export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = 'hull+bridges', height = 20 } = {}) {
-  const fam = SPACING[spacing];
-  const r = realizeLayout(wasm, font, layout, { height, ...fam.layout });
-  const vis = letterVisibility(wasm, r.cells, { height });
-  let joined = r.solid, bridges = [], blocks = [];
-  const replace = (next) => { if (joined !== r.solid) joined.delete(); joined = next; };
-  if (join.includes('hull')) { const h = hullJoin(wasm, joined, r.cells); replace(h.solid); blocks = h.blocks; }
-  if (join.includes('plate')) replace(basePlate(wasm, joined, r.cells));
-  if (join.includes('bridges')) { const b = bridgePieces(wasm, joined, fam.rods); replace(b.solid); bridges = b.bridges; }
-  const stray = strayShadow(wasm, r.solid, joined, r.cells);
+export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods = {}, height = 20, stretch = 0, imbalance = 0 } = {}) {
+  const base = measureComposition(wasm, solid, cells);
+  const vis = letterVisibility(wasm, cells, { height });
+  let joined = solid, bridges = [], blocks = [];
+  const replace = (next) => { if (joined !== solid) joined.delete(); joined = next; };
+  if (join.includes('hull') && cells.length > 1) { const h = hullJoin(wasm, joined, cells); replace(h.solid); blocks = h.blocks; }
+  if (join.includes('plate')) replace(basePlate(wasm, joined, cells));
+  if (join.includes('bridges')) { const b = bridgePieces(wasm, joined, rods); replace(b.solid); bridges = b.bridges; }
+  const stray = strayShadow(wasm, solid, joined, cells);
   const parts = joined.decompose();
   const finalPieces = parts.filter((x) => x.volume() >= 1e-3 * joined.volume()).length;
   for (const x of parts) x.delete();
-  const size = r.metrics.size;
+  const size = base.size;
   const metrics = {
-    coverage: r.metrics.worstCell,
+    coverage: base.worstCell, views: base.views,
     visibleMin: vis.worst.visible, leastVisible: vis.worst.ch,
     contactMax: vis.worstContact.contact, mostContact: vis.worstContact.ch,
-    stretch: layout.score?.distortion ?? 0,
-    imbalance: layout.imbalance ?? 0,
-    pieces: r.metrics.pieces, finalPieces,
+    stretch, imbalance,
+    pieces: base.pieces, finalPieces,
     blocks: blocks.length, rods: bridges.length, longestRod: bridges.length ? Math.max(...bridges.map((b) => b.length)) : 0,
     stray, strayMax: Math.max(0, ...Object.values(stray)),
     size, compactness: Math.min(...size) / Math.max(...size),
   };
   metrics.quality = designQuality(metrics);
   return {
-    cells: r.cells, solid: r.solid, joined, metrics,
-    dispose: () => { if (joined !== r.solid) joined.delete(); r.dispose(); },
+    cells, solid, joined, metrics,
+    dispose: () => { if (joined !== solid) joined.delete(); solid.delete(); disposeCells(cells); },
   };
+}
+
+/** Build one chain layout with a spacing family, join it, and measure everything. */
+export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = 'hull+bridges', height = 20 } = {}) {
+  const fam = SPACING[spacing];
+  const cells = layoutCells(wasm, font, { rows: layout.rows }, { height, ...fam.layout });
+  const solid = buildComposition(wasm, cells);
+  return finishDesign(wasm, cells, solid, {
+    join, rods: fam.rods, height, stretch: layout.score?.distortion ?? 0, imbalance: layout.imbalance ?? 0,
+  });
+}
+
+/**
+ * A block design (see block.js): whole words front and side, optional top
+ * shape. spacing 'touching' (letters just touch) or 'spaced' (visible gaps,
+ * joined by low level rods).
+ */
+export function realizeBlock(wasm, font, wordA, wordB, { caseMode = 'upper', spacing = 'spaced', top = null, join = 'bridges', height = 20 } = {}) {
+  const fam = SPACING[spacing];
+  const cells = blockCells(wasm, font, wordA, wordB, { height, caseMode, kiss: fam.layout.kiss, top });
+  const solid = buildComposition(wasm, cells);
+  return finishDesign(wasm, cells, solid, { join, rods: fam.rods, height });
 }
 
 /** Style key of a layout: case mode × number of rows. */

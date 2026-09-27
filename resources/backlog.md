@@ -9,9 +9,9 @@ when done. Owner requests are marked (owner).
 - (owner) **More "normal" layouts**: explore single-row only, with different
   relative view angles (non-orthogonal; any two vertical views still share z,
   so the interval arithmetic carries over; see brief-2026-09-26-synthesis.md).
-- (owner) **Third axis as a shape**: e.g. a heart for the top view: a Unicode
-  glyph (♥ U+2665 in a font that has it) or an emoji outline (silhouette only).
-  Needs the word-pair chain to get a top constraint, or a trip-let with a shape.
+- Third-axis shapes on *chain* layouts (block layouts have them now): the
+  chain's footprint is a diagonal staircase, so a top shape needs hull blocks
+  to fill it.
 - The chain/"jumbled" arrangements stay: they're compelling (owner).
 
 ## Rendering

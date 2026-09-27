@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-26 (block layouts; shapes on the third axis)
+
+- `block.js`: "normal" layouts. Whole word A front, whole word B side (single
+  rows, one cell), optional top-view shape stretched over the footprint.
+  `glyphSilhouette` turns any glyph into a filled outline (holes dropped).
+- `fonts/shapes/NotoEmoji.ttf` (OFL, monochrome outline emoji, 1,891 glyphs):
+  ❤ ♥ ⭐ 😀 🐱… as top shapes. None of the bundled letter fonts has ♥.
+- `design.js`: `finishDesign` (join + measure, shared) and `realizeBlock`.
+- Finola × Bryan, Kanit Black, touching: plain block 99.8% worst letter, one
+  piece. With ❤ on top: letters ≥99.7%, heart 97.9% shown, one piece, a
+  99 × 88 × 19 mm heart-shaped slab. Lowercase/title + ❤: letters ~88%. Spaced
+  blocks don't work: every letter pair is its own block (30 pieces, 29 rods), and
+  the gaps grid the heart (84%). Left out of the report.
+- Report: Block section (`--tops none,❤`); cards show the top view when constrained.
+- No subagents used.
+
 ## 2026-09-26 (single column)
 
 - `column` and `column-touching` families: one letter pair per row (rows = the
