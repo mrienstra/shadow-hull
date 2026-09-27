@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-09-26 (kiss spacing, letter visibility)
+
+- Problem: fixed overlaps (0.2 × row height between cells, −0.06 em
+  tracking) hid letters: in Finola × Bryan the least visible letter was 13–71%
+  visible (I 13%, l 27%, L 71%) while coverage said 100%.
+- `letterVisibility` (compose.js): the share of each letter not covered by other
+  letters in its view. Cells now carry per-letter outlines (`glyphRun`).
+- Kiss spacing: `glyphRun({ kiss })` inside chunks, and `layoutCells` with
+  `gap: 'kiss'` between cells and `lineGap: 'kiss'` between rows. Each neighbour
+  is placed to just touch, overlapping by `overlap` (0.3 mm) at the closest point
+  of the per-height edge profiles. Rows must touch in both views and share z,
+  so the tighter view overlaps more.
+- Result (best per style): least visible letter 93–97% in 10/12 layouts. Lowercase
+  and title with 3 rows nest their rows and hide 24–28% of an i. All 12 are one
+  piece: 9 via hull blocks alone (zero extra shadow), 3 with one rod (≤1.4%).
+  The cost: the lowercase/title i-dot is an island again (coverage ~93%).
+- Report defaults: `--gap kiss --line-gap kiss --kiss 0.01`; stats show the least
+  visible letter.
+- No subagents used.
+
 ## 2026-09-26 (hull-aware joining, tracking)
 
 - `join.js`: `fullHull` (whole words extruded and intersected; contains every

@@ -87,3 +87,35 @@ export function measureComposition(wasm, solid, cells) {
 export function disposeCells(cells) {
   for (const c of cells) for (const s of Object.values(c.shapes)) s?.delete();
 }
+
+/**
+ * How visible each letter is in its view: the share of its ink not covered
+ * by any other letter's ink in the same view (overlapping neighbours can hide
+ * a letter even when coverage is 100%). Needs cells with per-letter outlines
+ * (`cell.letters[view] = [{ ch, pts }]`, as from layoutCells).
+ * @returns { views: { front: [{ ch, visible }], ... }, worst: { ch, view, visible } }
+ */
+export function letterVisibility(wasm, cells) {
+  const { CrossSection } = wasm;
+  const scope = new Scope();
+  try {
+    const views = {};
+    let worst = { ch: null, view: null, visible: 1 };
+    for (const v of VIEW_NAMES) {
+      const letters = cells.flatMap((c) => c.letters?.[v] ?? []);
+      if (!letters.length) continue;
+      const shapes = letters.map((l) => scope.add(new CrossSection(l.pts, 'NonZero')));
+      views[v] = letters.map((l, i) => {
+        const others = shapes.filter((_, j) => j !== i);
+        const own = shapes[i].area();
+        const hidden = others.length ? scope.add(scope.add(CrossSection.union(others)).intersect(shapes[i])).area() : 0;
+        const visible = own > 0 ? 1 - hidden / own : 1;
+        if (visible < worst.visible) worst = { ch: l.ch, view: v, visible };
+        return { ch: l.ch, visible };
+      });
+    }
+    return { views, worst };
+  } finally {
+    scope.dispose();
+  }
+}

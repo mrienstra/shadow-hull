@@ -17,25 +17,26 @@
  * `gap` between (negative = overlap, which also helps join the cells).
  * The top view is unconstrained.
  */
-import { textContours } from './glyph.js';
+import { glyphRun, kissOffset } from './glyph.js';
 import { cellPieces } from './scan.js';
 import { buildComposition, measureComposition, disposeCells } from './compose.js';
 
 const inkCache = new WeakMap();
 
 /**
- * Outline and ink bounds of `text` in font units (y up).
- * `txt` = { tolerance, tracking } (see textContours).
+ * Outline (whole and per glyph) and ink bounds of `text` in font units (y up).
+ * `txt` = { tolerance, tracking, kiss } (see glyphRun).
  */
 export function ink(font, text, txt = {}) {
   let byText = inkCache.get(font);
   if (!byText) inkCache.set(font, (byText = new Map()));
-  const key = `${text}\u0000${txt.tolerance}\u0000${txt.tracking ?? 0}`;
+  const key = `${text}\u0000${txt.tolerance}\u0000${txt.tracking ?? 0}\u0000${txt.kiss ?? ''}`;
   if (!byText.has(key)) {
-    const contours = textContours(font, text, txt);
+    const glyphs = glyphRun(font, text, txt);
+    const contours = glyphs.flatMap((g) => g.contours);
     const pts = contours.flat();
     byText.set(key, {
-      contours,
+      contours, glyphs,
       xMin: Math.min(...pts.map((p) => p[0])), xMax: Math.max(...pts.map((p) => p[0])),
       yMin: Math.min(...pts.map((p) => p[1])), yMax: Math.max(...pts.map((p) => p[1])),
     });
@@ -74,37 +75,81 @@ function vertical(g, frame, height, fit) {
  * Cells for a fixed layout (for building the 3D solid).
  * @param layout.rows [{ a: [chunk...], b: [chunk...], fit?: ['shared'|'fill', ...], frame?: [y0, y1] }]
  *   top to bottom; a[i] pairs with b[i]. `frame` defaults to the row's own ink.
- * @param opts.height row height (mm); opts.gap between chunks (mm, may be < 0);
- *   opts.lineGap between rows (mm); opts.fit default per-cell fit.
+ * @param opts.height row height (mm); opts.gap between chunks (mm, may be < 0),
+ *   or 'kiss': each chunk just touches the previous one in each view,
+ *   overlapping by opts.overlap (mm) at the closest point; opts.lineGap
+ *   between rows (mm, or 'kiss' likewise); opts.fit default per-cell fit; opts.tracking / opts.kiss
+ *   letter spacing inside chunks (em; see glyphRun).
  */
 export function layoutCells(wasm, font, layout, opts = {}) {
-  const { height = 20, gap = 0, lineGap = 0, fit = 'shared', tolerance, tracking } = opts;
-  const txt = { tolerance, tracking };
-  const cells = [];
-  layout.rows.forEach((row, j) => {
+  const { height = 20, gap = 0, lineGap = 0, fit = 'shared', tolerance, tracking, kiss, overlap = 0.3 } = opts;
+  const txt = { tolerance, tracking, kiss };
+  const shiftPts = (pts, du, dv) => pts.map((c) => c.map(([u, v]) => [u + du, v + dv]));
+  // Pass 1: each row laid out with its bottom at z = 0 (plain JS geometry).
+  const rows = layout.rows.map((row) => {
     if (row.a.length !== row.b.length) throw new Error('Each row needs the same number of chunks in both words');
     // Never clip: widen a given frame to cover this row's own ink.
     const own = rowFrame(font, [...row.a, ...row.b], txt);
     const frame = row.frame ? [Math.min(row.frame[0], own[0]), Math.max(row.frame[1], own[1])] : own;
     const shared = height / (frame[1] - frame[0]);
-    const zTop = -j * (height + lineGap), z0 = zTop - height;
-    let x = 0, y = 0;
+    const out = [];
+    let x = 0, y = 0, prev = null;
     row.a.forEach((ta, i) => {
       const ga = ink(font, ta, txt), gb = ink(font, row.b[i], txt);
       const f = row.fit?.[i] ?? fit;
       const va = vertical(ga, frame, height, f), vb = vertical(gb, frame, height, f);
       const wa = (ga.xMax - ga.xMin) * shared, wb = (gb.xMax - gb.xMin) * shared;
-      cells.push({
-        box: { min: [x, y, z0], max: [x + wa, y + wb, zTop] },
-        shapes: {
-          front: placed(wasm, ga.contours, [ga.xMin, va.from], [x, z0], [shared, va.s]),
-          right: placed(wasm, gb.contours, [gb.xMin, vb.from], [y, z0], [shared, vb.s]),
-        },
-        label: `${ta}/${row.b[i]}`,
-      });
-      x += wa + gap;
-      y += wb + gap;
+      const lettersA = ga.glyphs.map((g) => ({ ch: g.ch, pts: placePoints(g.contours, [ga.xMin, va.from], [0, 0], [shared, va.s]) }));
+      const lettersB = gb.glyphs.map((g) => ({ ch: g.ch, pts: placePoints(g.contours, [gb.xMin, vb.from], [0, 0], [shared, vb.s]) }));
+      if (prev && gap === 'kiss') {
+        // Just touch the previous cell in each view (per-height edge profiles).
+        const dx = kissOffset(prev.a.flatMap((l) => l.pts), lettersA.flatMap((l) => l.pts), overlap);
+        const dy = kissOffset(prev.b.flatMap((l) => l.pts), lettersB.flatMap((l) => l.pts), overlap);
+        x = dx ?? prev.x + prev.wa; y = dy ?? prev.y + prev.wb;
+      }
+      const a = lettersA.map((l) => ({ ch: l.ch, pts: shiftPts(l.pts, x, 0) }));
+      const b = lettersB.map((l) => ({ ch: l.ch, pts: shiftPts(l.pts, y, 0) }));
+      out.push({ a, b, x, y, wa, wb, label: `${ta}/${row.b[i]}` });
+      prev = { a, b, x, y, wa, wb };
+      if (gap !== 'kiss') { x += wa + gap; y += wb + gap; }
     });
+    return out;
+  });
+  // Pass 2: stack rows top to bottom. With lineGap 'kiss', each row sits as
+  // high as it can while its ink stays below the row above in *both* views,
+  // touching (overlapping by `overlap`) in at least one of them.
+  const tops = [0];
+  for (let j = 1; j < rows.length; j++) {
+    let top = tops[j - 1] - height - (lineGap === 'kiss' ? 0 : lineGap);
+    if (lineGap === 'kiss') {
+      // Rotate (u, z) -> (-z, u) so "downwards" becomes "rightwards" for kissOffset.
+      const turn = (pts, dz) => pts.map((c) => c.map(([u, z]) => [-(z + dz), u]));
+      const needs = ['a', 'b'].map((k) => kissOffset(
+        rows[j - 1].flatMap((c) => c[k].flatMap((l) => turn(l.pts, tops[j - 1] - height))),
+        rows[j].flatMap((c) => c[k].flatMap((l) => turn(l.pts, 0))), overlap));
+      const ok = needs.filter((d) => d != null);
+      // kissOffset gives how far down (in -z) row j must move from z-bottom 0;
+      // the smaller move keeps it touching in the view that needs it most.
+      if (ok.length) top = -Math.min(...ok) + height;
+    }
+    tops.push(top);
+  }
+  const cells = [];
+  rows.forEach((row, j) => {
+    const z0 = tops[j] - height;
+    for (const c of row) {
+      const a = c.a.map((l) => ({ ch: l.ch, pts: shiftPts(l.pts, 0, z0) }));
+      const b = c.b.map((l) => ({ ch: l.ch, pts: shiftPts(l.pts, 0, z0) }));
+      cells.push({
+        box: { min: [c.x, c.y, z0], max: [c.x + c.wa, c.y + c.wb, tops[j]] },
+        shapes: {
+          front: new wasm.CrossSection(a.flatMap((l) => l.pts), 'NonZero'),
+          right: new wasm.CrossSection(b.flatMap((l) => l.pts), 'NonZero'),
+        },
+        letters: { front: a, right: b },
+        label: c.label,
+      });
+    }
   });
   return cells;
 }
@@ -137,8 +182,8 @@ function coverageUnder(wasm, cs, profile) {
  * Score one cell in 2D: both chunks placed in a row of the given frame/fit.
  * Returns { coverage: min of the two sides, covA, covB, distortion }.
  */
-export function scoreCell(wasm, font, ta, tb, frame0, fit, { height = 20, tolerance, tracking } = {}) {
-  const txt = { tolerance, tracking };
+export function scoreCell(wasm, font, ta, tb, frame0, fit, { height = 20, tolerance, tracking, kiss } = {}) {
+  const txt = { tolerance, tracking, kiss };
   const ga = ink(font, ta, txt), gb = ink(font, tb, txt);
   const frame = [Math.min(frame0[0], ga.yMin, gb.yMin), Math.max(frame0[1], ga.yMax, gb.yMax)];
   const shared = height / (frame[1] - frame[0]);
@@ -159,8 +204,8 @@ export function scoreCell(wasm, font, ta, tb, frame0, fit, { height = 20, tolera
  * "i" with a letter that has ink at dot height strands the dot as a floating
  * lump. Needs a small 3D build; callers cache it.
  */
-export function cellFragments(wasm, font, ta, tb, frame, fit, { height = 20, tolerance, tracking } = {}) {
-  const cells = layoutCells(wasm, font, { rows: [{ a: [ta], b: [tb], fit: [fit], frame }] }, { height, tolerance, tracking });
+export function cellFragments(wasm, font, ta, tb, frame, fit, { height = 20, tolerance, tracking, kiss } = {}) {
+  const cells = layoutCells(wasm, font, { rows: [{ a: [ta], b: [tb], fit: [fit], frame }] }, { height, tolerance, tracking, kiss });
   const solid = buildComposition(wasm, cells);
   try {
     const parts = solid.decompose();
@@ -176,8 +221,8 @@ export function cellFragments(wasm, font, ta, tb, frame, fit, { height = 20, tol
  * Same as cellFragments, but by scanline slicing in plain JS (see scan.js):
  * ~100x faster, may over-count a connection thinner than one slice.
  */
-export function cellFragmentsScan(font, ta, tb, frame0, fit, { height = 20, tolerance, tracking, levels = 200 } = {}) {
-  const txt = { tolerance, tracking };
+export function cellFragmentsScan(font, ta, tb, frame0, fit, { height = 20, tolerance, tracking, kiss, levels = 200 } = {}) {
+  const txt = { tolerance, tracking, kiss };
   const ga = ink(font, ta, txt), gb = ink(font, tb, txt);
   const frame = [Math.min(frame0[0], ga.yMin, gb.yMin), Math.max(frame0[1], ga.yMax, gb.yMax)];
   const shared = height / (frame[1] - frame[0]);
@@ -269,8 +314,8 @@ function pareto(items, limit) {
  * 1..maxChunk letters from each line, with every case variant and fit.
  */
 export function alignLines(wasm, font, lineA, lineB, opts = {}) {
-  const { caseMode = 'upper', fits = ['shared'], maxChunk = 3, frontLimit = 12, height = 20, tolerance, tracking } = opts;
-  const txt = { tolerance, tracking };
+  const { caseMode = 'upper', fits = ['shared'], maxChunk = 3, frontLimit = 12, height = 20, tolerance, tracking, kiss } = opts;
+  const txt = { tolerance, tracking, kiss };
   const A = [...CASES[caseMode === 'mixed' ? 'as' : caseMode](lineA)], B = [...CASES[caseMode === 'mixed' ? 'as' : caseMode](lineB)];
   const frameTexts = caseMode === 'mixed' ? [...A, ...B].flatMap((c) => [c.toUpperCase(), c.toLowerCase()]) : [...A, ...B];
   // A caller searching many line splits passes one frame and cache for all of
@@ -278,12 +323,12 @@ export function alignLines(wasm, font, lineA, lineB, opts = {}) {
   const frame = opts.frame ?? rowFrame(font, frameTexts, txt);
   const cellCache = opts.cache ?? new Map();
   const cellOptions = (ca, cb) => {
-    const key = `${caseMode}|${ca}|${cb}|${frame}|${fits}|${height}|${tracking ?? 0}`;
+    const key = `${caseMode}|${ca}|${cb}|${frame}|${fits}|${height}|${tracking ?? 0}|${kiss ?? ''}`;
     if (!cellCache.has(key)) {
       const out = [];
       for (const va of caseVariants(ca, caseMode)) for (const vb of caseVariants(cb, caseMode)) for (const fit of fits) {
-        const s = scoreCell(wasm, font, va, vb, frame, fit, { height, tolerance, tracking });
-        const fragments = cellFragmentsScan(font, va, vb, frame, fit, { height, tolerance, tracking });
+        const s = scoreCell(wasm, font, va, vb, frame, fit, { height, tolerance, tracking, kiss });
+        const fragments = cellFragmentsScan(font, va, vb, frame, fit, { height, tolerance, tracking, kiss });
         out.push({
           a: va, b: vb, fit, cell: s,
           score: { coverage: s.coverage, distortion: s.distortion, fragments, merged: [...va].length + [...vb].length - 2, lower: lowercaseCount(va) + lowercaseCount(vb) },
@@ -337,7 +382,7 @@ export function exploreWordPair(wasm, font, wordA, wordB, opts = {}) {
     const letters = [...wa, ...wb];
     const frame = rowFrame(font, lineMode === 'mixed'
       ? letters.flatMap((c) => [c.toUpperCase(), c.toLowerCase()])
-      : letters.map((c) => (CASES[lineMode] ?? CASES.as)(c)), { tolerance: opts.tolerance, tracking: opts.tracking });
+      : letters.map((c) => (CASES[lineMode] ?? CASES.as)(c)), { tolerance: opts.tolerance, tracking: opts.tracking, kiss: opts.kiss });
     for (const r of rowCounts) {
       if (r > Math.min([...wa].length, [...wb].length)) continue;
       for (const la of splits(wa, r)) {

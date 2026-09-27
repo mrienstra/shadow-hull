@@ -2,12 +2,14 @@
 // Explore layouts for a word pair and write an HTML report (3D view + both
 // shadows per layout) to reports/<a>-<b>.html. Exploration tool, not product.
 // Usage: node scripts/explore-words.js Finola Bryan [--font kanit-black] [--rows 1,2,3]
-//        [--cases upper,lower,title,mixed] [--fits shared,fill] [--gap=-0.2] [--line-gap=-0.05]
+//        [--cases upper,lower,title,mixed] [--fits shared,fill] [--gap=kiss|-0.2] [--line-gap=kiss|-0.05]
+//        [--overlap 0.3] [--kiss 0.01]
 //        [--join none|hull|plate|bridges|hull+bridges|...] [--tracking=-0.06]
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { getManifold, loadFont, worldToLocal } from '../src/core/index.js';
+import { letterVisibility } from '../src/core/compose.js';
 import { exploreWordPair, realizeLayout, describeLayout, rankScore } from '../src/core/wordpair.js';
 import { basePlate, bridgePieces, strayShadow, hullJoin } from '../src/core/join.js';
 
@@ -16,10 +18,13 @@ const { values: o, positionals: [wordA, wordB] } = parseArgs({
   options: {
     font: { type: 'string', default: 'kanit-black' }, rows: { type: 'string', default: '1,2,3' },
     cases: { type: 'string', default: 'upper,lower,title,mixed' }, fits: { type: 'string', default: 'shared,fill' },
-    gap: { type: 'string', default: '-0.2' }, 'line-gap': { type: 'string', default: '-0.05' },
+    // Spacing: 'kiss' = neighbours just touch (overlap mm); a number = fixed gap × row height.
+    gap: { type: 'string', default: 'kiss' }, 'line-gap': { type: 'string', default: 'kiss' },
+    overlap: { type: 'string', default: '0.3' },
+    kiss: { type: 'string', default: '0.01' }, // em overlap between letters inside a chunk ('' = use --tracking)
     'max-chunk': { type: 'string', default: '3' },
     join: { type: 'string', default: 'hull+bridges' }, // none | hull | plate | bridges, combined with '+'
-    tracking: { type: 'string', default: '-0.06' }, // em between letters inside chunks (negative = touching)
+    tracking: { type: 'string', default: '0' }, // em between letters inside chunks when --kiss=''
   },
 });
 if (!wordA || !wordB) { console.error('Usage: explore-words.js WORD_A WORD_B [options]'); process.exit(1); }
@@ -29,12 +34,15 @@ const fonts = JSON.parse(await readFile(new URL('fonts.json', FONTS_DIR), 'utf8'
 const entry = fonts.find((f) => f.id === o.font);
 const font = loadFont(await readFile(entry ? fileURLToPath(new URL(entry.file, FONTS_DIR)) : o.font));
 const wasm = await getManifold();
-const H = 20, gap = Number(o.gap) * H, lineGap = Number(o['line-gap']) * H;
+const H = 20;
+const gap = o.gap === 'kiss' ? 'kiss' : Number(o.gap) * H;
+const lineGap = o['line-gap'] === 'kiss' ? 'kiss' : Number(o['line-gap']) * H;
+const letterOpts = o.kiss === '' ? { tracking: Number(o.tracking) } : { kiss: Number(o.kiss) };
 
 const t0 = performance.now();
 const all = exploreWordPair(wasm, font, wordA, wordB, {
   cases: o.cases.split(','), rows: o.rows.split(',').map(Number), fits: o.fits.split(','),
-  maxChunk: Number(o['max-chunk']), byStyle: true, height: H, tracking: Number(o.tracking),
+  maxChunk: Number(o['max-chunk']), byStyle: true, height: H, ...letterOpts,
 });
 console.error(`search: ${all.length} layouts in ${((performance.now() - t0) / 1000).toFixed(0)} s`);
 
@@ -51,7 +59,8 @@ const entries = [];
 for (const [style, ps] of groups) {
   ps.sort((p, q) => rankScore(p.score, q.score));
   const p = ps[0];
-  const r = realizeLayout(wasm, font, p, { height: H, gap, lineGap, tracking: Number(o.tracking) });
+  const r = realizeLayout(wasm, font, p, { height: H, gap, lineGap, overlap: Number(o.overlap), ...letterOpts });
+  const vis = letterVisibility(wasm, r.cells);
   const m = r.metrics;
   // Join into one piece; the letters-only solid stays in r.solid for coverage.
   let joined = r.solid, bridges = [], blocks = [];
@@ -80,7 +89,7 @@ for (const [style, ps] of groups) {
   for (let i = 0; i < mesh.vertProperties.length; i += mesh.numProp) verts.push(...[0, 1, 2].map((k) => Math.round(mesh.vertProperties[i + k] * 100) / 100));
   entries.push({
     style, text: describeLayout(p),
-    stats: `worst letter ${pct(m.worstCell)} · stretch ${(p.score.distortion * 100).toFixed(0)}% · ${m.pieces} piece${m.pieces > 1 ? 's' : ''}`
+    stats: `worst letter ${pct(m.worstCell)} · least visible ${vis.worst.ch} ${pct(vis.worst.visible)} · stretch ${(p.score.distortion * 100).toFixed(0)}% · ${m.pieces} piece${m.pieces > 1 ? 's' : ''}`
       + (o.join === 'none' ? '' : ` → ${finalPieces} after ${o.join} (${blocks.length ? `${blocks.length} hull block${blocks.length === 1 ? '' : 's'}, ` : ''}${bridges.length} rod${bridges.length === 1 ? '' : 's'}${bridges.length ? `, longest ${Math.max(...bridges.map((b) => b.length)).toFixed(1)} mm` : ''}; extra shadow ${pct(stray.front)} / ${pct(stray.right)})`)
       + ` · ${m.size.map((x) => x.toFixed(0)).join(' × ')} mm`,
     views, verts, tris: Array.from(mesh.triVerts),
@@ -107,7 +116,7 @@ canvas { width:100%; height:240px; display:block; background:var(--bg); border-r
 path.s { fill:var(--ink); } path.m { fill:var(--miss); }
 </style></head><body>
 <h1>${wordA} × ${wordB}</h1>
-<p class="sub">Best layout per style (${entry?.name ?? o.font}). “·” separates cells, “/” rows, “↕” = letter stretched to row height. Front reads ${wordA}, right reads ${wordB}; red = missing from the letter. Joined with: ${o.join}; tracking ${o.tracking} em. Drag to rotate.</p>
+<p class="sub">Best layout per style (${entry?.name ?? o.font}). “·” separates cells, “/” rows, “↕” = letter stretched to row height. Front reads ${wordA}, right reads ${wordB}; red = missing from the letter. “Least visible” = share of a letter not covered by neighbouring letters. Spacing: ${o.gap} (rows ${o['line-gap']}); joined with ${o.join}. Drag to rotate.</p>
 <div class="grid" id="grid"></div>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/" } }</script>
 <script type="module">

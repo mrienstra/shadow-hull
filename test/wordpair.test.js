@@ -50,3 +50,29 @@ test('scanline fragment counts agree with 3D on common letter pairs', async () =
     }
   }
 });
+
+test('kissOffset makes shapes just touch; letterVisibility sees overlaps', async () => {
+  const { kissOffset } = await import('../src/core/glyph.js');
+  const { letterVisibility } = await import('../src/core/compose.js');
+  const sq = (x0, w) => [[[x0, 0], [x0 + w, 0], [x0 + w, 10], [x0, 10]]];
+  // Right square placed at 0 must move to 10 - 0.5 to overlap the left one by 0.5.
+  assert.ok(Math.abs(kissOffset(sq(0, 10), sq(0, 4), 0.5) - 9.5) < 1e-9);
+  // No shared heights: no kiss.
+  assert.equal(kissOffset(sq(0, 10), [[[0, 20], [4, 20], [4, 30], [0, 30]]], 0.5), null);
+  const cells = [{ letters: { front: [{ ch: 'A', pts: sq(0, 10) }, { ch: 'B', pts: sq(7.5, 10) }] } }];
+  const v = letterVisibility(wasm, cells);
+  assert.ok(Math.abs(v.views.front[0].visible - 0.75) < 1e-9);
+  assert.equal(v.worst.visible, v.views.front[0].visible);
+});
+
+test('kiss spacing keeps every Finola/Bryan letter at least 90% visible', () => {
+  const layout = { rows: [{ a: ['F', 'I', 'N', 'O', 'LA'], b: ['B', 'R', 'Y', 'A', 'N'] }] };
+  const r = realizeLayout(wasm, font, layout, { gap: 'kiss', overlap: 0.3, kiss: 0.01 });
+  const fixed = realizeLayout(wasm, font, layout, { gap: -4, tracking: -0.06 });
+  return import('../src/core/compose.js').then(({ letterVisibility }) => {
+    try {
+      assert.ok(letterVisibility(wasm, r.cells).worst.visible > 0.9);
+      assert.ok(letterVisibility(wasm, fixed.cells).worst.visible < 0.5, 'fixed overlap hides a letter');
+    } finally { r.dispose(); fixed.dispose(); }
+  });
+});
