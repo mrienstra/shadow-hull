@@ -159,3 +159,35 @@ test('shared links restore the page state (cube, word looks, and old-format link
   assert.equal(await p2.isChecked('input[name="stand"]'), true);
   assert.deepEqual(errors, []);
 });
+
+test('swing: pauses on exactly the front view, then the side view; controls stop it', async () => {
+  const page = await browser.newPage({ viewport: { width: 1300, height: 800 } });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto(url + '#look=row&font=kanit-black&a=Finola&b=Bryan');
+  await wordsDone(page);
+  assert.deepEqual(
+    await page.$$eval('#swing-secs, #swing-hold, #swing-tilt', (els) => els.map((e) => Number(e.value))),
+    [2, 0.6, 0], 'defaults',
+  );
+  const frame = () => page.evaluate(() => document.querySelector('#viewport canvas').toDataURL());
+  // Reference: the exact front view.
+  await page.click('.toolbar [data-view="front"]');
+  await page.waitForTimeout(300);
+  const front = await frame();
+  await page.click('.toolbar [data-view="right"]');
+  await page.waitForTimeout(300);
+  const side = await frame();
+  // Swing with long pauses so the test can sample them reliably.
+  await page.click('#swing');
+  await page.fill('#swing-hold', '3');
+  await page.waitForTimeout(1000); // inside the front pause
+  assert.equal(await frame(), front, 'first pause is the exact front view');
+  await page.waitForTimeout(5500); // front pause 0–3 s, swing 3–5 s, side pause 5–8 s: now ≈ 6.5 s
+  assert.equal(await frame(), side, 'second pause is the exact side view');
+  // Pressing a view button stops the swing.
+  await page.click('.toolbar [data-view="iso"]');
+  assert.equal(await page.getAttribute('#swing', 'aria-pressed'), 'false');
+  assert.equal(await page.isVisible('#swing-timing'), false); // visibility: hidden
+  assert.deepEqual(errors, []);
+});

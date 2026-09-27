@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-09-27 (swing animation)
+
+- Viewer: "Swing ⇄" ping-pongs the camera around the vertical axis between the
+  exact front and side views (each design's own view directions, so angled
+  blocks and the 45° turn work; the letter cube swings front ↔ side). Sine
+  ease-in-out, so the camera stops smoothly at each end; a pause at each end;
+  "max tilt" rises (or, negative, dips) along a sine arch that's 0 at both
+  ends, so each word still reads exactly. Defaults chosen by the owner after
+  previewing: swing 2.0 s, pause 0.6 s, max tilt 0°. Dragging or a view button
+  stops it; a new design keeps swinging.
+- Fixed a layout shift: showing the timing inputs wrapped the toolbar, which
+  resized the viewport and rescaled the view. The inputs now always take
+  their space (visibility: hidden when off).
+- e2e: both pauses match the Front / Side button views pixel for pixel;
+  defaults; a view button stops the swing.
+- No subagents used.
+
 ## 2026-09-27 (report by look; old gallery generator removed)
 
 - `scripts/explore-words.js` now generates every word look with "More

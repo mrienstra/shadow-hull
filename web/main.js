@@ -127,7 +127,68 @@ function showMesh({ numProp, vertProperties, triVerts, runs = [] }) {
   fitFrustum();
 }
 
-renderer.setAnimationLoop(() => { controls.update(); renderer.render(scene, camera); });
+// ---- Swing: ping-pong between the front and side views -----------------------
+// The camera circles the vertical axis between the two exact horizontal views,
+// holding each for a moment, with ease-in-out (sine) motion so the reversal is
+// gentle: velocity is zero at both ends. Timing is tunable in the toolbar.
+let swing = null; // { a0, a1, t0 } while swinging
+function swingEnds() {
+  let front, side;
+  if (mode === 'words') {
+    if (!wordFrames) return null;
+    front = wordFrames.front.D; side = wordFrames.right.D;
+  } else {
+    if (!guide) return null;
+    front = SIDES[guide.front.from][0]; side = SIDES[guide.right.from][0];
+  }
+  const a0 = Math.atan2(front[1], front[0]);
+  let a1 = Math.atan2(side[1], side[0]);
+  // Go the short way round.
+  while (a1 - a0 > Math.PI) a1 -= 2 * Math.PI;
+  while (a1 - a0 < -Math.PI) a1 += 2 * Math.PI;
+  return { a0, a1 };
+}
+function setSwing(on) {
+  const ends = on ? swingEnds() : null;
+  swing = ends ? { ...ends, t0: performance.now() } : null;
+  $('#swing').setAttribute('aria-pressed', String(!!swing));
+  $('#swing-timing').classList.toggle('off', !swing);
+  if (!swing) {
+    // Hand the camera back to the orbit controls where the swing left it.
+    controls.dispose();
+    controls = new OrbitControls(camera, renderer.domElement);
+  }
+}
+const easeInOutSine = (x) => 0.5 - 0.5 * Math.cos(Math.PI * x);
+function swingCamera(now) {
+  const move = Math.max(0.3, Number($('#swing-secs').value) || 2) * 1000;
+  const hold = Math.max(0, Number($('#swing-hold').value) || 0) * 1000;
+  const period = 2 * (move + hold);
+  const t = (now - swing.t0) % period;
+  // hold at front → swing to side → hold at side → swing back
+  let x;
+  if (t < hold) x = 0;
+  else if (t < hold + move) x = easeInOutSine((t - hold) / move);
+  else if (t < 2 * hold + move) x = 1;
+  else x = 1 - easeInOutSine((t - 2 * hold - move) / move);
+  const a = swing.a0 + (swing.a1 - swing.a0) * x;
+  // Tilt follows a sine arch over the swing: 0 at both ends (exact outlines),
+  // the maximum halfway. It uses the eased progress, so it settles smoothly too.
+  // Negative looks up from below.
+  const maxTilt = (Math.min(60, Math.max(-60, Number($('#swing-tilt').value) || 0)) * Math.PI) / 180;
+  const tilt = maxTilt * Math.sin(Math.PI * x);
+  const r = size * 4;
+  camera.position.set(Math.cos(a) * Math.cos(tilt) * r, Math.sin(a) * Math.cos(tilt) * r, Math.sin(tilt) * r);
+  camera.up.set(0, 0, 1);
+  camera.lookAt(0, 0, 0);
+}
+renderer.domElement.addEventListener('pointerdown', () => swing && setSwing(false));
+
+renderer.setAnimationLoop((now) => {
+  if (swing) swingCamera(now);
+  else controls.update();
+  renderer.render(scene, camera);
+});
 
 // ---- Shadow panels ---------------------------------------------------------
 const SVGNS = 'http://www.w3.org/2000/svg';
@@ -222,7 +283,7 @@ async function select(candidate, button) {
   showMesh(r);
   showShadows(r.views, r.metrics);
   showPrintCheck(r.metrics, r.thickness);
-  snap('iso');
+  if (swing) setSwing(true); else snap('iso');
 }
 
 const fontChoice = $('#font-choice');
@@ -297,7 +358,8 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
-for (const b of document.querySelectorAll('.toolbar [data-view]')) b.addEventListener('click', () => snap(b.dataset.view));
+for (const b of document.querySelectorAll('.toolbar [data-view]')) b.addEventListener('click', () => { setSwing(false); snap(b.dataset.view); });
+$('#swing').addEventListener('click', () => setSwing(!swing));
 $('#colour-faces').addEventListener('change', applyColour);
 
 $('#download').addEventListener('click', () => {
@@ -541,7 +603,7 @@ function selectWordDesign(item, button) {
     $('#download').disabled = false;
     showMesh({ ...view.mesh, runs: view.runs });
     showWordShadows(view, item);
-    snap('iso');
+    if (swing) setSwing(true); else snap('iso');
   });
   // The finish (stand, turn) comes from the current knobs, not the listed recipe.
   const finish = { stand: !!knobValues.stand, turn: !!knobValues.turn };
