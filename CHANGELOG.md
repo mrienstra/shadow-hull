@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-09-27 (web: Two words mode; gallery in core)
+
+- `src/core/gallery.js`: every word-pair variant (chain families, blocks with
+  top shapes, angled blocks, tall-letter columns, stacked columns, hearts) as
+  plain JSON recipes streamed by `generateGallery`; `buildRecipe` rebuilds one;
+  `designView` gives mesh, face runs, per-view outlines and frames. The report
+  script now uses it (68 designs for Finola × Bryan, ~3.6 min).
+- Web page: tabs for Three letters / Two words. Two words: words, font, which
+  sections (defaults: blocks + stacked, ~15 s; "Everything" matches the
+  report), options for chain families, cases, rows, top shapes (any characters
+  from Noto Emoji) and view angles. Designs stream into a grouped list; clicking
+  one builds it on a second worker and shows it in 3D (recentred; camera snaps
+  use the design's view frames, so angled blocks get a proper "side" view),
+  with shadows, metrics, colour by view and STL download. Stop terminates the
+  gallery worker. The viewer and shadow panels stay pinned while the list scrolls.
+- Fixed a race: a three-letters search finishing after switching to Two words
+  drew its shadows over the words view.
+- e2e: Two words mode streams designs and shows a heart block with three views.
+- No subagents used.
+
 ## 2026-09-27 (column variants: heart from above; stacked, all taller)
 
 - Heart over a column: `spanColumnCells` / `stackedColumnCells` take a top

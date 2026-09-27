@@ -20,5 +20,6 @@ when done. Owner requests are marked (owner).
   with |log s| penalty weighted by horizontal strokes.
 - Legibility score: junction-weighted coverage; OCR/classifier later.
 - Variable-font axes (Roboto Flex) as a deformation space.
-- Web page: word-pair mode using `designWordPair` (core), families as options.
+- Web: move long galleries to a pool of workers (sections in parallel).
+- Web: share/permalink a design (recipe in the URL).
 - Ranking of trip-let candidates by the voxel thin-feature check (top few).

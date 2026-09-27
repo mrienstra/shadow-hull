@@ -103,3 +103,35 @@ label.toggle { margin: 0 0 6px; font-size: 13px; }
 #shadow-panels.plain .missing, #shadow-panels.plain .target { display: none; }
 .shadows:has(#shadow-panels.plain) .legend .extra { display: none; }
 .colour-toggle { font-size: 13px; color: var(--ink); margin-left: 8px; }
+
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 12px; }
+.tabs [role="tab"] { font-weight: 600; }
+.tabs [role="tab"][aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.font-row { margin-bottom: 10px; }
+.words { display: grid; gap: 8px; }
+.words input { font-size: 18px; font-weight: 700; background: var(--surface); border: 1px solid var(--target); padding: 6px 8px; border-radius: 6px; }
+fieldset { border: 1px solid var(--line); border-radius: 6px; padding: 8px 10px; margin: 0; display: grid; gap: 4px; }
+fieldset.inline { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+legend { font-size: 12px; color: var(--muted); padding: 0 4px; }
+.hint { color: var(--muted); font-size: 11px; margin-left: auto; }
+.sections .check { width: 100%; }
+.buttons { display: flex; gap: 6px; }
+.buttons #words-go { flex: 1; background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+#words-status { margin: 0; min-height: 1.4em; font-size: 13px; color: var(--muted); }
+#designs { margin-top: 8px; max-height: 55vh; overflow: auto; display: grid; gap: 4px; }
+#designs h3 { font-size: 12px; margin: 10px 0 2px; color: var(--muted); font-weight: 600; }
+#designs button { width: 100%; text-align: left; display: grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-variant-numeric: tabular-nums; }
+#designs button[aria-pressed="true"] { border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); }
+#designs .title { font-weight: 600; font-size: 13px; }
+#designs .q { color: var(--muted); font-size: 12px; }
+#designs .text { grid-column: 1 / -1; font-size: 11px; color: var(--muted); font-family: ui-monospace, monospace; }
+figure svg.wide { aspect-ratio: auto; height: auto; max-height: 180px; }
+#word-stats { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
+
+/* Keep the 3D view and shadows in sight while the settings/results column scrolls. */
+@media (min-width: 1001px) {
+  main { align-items: start; }
+  .viewer, .shadows { position: sticky; top: 12px; }
+  .viewer { height: calc(100vh - 24px); }
+  .shadows { max-height: calc(100vh - 24px); overflow: auto; }
+}
