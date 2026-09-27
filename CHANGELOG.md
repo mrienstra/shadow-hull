@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-09-27 (GitHub Pages)
+
+- `.github/workflows/pages.yml`: on every push to main, run the unit tests,
+  build the web page and deploy it to https://mrienstra.github.io/shadow-hull/
+  (Pages build type: GitHub Actions). README links to it.
+
 ## 2026-09-27 (release prep)
 
 - README.md (what it is, synonyms, quick start, fonts, papers and prior work)

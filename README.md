@@ -4,6 +4,8 @@ Make solids whose shadows read as letters, words or shapes from different
 sides, like the carved blocks on the cover of Douglas Hofstadter's
 *Gödel, Escher, Bach*, which cast "G", "E" and "B" along three axes.
 
+**Try it online: https://mrienstra.github.io/shadow-hull/**
+
 Also known as: **trip-lets** (Hofstadter's name), **visual hulls** or
 **shadow hulls**, **shadow art** and **shadow sculptures**, **3D ambigrams**,
 **dual-letter illusions** or **triple-letter blocks**, and, in computer vision,
