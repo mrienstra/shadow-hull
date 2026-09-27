@@ -38,6 +38,8 @@ const REACHABLE = [
   ['tower: one tall letter', 'tower', { style: 'tall' }, (r) => r.kind === 'span'],
   ['tower: stacked', 'tower', { style: 'stacked' }, (r) => r.kind === 'stacked'],
   ['heart-shaped tower', 'tower', { style: 'stacked', shape: '❤' }, (r) => r.kind === 'stacked' && r.top?.char === '❤'],
+  ['gapped stacked tower', 'tower', { style: 'stacked', spacing: 'gapped' }, (r) => r.kind === 'stacked' && r.spacing === 'spaced'],
+  ['heart-shaped tower, one pair per level', 'tower', { style: 'pairs', shape: '❤' }, (r) => r.kind === 'chain' && r.top?.char === '❤'],
   ['whole-word block', 'block', {}, (r) => r.kind === 'block' && !r.top && (r.angle ?? 90) === 90],
   ['heart slab', 'block', { shape: '❤' }, (r) => r.kind === 'block' && r.top?.char === '❤'],
   ['angled block', 'block', { angle: 45 }, (r) => r.kind === 'block' && r.angle === 45],
@@ -54,6 +56,29 @@ for (const [name, lookId, knobs, check] of REACHABLE) {
     } finally { d.dispose(); }
   });
 }
+
+// Every knob a look shows must change the object (turn only rotates it for
+// display, so it's checked by the recipe instead).
+test('tower knobs take effect: spacing and shape on every style; no compact knob', () => {
+  assert.ok(!('compact' in LOOK.tower.knobs), 'compact never changed a tower');
+  const shape = (knobs) => {
+    const [first] = generateLook(ctx, 'Finola', 'Bryan', 'tower', knobs);
+    const d = buildRecipe(ctx, 'Finola', 'Bryan', first.recipe);
+    try {
+      const { min, max } = d.joined.boundingBox();
+      return { key: `${d.joined.volume().toFixed(1)}|${[...min, ...max].map((x) => x.toFixed(1))}`, metrics: d.metrics };
+    } finally { d.dispose(); }
+  };
+  for (const style of ['stacked', 'pairs', 'tall']) {
+    const plain = shape({ style });
+    assert.notEqual(shape({ style, spacing: 'gapped' }).key, plain.key, `${style}: spacing`);
+    const heart = shape({ style, shape: '❤' });
+    assert.notEqual(heart.key, plain.key, `${style}: shape`);
+    assert.ok(heart.metrics.views.top.coverage > 0.9, `${style}: heart shown ${heart.metrics.views.top.coverage}`);
+  }
+  const loose = shape({ style: 'stacked', spacing: 'gapped', supports: 'none' }).metrics;
+  assert.ok(loose.rods === 0 && loose.finalPieces > 1, 'gapped stacked tower without supports stays in pieces');
+});
 
 test('the letter cube is a look too (three letters)', () => {
   assert.equal(LOOK.cube.inputs, 'letters');

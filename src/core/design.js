@@ -11,7 +11,7 @@
 import { letterVisibility, buildComposition, measureComposition, disposeCells } from './compose.js';
 import { exploreWordPair, layoutCells, rankLayouts } from './wordpair.js';
 import { blockCells } from './block.js';
-import { compositions, spanColumnCells, stackedColumnCells } from './column.js';
+import { compositions, spanColumnCells, stackedColumnCells, placeTop } from './column.js';
 import { basePlate, bridgePieces, strayShadow, hullJoin, displayStand } from './join.js';
 
 /**
@@ -117,9 +117,20 @@ export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods =
 }
 
 /** Build one chain layout with a spacing family, join it, and measure everything. */
-export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = 'hull+bridges', height = 20, weights } = {}) {
+export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = 'hull+bridges', height = 20, weights, top = null } = {}) {
   const fam = SPACING[spacing];
   const cells = layoutCells(wasm, font, { rows: layout.rows }, { height, ...fam.layout });
+  if (top?.shape) {
+    // A shape seen from above over the whole layout (used for towers of
+    // letter pairs): fitted to the cells' combined footprint, shared by all.
+    const x0 = Math.min(...cells.map((c) => c.box.min[0])), x1 = Math.max(...cells.map((c) => c.box.max[0]));
+    const y0 = Math.min(...cells.map((c) => c.box.min[1])), y1 = Math.max(...cells.map((c) => c.box.max[1]));
+    for (const c of cells) {
+      const centred = placeTop(top, (x1 - x0) / 2, (y1 - y0) / 2);
+      c.shapes.top = centred.translate([(x0 + x1) / 2, (y0 + y1) / 2]);
+      centred.delete();
+    }
+  }
   const solid = buildComposition(wasm, cells);
   return finishDesign(wasm, cells, solid, {
     join, rods: fam.rods, height, stretch: layout.score?.distortion ?? 0, imbalance: layout.imbalance ?? 0, weights,

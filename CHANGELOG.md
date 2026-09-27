@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-09-27 (tower knobs that did nothing)
+
+- The owner noticed Tower → Spacing: gapped had no effect. An audit of every
+  knob on every look (build each look with one knob changed and compare the
+  finished object's volume and bounding box) found three tower bugs:
+  - **Stacked tower ignored spacing.** The recipe never carried it, so the
+    builder always used touching. Now gapped leaves a gap between the letters,
+    joined by rods (or left in pieces with Support rods: none).
+  - **One pair per level ignored the shape.** Chains had no top shape.
+    `realizeDesign` now takes `top`: the shape is fitted over the whole
+    layout's footprint (`placeTop`) and searched for the best rotation/scale
+    like the other towers. FINOLA × BRYAN + ❤: 99.7% of the heart shown, one piece.
+  - **Prefer compact never changed a tower** (each tower style has a single
+    layout), so the knob is gone from Tower. Old share links that carry it
+    just ignore it.
+- The audit's other "no effect" cases are expected: Turn only rotates the
+  finished object for display; Support rods: none on touching designs that
+  are already one piece; Prefer compact / Stretch on rows and grids when the
+  ranking picks the same layout either way.
+- Tests: gapped stacked tower and heart tower (one pair per level) are in the
+  reachable list; spacing and shape change the object for all three tower
+  styles; a gapped stacked tower without supports stays in pieces.
+- No subagents used.
+
 ## 2026-09-27 (bounding box toggle)
 
 - Viewer: "Bounding box" checkbox, off by default (the box was always drawn).

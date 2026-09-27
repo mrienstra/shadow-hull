@@ -40,10 +40,10 @@ export function buildRecipe(ctx, wordA, wordB, r) {
     return j;
   };
   switch (r.kind) {
-    case 'chain': return realizeDesign(wasm, font, r.layout, { spacing: r.spacing, join: withStand(r.join ?? 'hull+bridges'), height, weights: r.weights });
+    case 'chain': return realizeDesign(wasm, font, r.layout, { spacing: r.spacing, join: withStand(r.join ?? 'hull+bridges'), height, weights: r.weights, top });
     case 'block': return realizeBlock(wasm, font, wordA, wordB, { caseMode: r.caseMode, spacing: 'touching', top, join: withStand('bridges'), height, angle: r.angle ?? 90 });
     case 'span': return realizeSpanColumn(wasm, font, wordA, wordB, r.spans, { spacing: r.spacing, fit: r.fit, height, top, join: withStand('hull+bridges') });
-    case 'stacked': return realizeStackedColumn(wasm, font, wordA, wordB, { fit: r.fit, height, top, join: withStand('bridges') });
+    case 'stacked': return realizeStackedColumn(wasm, font, wordA, wordB, { spacing: r.spacing === 'spaced' ? 'spaced' : 'touching', fit: r.fit, height, top, join: withStand('bridges') });
     default: throw new Error(`Unknown recipe kind ${r.kind}`);
   }
 }

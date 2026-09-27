@@ -46,7 +46,7 @@ export const LOOKS = [
     knobs: {
       style: choice(['stacked', 'pairs', 'tall'], 'stacked', { stacked: 'Stacked (shorter word’s letters taller)', pairs: 'One pair per level', tall: 'One tall letter' }),
       spacing: choice(['touching', 'gapped'], 'touching'), shape: { type: 'text', default: '' },
-      stretch: bool(false), compact: bool(false), supports: supports(), stand: bool(false), turn: bool(false),
+      stretch: bool(false), supports: supports(), stand: bool(false), turn: bool(false),
     },
   },
   {

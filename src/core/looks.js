@@ -26,6 +26,7 @@ export { LOOKS, LOOK, lookKnobs };
 
 const pct = (x) => `${(x * 100).toFixed(1)}%`;
 const rowFamily = (spacing) => (spacing === 'touching' ? 'touching' : 'spaced');
+const stripExtra = ({ stand, turn, supports, weights, ...r }) => r;
 const finish = (k) => ({ stand: !!k.stand, turn: !!k.turn });
 // Short case names for list titles (the knob labels are longer).
 const SHORT_CASES = { upper: 'Capitals', lower: 'lowercase', title: 'Title case', mixed: 'Mixed case' };
@@ -73,7 +74,18 @@ export function* generateLook(ctx, wordA, wordB, lookId, given = {}, { more = fa
       for (const style of styles) {
         if (style === 'pairs') {
           const fam = k.spacing === 'touching' ? 'column-touching' : 'column';
-          yield* chains(Math.min([...wordA].length, [...wordB].length), fam, 'One pair per level · ');
+          const levels = Math.min([...wordA].length, [...wordB].length);
+          if (!(shapeChar && ctx.shapeFont)) {
+            yield* chains(levels, fam, 'One pair per level · ');
+            continue;
+          }
+          // With a shape from above: the best layout, then the best fit of the shape over it.
+          for (const item of chains(levels, fam, 'One pair per level · ')) {
+            const base = stripExtra(item.recipe);
+            const [best] = searchTopFit((t) => buildRecipe(ctx, wordA, wordB, { ...base, ...extra, top: { char: shapeChar, rotate: t.rotate, scale: t.scale } }), topShape(ctx, shapeChar));
+            yield out(`${item.title} + ${shapeChar}`, `${item.text} · ${shapeChar} seen from above, ${pct(best.metrics.views.top.coverage)} shown`, { ...base, top: { char: shapeChar, rotate: best.rotate, scale: best.scale } }, best.metrics);
+            if (!more) break;
+          }
           continue;
         }
         const fit = k.stretch ? 'stretch' : 'uniform';
@@ -84,8 +96,8 @@ export function* generateLook(ctx, wordA, wordB, lookId, given = {}, { more = fa
           label = `One tall letter (${[...shorter.toUpperCase()].map((c, i) => (best.spans[i] > 1 ? `${c}×${best.spans[i]}` : c)).join('')})`;
           base = { kind: 'span', spacing: k.spacing === 'touching' ? 'touching' : 'spaced', fit, spans: best.spans };
         } else {
-          label = `Stacked (${fit === 'stretch' ? 'taller' : 'larger'})`;
-          base = { kind: 'stacked', fit };
+          label = `Stacked (${fit === 'stretch' ? 'taller' : 'larger'}${k.spacing === 'gapped' ? ', gapped' : ''})`;
+          base = { kind: 'stacked', fit, spacing: k.spacing === 'gapped' ? 'spaced' : 'touching' };
         }
         if (shapeChar && ctx.shapeFont) {
           const [best] = searchTopFit((t) => buildRecipe(ctx, wordA, wordB, { ...base, top: { char: shapeChar, rotate: t.rotate, scale: t.scale } }), topShape(ctx, shapeChar));
