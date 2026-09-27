@@ -5,6 +5,7 @@ import wasmUrl from 'manifold-3d/manifold.wasm?url';
 import shapeFontUrl from '../fonts/shapes/NotoEmoji.ttf?url';
 import { getManifold, loadFont, toBinarySTL } from '../src/core/index.js';
 import { generateGallery, buildRecipe, designView } from '../src/core/gallery.js';
+import { generateLook } from '../src/core/looks.js';
 
 const wasmReady = getManifold({ locateFile: () => wasmUrl });
 const ctx = { wasm: null, font: null, shapeFont: null, height: 20 };
@@ -30,6 +31,15 @@ self.onmessage = async ({ data: msg }) => {
       const t0 = performance.now();
       let n = 0;
       for (const item of generateGallery(ctx, wordA, wordB, opts)) {
+        self.postMessage({ id: msg.id, type: 'item', item, n: ++n, ms: performance.now() - t0 });
+      }
+      self.postMessage({ id: msg.id, type: 'done', n, ms: performance.now() - t0 });
+    } else if (msg.type === 'look') {
+      const { wordA, wordB, lookId, knobs, more } = msg;
+      await ensureFonts({ ...msg, needShapes: !!(knobs.shape && knobs.shape.trim()) || (more && lookId === 'block') });
+      const t0 = performance.now();
+      let n = 0;
+      for (const item of generateLook(ctx, wordA, wordB, lookId, knobs, { more })) {
         self.postMessage({ id: msg.id, type: 'item', item, n: ++n, ms: performance.now() - t0 });
       }
       self.postMessage({ id: msg.id, type: 'done', n, ms: performance.now() - t0 });

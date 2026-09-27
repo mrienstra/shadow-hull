@@ -15,13 +15,17 @@ and/or web) before deciding which to keep.
 - `src/core/design.js` — word-pair pipeline (search → build → join → measure →
   rank by `designQuality`) and the spacing families; shared by the report
   script and the web page.
+- `src/core/looks.js` (+ data-only `look-defs.js`) — the looks the web page
+  offers (letter cube, pairs in a row, pairs in rows, grid, tower, word block),
+  each with its own knobs; `generateLook` → gallery recipes. Every look in
+  `resources/design/ui-map.md` must stay reachable (`test/looks.test.js`).
 - `src/core/gallery.js` — every word-pair variant as a JSON recipe
   (`generateGallery`, `buildRecipe`, `designView`); used by both the report
   script and the web page's Two words mode, so they show the same designs.
 - `src/cli.js` — Node CLI (`node src/cli.js GEB -o out.stl`, `--help`).
-- `web/` — Vite + Three.js page with two modes: Three letters (`worker.js`)
-  and Two words (`words-worker.js`, streaming the gallery; a second worker
-  builds the selected design). `npm run dev` / `npm run build` (→ `dist/`).
+- `web/` — Vite + Three.js page. A look menu: the letter cube (`worker.js`)
+  or a two-word look (`words-worker.js` streams `generateLook`; a second
+  worker builds the selected design). `npm run dev` / `npm run build` (→ `dist/`).
 - `py/` — Python port (manifold3d + fontTools), kept in parity with the JS core.
 - `test/` — `npm test` (node:test). The "F" tests check reading orientation
   against viewer frames written independently of `views.js`; keep them independent.

@@ -60,86 +60,92 @@ test('page generates GEB with complete shadows', async () => {
   assert.deepEqual(errors, []);
 });
 
-test('two-words mode streams designs and shows a heart block with three views', async () => {
+const wordsDone = (page) => page.waitForFunction(
+  () => /in [\d.]+ s/.test(document.querySelector('#words-status').textContent) && document.querySelectorAll('#shadow-panels figure').length >= 2,
+  null, { timeout: 180_000 });
+
+test('look menu: every two-word look makes a one-piece design; knobs and finish work', async () => {
   const page = await browser.newPage({ viewport: { width: 1400, height: 950 } });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   await page.goto(url);
   await page.waitForSelector('#candidates button[aria-pressed="true"]', { timeout: 60_000 });
-  await page.click('#tab-words');
-  // Only the active mode's controls are visible.
-  assert.equal(await page.isVisible('#form'), false, 'three-letters form hidden');
-  assert.equal(await page.isVisible('#candidates'), false);
-  assert.equal(await page.isVisible('#words-form'), true);
-  // Default sections: blocks (none and ❤ on top, three cases) and stacked columns.
-  await page.waitForFunction(() => /designs in/.test(document.querySelector('#words-status').textContent), null, { timeout: 180_000 });
-  const titles = await page.$$eval('#designs button .title', (els) => els.map((e) => e.textContent));
-  assert.ok(titles.includes('upper, top ❤'), titles.join(', '));
-  assert.ok(titles.includes('stacked + ❤'), titles.join(', '));
-  await page.locator('#designs button', { hasText: 'upper, top ❤' }).click();
-  await page.waitForFunction(() => document.querySelectorAll('#shadow-panels figure').length === 3, null, { timeout: 60_000 });
-  const captions = await page.$$eval('#shadow-panels figcaption', (els) => els.map((e) => e.textContent));
-  assert.deepEqual(captions.map((c) => c.split(' ·')[0]), ['front', 'right', 'top']);
-  assert.match(await page.textContent('#print-check'), /^One piece/);
-  assert.equal(await page.isDisabled('#download'), false);
-  await page.check('#colour-faces');
-  await page.click('.toolbar [data-view="top"]');
-  // Finish options rebuild the selected design and go into the share link.
+  assert.deepEqual(await page.$$eval('#looks button', (bs) => bs.map((b) => b.dataset.look)), ['cube', 'row', 'rows', 'grid', 'tower', 'block']);
+  for (const look of ['row', 'rows', 'grid', 'tower', 'block']) {
+    await page.click(`#looks button[data-look="${look}"]`);
+    // Only the active look's controls are visible.
+    assert.equal(await page.isVisible('#form'), false, 'cube form hidden');
+    assert.equal(await page.isVisible('#words-form'), true);
+    await wordsDone(page);
+    assert.match(await page.textContent('#print-check'), /^One piece/, look);
+  }
+  // Word block with a heart from above: three views.
+  await page.click('#looks button[data-look="block"]');
+  await wordsDone(page);
+  await page.click('.shape-row button[title="Use ❤"]');
+  await page.waitForFunction(() => document.querySelectorAll('#shadow-panels figure').length === 3, null, { timeout: 120_000 });
+  const captions = await page.$$eval('#shadow-panels figcaption', (els) => els.map((e) => e.textContent.split(' ·')[0]));
+  assert.deepEqual(captions, ['front', 'right', 'top']);
+  // Finish options go into the share link's knobs.
   await page.check('input[name="stand"]');
-  await page.check('input[name="turn"]');
-  await page.waitForFunction(() => ['stand', 'turn'].every((k) => new URLSearchParams(location.hash.slice(1)).get(k) === '1'));
-  await page.waitForFunction(() => document.querySelectorAll('#shadow-panels figure').length === 3, null, { timeout: 60_000 });
-  // Switching back to three letters still works, and hides the words controls.
-  await page.click('#tab-letters');
+  await page.waitForFunction(() => JSON.parse(new URLSearchParams(location.hash.slice(1)).get('k') ?? '{}').stand === true);
+  await page.check('#colour-faces');
+  // Back to the cube, whose controls return.
+  await page.click('#looks button[data-look="cube"]');
   await page.waitForSelector('#candidates button[aria-pressed="true"]', { timeout: 60_000 });
-  assert.equal(await page.isVisible('#words-form'), false, 'words form hidden');
-  assert.equal(await page.isVisible('#designs'), false);
+  assert.equal(await page.isVisible('#words-form'), false);
   assert.deepEqual(errors, []);
 });
 
-test('shared links restore the page state (both modes)', async () => {
+test('shared links restore the page state (cube, word looks, and old-format links)', async () => {
   const page = await browser.newPage({ viewport: { width: 1400, height: 950 } });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  // Three letters: a non-default word set, font and a non-first candidate.
+  // Cube: a non-default font and a non-first candidate.
   await page.goto(url);
   await page.waitForSelector('#candidates button[aria-pressed="true"]', { timeout: 60_000 });
   await page.selectOption('#font-choice', 'anton');
-  await page.waitForFunction(() => /Tried/.test(document.querySelector('#status').textContent) && document.querySelector('#font-choice').value === 'anton');
-  // Let the automatic first selection finish writing the hash, then pick another.
   await page.waitForFunction(() => new URLSearchParams(location.hash.slice(1)).get('font') === 'anton' && new URLSearchParams(location.hash.slice(1)).has('pick'));
   await page.waitForTimeout(500);
   const before = await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get('pick'));
   await page.locator('#candidates button').nth(2).click();
   await page.waitForFunction((p) => new URLSearchParams(location.hash.slice(1)).get('pick') !== p, before);
-  const lettersUrl = page.url();
+  const cubeUrl = page.url();
   const picked = await page.textContent('#candidates button[aria-pressed="true"] .letters');
-  assert.equal(picked, await page.textContent('#candidates li:nth-child(3) .letters'));
 
-  // Two words: switch, pick a specific design.
-  await page.click('#tab-words');
+  // A word look with knobs and a selected design.
+  await page.click('#looks button[data-look="tower"]');
   await page.fill('input[name="wordA"]', 'Ada');
   await page.fill('input[name="wordB"]', 'Bo');
   await page.click('#words-go');
-  await page.waitForFunction(() => /designs in/.test(document.querySelector('#words-status').textContent), null, { timeout: 180_000 });
-  await page.locator('#designs button', { hasText: 'upper, top ❤' }).click();
-  await page.waitForFunction(() => new URLSearchParams(location.hash.slice(1)).get('ti') === 'upper, top ❤');
-  const wordsUrl = page.url();
+  await wordsDone(page);
+  await page.click('.shape-row button[title="Use ❤"]');
+  await page.waitForFunction(() => new URLSearchParams(location.hash.slice(1)).get('ti')?.includes('❤'), null, { timeout: 120_000 });
+  const lookUrl = page.url();
 
-  // Open each link fresh.
   const p2 = await browser.newPage({ viewport: { width: 1400, height: 950 } });
   p2.on('pageerror', (e) => errors.push(e.message));
-  await p2.goto(wordsUrl);
+  await p2.goto(lookUrl);
   await p2.waitForFunction(() => document.querySelectorAll('#shadow-panels figure').length === 3, null, { timeout: 120_000 });
-  assert.equal(await p2.getAttribute('#tab-words', 'aria-selected'), 'true');
+  assert.equal(await p2.getAttribute('#looks button[data-look="tower"]', 'aria-checked'), 'true');
   assert.equal(await p2.inputValue('input[name="wordA"]'), 'Ada');
-  assert.equal(await p2.inputValue('#font-choice'), 'anton');
-  assert.match(await p2.textContent('#word-stats'), /^upper, top ❤/);
+  assert.equal(await p2.inputValue('.shape-row input'), '❤');
+  assert.match(await p2.textContent('#word-stats'), /❤/);
+
   await p2.goto('about:blank');
-  await p2.goto(lettersUrl);
+  await p2.goto(cubeUrl);
   await p2.waitForSelector('#candidates button[aria-pressed="true"]', { timeout: 60_000 });
-  assert.equal(await p2.getAttribute('#tab-letters', 'aria-selected'), 'true');
+  assert.equal(await p2.getAttribute('#looks button[data-look="cube"]', 'aria-checked'), 'true');
   assert.equal(await p2.inputValue('#font-choice'), 'anton');
   assert.equal(await p2.textContent('#candidates button[aria-pressed="true"] .letters'), picked);
+
+  // An old-format link (from before the look menu) still opens its design.
+  const old = '#' + new URLSearchParams({ m: 'words', font: 'kanit-black', a: 'Stop', b: 'Work', sec: 'families', fam: 'spaced', case: 'upper', rows: '1', stand: '1', turn: '1' });
+  await p2.goto('about:blank');
+  await p2.goto(url + old);
+  await p2.waitForFunction(() => /in [\d.]+ s/.test(document.querySelector('#words-status').textContent), null, { timeout: 120_000 });
+  assert.equal(await p2.getAttribute('#looks button[data-look="row"]', 'aria-checked'), 'true');
+  assert.equal(await p2.inputValue('input[name="wordA"]'), 'Stop');
+  assert.equal(await p2.isChecked('input[name="stand"]'), true);
   assert.deepEqual(errors, []);
 });

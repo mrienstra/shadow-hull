@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-09-27 (UI reorganisation, stages 2 and 6: look-first page)
+
+- The tabs are replaced by a look menu (six cards with small drawings):
+  Letter cube, Pairs in a row, Pairs in rows, Grid, Tower, Word block. Each
+  look shows only its own knobs, generated from `look-defs.js`: segmented
+  choices, checkboxes (allow stretching, display stand, turn 45°, monospaced),
+  and a shape field with quick-insert symbols (❤ ♥ ⭐ ☀ ♣ ♠ ♦ ♪ 😀 🐱). Changing a
+  knob regenerates (0.2–2 s), and stand/turn rebuild only the selection. "More
+  variants" widens the search. Font changes regenerate too.
+- The letter cube is a look (stage 6): same flow, its existing options.
+- Share links: `#look=…&k={knobs}&r=…`; older `#m=letters` / `#m=words…` links
+  still open (a recipe maps to its look).
+- Look definitions are data-only (`look-defs.js`) so the page doesn't bundle
+  the geometry code.
+- e2e rewritten: every look makes a one-piece design, only the active look's
+  controls show, a shape knob gives three views, finish goes into the link,
+  and round trips work for the cube, a word look and an old-format link.
+- No subagents used.
+
 ## 2026-09-27 (UI reorganisation, stage 1: looks in core)
 
 - `src/core/looks.js`: six looks (letter cube, pairs in a row, pairs in rows,

@@ -10,21 +10,21 @@
 <body>
   <header>
     <h1>Shadow Hull</h1>
-    <p>Solids whose shadows read as letters or words from different sides, like the carved blocks on the cover of <i>Gödel, Escher, Bach</i>.</p>
+    <p>Solids whose shadows read as letters or words from different sides, like the carved blocks on the cover of <i>Gödel, Escher, Bach</i>. Pick what to make:</p>
   </header>
 
   <main>
     <section class="panel controls" aria-label="Settings">
-      <div class="tabs" role="tablist" aria-label="Mode">
-        <button type="button" role="tab" id="tab-letters" aria-selected="true" aria-controls="form">Three letters</button>
-        <button type="button" role="tab" id="tab-words" aria-selected="false" aria-controls="words-form">Two words</button>
-      </div>
+      <div class="looks" id="looks" role="radiogroup" aria-label="What to make"></div>
+      <p class="look-blurb" id="look-blurb"></p>
       <label class="font-row">Font <select name="fontChoice" id="font-choice"></select></label>
       <div class="gfont">
         <input id="gfont" list="gfont-list" placeholder="…or any Google Font, e.g. Big Shoulders Display" autocomplete="off" aria-label="Google Font family">
         <select id="gweight" aria-label="Weight" title="Weight (heaviest is usually best)" disabled></select>
         <datalist id="gfont-list"></datalist>
       </div>
+
+      <!-- Letter cube (three letters) -->
       <form id="form">
         <div class="texts">
           <label>Front <input name="front" value="G" maxlength="12" autocomplete="off"></label>
@@ -57,53 +57,17 @@
       </form>
       <ol id="candidates" aria-label="Candidates, best first"></ol>
 
+      <!-- Two-word looks -->
       <form id="words-form" hidden>
         <div class="words">
-          <label>Front word <input name="wordA" value="Finola" maxlength="16" autocomplete="off"></label>
-          <label>Side word <input name="wordB" value="Bryan" maxlength="16" autocomplete="off"></label>
+          <label>Word seen from one side <input name="wordA" value="Finola" maxlength="16" autocomplete="off"></label>
+          <label>Word seen from the other <input name="wordB" value="Bryan" maxlength="16" autocomplete="off"></label>
           <p class="hint">Example pair: Finola and Bryan, the lead agents in NBC's sci-fi series <i>Debris</i> (2021).</p>
         </div>
-        <fieldset class="inline finish">
-          <legend>Finish (applies to the selected design)</legend>
-          <label class="check" title="A rounded base under the whole design: joins the bottom row without rods, adds a bar under both shadows"><input type="checkbox" name="stand"> Display stand</label>
-          <label class="check" title="Rotate the output 45° so the two words face front-left and front-right"><input type="checkbox" name="turn"> Turn 45° for display</label>
-        </fieldset>
-        <fieldset class="sections">
-          <legend>Designs to generate</legend>
-          <label class="check"><input type="checkbox" name="section" value="blocks" checked> Blocks: whole words, optional shape on top <span class="hint">fast</span></label>
-          <label class="check"><input type="checkbox" name="section" value="stacked" checked> Stacked columns, ❤ from above <span class="hint">~20 s</span></label>
-          <label class="check"><input type="checkbox" name="section" value="spans"> Column with a tall letter <span class="hint">~40 s</span></label>
-          <label class="check"><input type="checkbox" name="section" value="angles"> Blocks at other view angles <span class="hint">~10 s</span></label>
-          <label class="check"><input type="checkbox" name="section" value="families"> Word chains: spacing families <span class="hint">slow, minutes</span></label>
-        </fieldset>
-        <details>
-          <summary>Options</summary>
-          <fieldset class="inline"><legend>Chain families</legend>
-            <label class="check"><input type="checkbox" name="family" value="touching" checked> touching</label>
-            <label class="check"><input type="checkbox" name="family" value="spaced" checked> spaced</label>
-            <label class="check"><input type="checkbox" name="family" value="grid"> grid</label>
-            <label class="check"><input type="checkbox" name="family" value="grid-mono"> grid, mono</label>
-            <label class="check"><input type="checkbox" name="family" value="column"> column</label>
-            <label class="check"><input type="checkbox" name="family" value="column-touching"> column, touching</label>
-          </fieldset>
-          <fieldset class="inline"><legend>Letter case</legend>
-            <label class="check"><input type="checkbox" name="case" value="upper" checked> UPPER</label>
-            <label class="check"><input type="checkbox" name="case" value="lower"> lower</label>
-            <label class="check"><input type="checkbox" name="case" value="title"> Title</label>
-            <label class="check"><input type="checkbox" name="case" value="mixed" checked> miXed</label>
-            <span class="hint">Lowercase needs a font that has it (Bungee and Rubik Mono One are all capitals).</span>
-          </fieldset>
-          <fieldset class="inline"><legend>Rows (chains)</legend>
-            <label class="check"><input type="checkbox" name="rows" value="1" checked> 1</label>
-            <label class="check"><input type="checkbox" name="rows" value="2" checked> 2</label>
-            <label class="check"><input type="checkbox" name="rows" value="3"> 3</label>
-          </fieldset>
-          <label>Top shapes for blocks (characters, e.g. ❤ ⭐ 😀; blank = none) <input name="tops" value="❤" autocomplete="off"></label>
-          <label>View angles for angled blocks (degrees) <input name="angles" value="75, 60, 45" autocomplete="off"></label>
-        </details>
+        <div id="knobs" class="knobs"></div>
         <div class="buttons">
-          <button type="submit" id="words-go">Generate</button>
-          <button type="button" id="words-all" title="Every section, family, case and row count (as in the report) — several minutes">Everything</button>
+          <button type="submit" id="words-go">Make it</button>
+          <button type="button" id="words-more" title="Try more variants of this look: every letter case, alternative layouts, other styles">More variants</button>
           <button type="button" id="words-stop" disabled>Stop</button>
         </div>
         <p id="words-status" role="status"></p>

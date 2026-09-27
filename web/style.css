@@ -142,3 +142,24 @@ figure svg.wide { aspect-ratio: auto; height: auto; max-height: 180px; }
 .gfont { display: grid; grid-template-columns: 1fr auto; gap: 6px; margin: -4px 0 10px; }
 .gfont input { padding: 6px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); min-width: 0; font-size: 13px; }
 .gfont select { padding: 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-size: 13px; }
+
+/* Look menu */
+.looks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 8px; }
+.looks button { display: grid; justify-items: center; gap: 4px; padding: 8px 4px 6px; font-size: 12px; line-height: 1.2; text-align: center; }
+.looks button svg { width: 56px; height: 40px; }
+.looks button svg .ink { fill: var(--ink); }
+.looks button svg .base { fill: var(--muted); opacity: 0.55; }
+.looks button svg .line { fill: none; stroke: var(--ink); stroke-width: 1.4; }
+.looks button[aria-checked="true"] { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--bg)); }
+.look-blurb { margin: 0 0 10px; font-size: 13px; color: var(--muted); min-height: 2.6em; }
+/* Knobs */
+.knobs { display: grid; gap: 8px; }
+.knob { display: grid; gap: 4px; font-size: 13px; }
+.knob > span { color: var(--muted); font-size: 12px; }
+.seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.seg button { padding: 4px 9px; font-size: 12px; border-radius: 999px; }
+.seg button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.knob-bools { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.shape-row { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; }
+.shape-row input { width: 5em; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--bg); font-size: 16px; }
+.shape-row button { padding: 2px 7px; font-size: 16px; line-height: 1.2; }
