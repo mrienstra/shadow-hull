@@ -23,13 +23,16 @@ import { buildComposition, measureComposition, disposeCells } from './compose.js
 
 const inkCache = new WeakMap();
 
-/** Outline and ink bounds of `text` in font units (y up). */
-export function ink(font, text, tolerance) {
+/**
+ * Outline and ink bounds of `text` in font units (y up).
+ * `txt` = { tolerance, tracking } (see textContours).
+ */
+export function ink(font, text, txt = {}) {
   let byText = inkCache.get(font);
   if (!byText) inkCache.set(font, (byText = new Map()));
-  const key = `${text}\u0000${tolerance}`;
+  const key = `${text}\u0000${txt.tolerance}\u0000${txt.tracking ?? 0}`;
   if (!byText.has(key)) {
-    const contours = textContours(font, text, { tolerance });
+    const contours = textContours(font, text, txt);
     const pts = contours.flat();
     byText.set(key, {
       contours,
@@ -49,8 +52,8 @@ function placed(wasm, contours, from, to, scale) {
 }
 
 /** Vertical frame [yMin, yMax] (font units) shared by a row: all texts' ink. */
-export function rowFrame(font, texts, tolerance) {
-  const inks = texts.map((t) => ink(font, t, tolerance));
+export function rowFrame(font, texts, txt) {
+  const inks = texts.map((t) => ink(font, t, txt));
   return [Math.min(...inks.map((g) => g.yMin)), Math.max(...inks.map((g) => g.yMax))];
 }
 
@@ -75,18 +78,19 @@ function vertical(g, frame, height, fit) {
  *   opts.lineGap between rows (mm); opts.fit default per-cell fit.
  */
 export function layoutCells(wasm, font, layout, opts = {}) {
-  const { height = 20, gap = 0, lineGap = 0, fit = 'shared', tolerance } = opts;
+  const { height = 20, gap = 0, lineGap = 0, fit = 'shared', tolerance, tracking } = opts;
+  const txt = { tolerance, tracking };
   const cells = [];
   layout.rows.forEach((row, j) => {
     if (row.a.length !== row.b.length) throw new Error('Each row needs the same number of chunks in both words');
     // Never clip: widen a given frame to cover this row's own ink.
-    const own = rowFrame(font, [...row.a, ...row.b], tolerance);
+    const own = rowFrame(font, [...row.a, ...row.b], txt);
     const frame = row.frame ? [Math.min(row.frame[0], own[0]), Math.max(row.frame[1], own[1])] : own;
     const shared = height / (frame[1] - frame[0]);
     const zTop = -j * (height + lineGap), z0 = zTop - height;
     let x = 0, y = 0;
     row.a.forEach((ta, i) => {
-      const ga = ink(font, ta, tolerance), gb = ink(font, row.b[i], tolerance);
+      const ga = ink(font, ta, txt), gb = ink(font, row.b[i], txt);
       const f = row.fit?.[i] ?? fit;
       const va = vertical(ga, frame, height, f), vb = vertical(gb, frame, height, f);
       const wa = (ga.xMax - ga.xMin) * shared, wb = (gb.xMax - gb.xMin) * shared;
@@ -133,8 +137,9 @@ function coverageUnder(wasm, cs, profile) {
  * Score one cell in 2D: both chunks placed in a row of the given frame/fit.
  * Returns { coverage: min of the two sides, covA, covB, distortion }.
  */
-export function scoreCell(wasm, font, ta, tb, frame0, fit, { height = 20, tolerance } = {}) {
-  const ga = ink(font, ta, tolerance), gb = ink(font, tb, tolerance);
+export function scoreCell(wasm, font, ta, tb, frame0, fit, { height = 20, tolerance, tracking } = {}) {
+  const txt = { tolerance, tracking };
+  const ga = ink(font, ta, txt), gb = ink(font, tb, txt);
   const frame = [Math.min(frame0[0], ga.yMin, gb.yMin), Math.max(frame0[1], ga.yMax, gb.yMax)];
   const shared = height / (frame[1] - frame[0]);
   const va = vertical(ga, frame, height, fit), vb = vertical(gb, frame, height, fit);
@@ -154,8 +159,8 @@ export function scoreCell(wasm, font, ta, tb, frame0, fit, { height = 20, tolera
  * "i" with a letter that has ink at dot height strands the dot as a floating
  * lump. Needs a small 3D build; callers cache it.
  */
-export function cellFragments(wasm, font, ta, tb, frame, fit, { height = 20, tolerance } = {}) {
-  const cells = layoutCells(wasm, font, { rows: [{ a: [ta], b: [tb], fit: [fit], frame }] }, { height, tolerance });
+export function cellFragments(wasm, font, ta, tb, frame, fit, { height = 20, tolerance, tracking } = {}) {
+  const cells = layoutCells(wasm, font, { rows: [{ a: [ta], b: [tb], fit: [fit], frame }] }, { height, tolerance, tracking });
   const solid = buildComposition(wasm, cells);
   try {
     const parts = solid.decompose();
@@ -171,8 +176,9 @@ export function cellFragments(wasm, font, ta, tb, frame, fit, { height = 20, tol
  * Same as cellFragments, but by scanline slicing in plain JS (see scan.js):
  * ~100x faster, may over-count a connection thinner than one slice.
  */
-export function cellFragmentsScan(font, ta, tb, frame0, fit, { height = 20, tolerance, levels = 200 } = {}) {
-  const ga = ink(font, ta, tolerance), gb = ink(font, tb, tolerance);
+export function cellFragmentsScan(font, ta, tb, frame0, fit, { height = 20, tolerance, tracking, levels = 200 } = {}) {
+  const txt = { tolerance, tracking };
+  const ga = ink(font, ta, txt), gb = ink(font, tb, txt);
   const frame = [Math.min(frame0[0], ga.yMin, gb.yMin), Math.max(frame0[1], ga.yMax, gb.yMax)];
   const shared = height / (frame[1] - frame[0]);
   const va = vertical(ga, frame, height, fit), vb = vertical(gb, frame, height, fit);
@@ -263,20 +269,21 @@ function pareto(items, limit) {
  * 1..maxChunk letters from each line, with every case variant and fit.
  */
 export function alignLines(wasm, font, lineA, lineB, opts = {}) {
-  const { caseMode = 'upper', fits = ['shared'], maxChunk = 3, frontLimit = 12, height = 20, tolerance } = opts;
+  const { caseMode = 'upper', fits = ['shared'], maxChunk = 3, frontLimit = 12, height = 20, tolerance, tracking } = opts;
+  const txt = { tolerance, tracking };
   const A = [...CASES[caseMode === 'mixed' ? 'as' : caseMode](lineA)], B = [...CASES[caseMode === 'mixed' ? 'as' : caseMode](lineB)];
   const frameTexts = caseMode === 'mixed' ? [...A, ...B].flatMap((c) => [c.toUpperCase(), c.toLowerCase()]) : [...A, ...B];
   // A caller searching many line splits passes one frame and cache for all of
   // them (same row height scale everywhere, and cells are scored once).
-  const frame = opts.frame ?? rowFrame(font, frameTexts, tolerance);
+  const frame = opts.frame ?? rowFrame(font, frameTexts, txt);
   const cellCache = opts.cache ?? new Map();
   const cellOptions = (ca, cb) => {
-    const key = `${caseMode}|${ca}|${cb}|${frame}|${fits}|${height}`;
+    const key = `${caseMode}|${ca}|${cb}|${frame}|${fits}|${height}|${tracking ?? 0}`;
     if (!cellCache.has(key)) {
       const out = [];
       for (const va of caseVariants(ca, caseMode)) for (const vb of caseVariants(cb, caseMode)) for (const fit of fits) {
-        const s = scoreCell(wasm, font, va, vb, frame, fit, { height, tolerance });
-        const fragments = cellFragmentsScan(font, va, vb, frame, fit, { height, tolerance });
+        const s = scoreCell(wasm, font, va, vb, frame, fit, { height, tolerance, tracking });
+        const fragments = cellFragmentsScan(font, va, vb, frame, fit, { height, tolerance, tracking });
         out.push({
           a: va, b: vb, fit, cell: s,
           score: { coverage: s.coverage, distortion: s.distortion, fragments, merged: [...va].length + [...vb].length - 2, lower: lowercaseCount(va) + lowercaseCount(vb) },
@@ -330,7 +337,7 @@ export function exploreWordPair(wasm, font, wordA, wordB, opts = {}) {
     const letters = [...wa, ...wb];
     const frame = rowFrame(font, lineMode === 'mixed'
       ? letters.flatMap((c) => [c.toUpperCase(), c.toLowerCase()])
-      : letters.map((c) => (CASES[lineMode] ?? CASES.as)(c)), opts.tolerance);
+      : letters.map((c) => (CASES[lineMode] ?? CASES.as)(c)), { tolerance: opts.tolerance, tracking: opts.tracking });
     for (const r of rowCounts) {
       if (r > Math.min([...wa].length, [...wb].length)) continue;
       for (const la of splits(wa, r)) {

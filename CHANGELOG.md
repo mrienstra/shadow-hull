@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-09-26 (hull-aware joining, tracking)
+
+- `join.js`: `fullHull` (whole words extruded and intersected; contains every
+  solid whose shadows stay in the letters) and `hullJoin` (adds off-diagonal
+  hull blocks, nearest first, across rows too, kept only if they cut the piece
+  count; zero extra shadow by construction). Test: two cells meeting at an
+  edge join with one block and no stray shadow.
+- Letter tracking (`textContours` `tracking`, em; negative = touching) threaded
+  through the word-pair search and layout; report `--tracking` (default −0.06)
+  and `--join hull+bridges` (default).
+- Finola × Bryan, Kanit Black, best per style: with tracking 0, hull joining
+  alone fixed 1/12 layouts; at −0.06 em, 6/12 are one piece with zero extra
+  shadow, the rest need 1–2 rods ≤4.1 mm (≤2.2% extra shadow), and every style
+  reaches 100% (the title-case i-dot merges into the F). Piece counts equal the
+  larger number of shadow parts in either view, as the responses predicted.
+- Known issue: the fixed overlap between cells (0.2 × row height) swallows
+  narrow letters ("FINOLA" reads almost "FNOLA"). Should be per-pair: just
+  enough for neighbours to touch.
+- No subagents used.
+
 ## 2026-09-26 (thin-feature check)
 
 - `voxel.js`: `thinFeatures` finds material thinner than the minimum wall by

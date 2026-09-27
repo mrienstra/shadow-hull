@@ -11,11 +11,12 @@ export function loadFont(data) {
 /**
  * Outline of `text` (one or more characters, kerned) as closed polygons in
  * font units, y up. Curves are flattened so that segments are at most about
- * `tolerance` em long.
+ * `tolerance` em long. `tracking` (em, may be negative) is added between
+ * letters; negative values make letters overlap.
  *
  * @returns {Array<Array<[number, number]>>}
  */
-export function textContours(font, text, { tolerance = 0.01 } = {}) {
+export function textContours(font, text, { tolerance = 0.01, tracking = 0 } = {}) {
   const em = font.unitsPerEm;
   const maxSeg = tolerance * em;
   // Lay glyphs out ourselves (advance width + pair kerning) rather than via
@@ -27,7 +28,7 @@ export function textContours(font, text, { tolerance = 0.01 } = {}) {
   let pen = 0;
   glyphs.forEach((g, i) => {
     path.commands.push(...g.getPath(pen, 0, em).commands);
-    pen += g.advanceWidth + (i + 1 < glyphs.length ? font.getKerningValue(g, glyphs[i + 1]) : 0);
+    if (i + 1 < glyphs.length) pen += g.advanceWidth + font.getKerningValue(g, glyphs[i + 1]) + tracking * em;
   });
   const contours = [];
   let cur = null;

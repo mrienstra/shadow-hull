@@ -3,13 +3,13 @@
 // shadows per layout) to reports/<a>-<b>.html. Exploration tool, not product.
 // Usage: node scripts/explore-words.js Finola Bryan [--font kanit-black] [--rows 1,2,3]
 //        [--cases upper,lower,title,mixed] [--fits shared,fill] [--gap=-0.2] [--line-gap=-0.05]
-//        [--join none|plate|bridges|plate+bridges]
+//        [--join none|hull|plate|bridges|hull+bridges|...] [--tracking=-0.06]
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { getManifold, loadFont, worldToLocal } from '../src/core/index.js';
 import { exploreWordPair, realizeLayout, describeLayout, rankScore } from '../src/core/wordpair.js';
-import { basePlate, bridgePieces, strayShadow } from '../src/core/join.js';
+import { basePlate, bridgePieces, strayShadow, hullJoin } from '../src/core/join.js';
 
 const { values: o, positionals: [wordA, wordB] } = parseArgs({
   allowPositionals: true,
@@ -18,7 +18,8 @@ const { values: o, positionals: [wordA, wordB] } = parseArgs({
     cases: { type: 'string', default: 'upper,lower,title,mixed' }, fits: { type: 'string', default: 'shared,fill' },
     gap: { type: 'string', default: '-0.2' }, 'line-gap': { type: 'string', default: '-0.05' },
     'max-chunk': { type: 'string', default: '3' },
-    join: { type: 'string', default: 'bridges' }, // none | plate | bridges | plate+bridges
+    join: { type: 'string', default: 'hull+bridges' }, // none | hull | plate | bridges, combined with '+'
+    tracking: { type: 'string', default: '-0.06' }, // em between letters inside chunks (negative = touching)
   },
 });
 if (!wordA || !wordB) { console.error('Usage: explore-words.js WORD_A WORD_B [options]'); process.exit(1); }
@@ -33,7 +34,7 @@ const H = 20, gap = Number(o.gap) * H, lineGap = Number(o['line-gap']) * H;
 const t0 = performance.now();
 const all = exploreWordPair(wasm, font, wordA, wordB, {
   cases: o.cases.split(','), rows: o.rows.split(',').map(Number), fits: o.fits.split(','),
-  maxChunk: Number(o['max-chunk']), byStyle: true, height: H,
+  maxChunk: Number(o['max-chunk']), byStyle: true, height: H, tracking: Number(o.tracking),
 });
 console.error(`search: ${all.length} layouts in ${((performance.now() - t0) / 1000).toFixed(0)} s`);
 
@@ -50,15 +51,16 @@ const entries = [];
 for (const [style, ps] of groups) {
   ps.sort((p, q) => rankScore(p.score, q.score));
   const p = ps[0];
-  const r = realizeLayout(wasm, font, p, { height: H, gap, lineGap });
+  const r = realizeLayout(wasm, font, p, { height: H, gap, lineGap, tracking: Number(o.tracking) });
   const m = r.metrics;
   // Join into one piece; the letters-only solid stays in r.solid for coverage.
-  let joined = r.solid, bridges = [];
-  if (o.join.includes('plate')) joined = basePlate(wasm, joined, r.cells);
+  let joined = r.solid, bridges = [], blocks = [];
+  const replace = (next) => { if (joined !== r.solid) joined.delete(); joined = next; };
+  if (o.join.includes('hull')) { const h = hullJoin(wasm, joined, r.cells); replace(h.solid); blocks = h.blocks; }
+  if (o.join.includes('plate')) replace(basePlate(wasm, joined, r.cells));
   if (o.join.includes('bridges')) {
     const b = bridgePieces(wasm, joined);
-    if (joined !== r.solid) joined.delete();
-    joined = b.solid; bridges = b.bridges;
+    replace(b.solid); bridges = b.bridges;
   }
   const stray = strayShadow(wasm, r.solid, joined, r.cells);
   const finalParts = joined.decompose();
@@ -79,7 +81,7 @@ for (const [style, ps] of groups) {
   entries.push({
     style, text: describeLayout(p),
     stats: `worst letter ${pct(m.worstCell)} · stretch ${(p.score.distortion * 100).toFixed(0)}% · ${m.pieces} piece${m.pieces > 1 ? 's' : ''}`
-      + (o.join === 'none' ? '' : ` → ${finalPieces} after ${o.join} (${bridges.length} rod${bridges.length === 1 ? '' : 's'}${bridges.length ? `, longest ${Math.max(...bridges.map((b) => b.length)).toFixed(1)} mm` : ''}; extra shadow ${pct(stray.front)} / ${pct(stray.right)})`)
+      + (o.join === 'none' ? '' : ` → ${finalPieces} after ${o.join} (${blocks.length ? `${blocks.length} hull block${blocks.length === 1 ? '' : 's'}, ` : ''}${bridges.length} rod${bridges.length === 1 ? '' : 's'}${bridges.length ? `, longest ${Math.max(...bridges.map((b) => b.length)).toFixed(1)} mm` : ''}; extra shadow ${pct(stray.front)} / ${pct(stray.right)})`)
       + ` · ${m.size.map((x) => x.toFixed(0)).join(' × ')} mm`,
     views, verts, tris: Array.from(mesh.triVerts),
   });
@@ -105,7 +107,7 @@ canvas { width:100%; height:240px; display:block; background:var(--bg); border-r
 path.s { fill:var(--ink); } path.m { fill:var(--miss); }
 </style></head><body>
 <h1>${wordA} × ${wordB}</h1>
-<p class="sub">Best layout per style (${entry?.name ?? o.font}). “·” separates cells, “/” rows, “↕” = letter stretched to row height. Front reads ${wordA}, right reads ${wordB}; red = missing from the letter. Joined with: ${o.join}. Drag to rotate.</p>
+<p class="sub">Best layout per style (${entry?.name ?? o.font}). “·” separates cells, “/” rows, “↕” = letter stretched to row height. Front reads ${wordA}, right reads ${wordB}; red = missing from the letter. Joined with: ${o.join}; tracking ${o.tracking} em. Drag to rotate.</p>
 <div class="grid" id="grid"></div>
 <script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/" } }</script>
 <script type="module">

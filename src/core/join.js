@@ -11,8 +11,8 @@
  *
  * Both return a new Manifold (caller owns it); neither consumes its inputs.
  */
-import { Scope } from './manifold.js';
-import { VIEW_NAMES, worldToLocal } from './views.js';
+import { Scope, extrudeCentered } from './manifold.js';
+import { VIEW_NAMES, localToWorld, worldToLocal } from './views.js';
 
 /** Base plate under the bottom row of `cells`, fitted to `solid`. */
 export function basePlate(wasm, solid, cells, { thickness = 1.5, embed = 0.3 } = {}) {
@@ -126,6 +126,90 @@ export function strayShadow(wasm, lettersSolid, joinedSolid, cells) {
       out[v] = scope.add(b.subtract(a)).area() / target.area();
     }
     return out;
+  } finally {
+    scope.dispose();
+  }
+}
+
+/**
+ * The full hull H of a composition: every constrained view's whole target
+ * (union of its cells' shapes) extruded along its axis, intersected. H
+ * contains every solid whose shadows stay inside the targets, so it bounds
+ * coverage from above, and material taken from H never adds shadow.
+ * Caller owns the result.
+ */
+export function fullHull(wasm, cells) {
+  const { Manifold, CrossSection } = wasm;
+  const scope = new Scope();
+  try {
+    let extent = 0;
+    for (const { box } of cells) for (const v of [...box.min, ...box.max]) extent = Math.max(extent, Math.abs(v));
+    const length = 4 * extent + 1;
+    const prisms = [];
+    for (const v of VIEW_NAMES) {
+      const own = cells.map((c) => c.shapes[v]).filter(Boolean);
+      if (!own.length) continue;
+      const word = scope.add(CrossSection.union(own));
+      prisms.push(scope.add(scope.add(extrudeCentered(wasm, word, length)).transform(localToWorld(v))));
+    }
+    return Manifold.intersection(prisms);
+  } finally {
+    scope.dispose();
+  }
+}
+
+const significant = (m, dustFraction = 1e-3) => {
+  const parts = m.decompose();
+  const total = m.volume();
+  const n = parts.filter((p) => p.volume() >= dustFraction * total).length;
+  for (const p of parts) p.delete();
+  return n;
+};
+
+/**
+ * Join pieces with zero extra shadow by adding "off-diagonal" blocks of the
+ * full hull: H inside the box spanned by cell i's x-range, cell j's y-range
+ * and both cells' z-ranges. Blocks are tried nearest-first and
+ * kept only if they reduce the piece count. Pieces in different components
+ * of H can't be joined invisibly; bridge those afterwards.
+ * @returns { solid, blocks: [{ i, j, volume }], pieces }
+ */
+export function hullJoin(wasm, solid, cells, { dustFraction = 1e-3 } = {}) {
+  const { Manifold } = wasm;
+  const scope = new Scope();
+  try {
+    const H = scope.add(fullHull(wasm, cells));
+    let current = solid, pieces = significant(solid, dustFraction);
+    const blocks = [];
+    const candidates = [];
+    // Block (i, j): x-range of cell i, y-range of cell j, spanning both cells'
+    // z-ranges (so blocks can also join stacked rows). Nearest first.
+    cells.forEach((a, i) => cells.forEach((b, j) => {
+      if (i === j) return;
+      const rows = a.box.min[2] === b.box.min[2] ? 0 : 1;
+      candidates.push({ i, j, dist: Math.abs(i - j) + 10 * rows });
+    }));
+    candidates.sort((p, q) => p.dist - q.dist);
+    for (const c of candidates) {
+      if (pieces <= 1) break;
+      const a = cells[c.i].box, b = cells[c.j].box;
+      const min = [a.min[0], b.min[1], Math.min(a.min[2], b.min[2])];
+      const max = [a.max[0], b.max[1], Math.max(a.max[2], b.max[2])];
+      const box = scope.add(scope.add(Manifold.cube(max.map((x, k) => x - min[k]), false)).translate(min));
+      const block = scope.add(H.intersect(box));
+      if (block.isEmpty()) continue;
+      const next = Manifold.union(current, block);
+      const n = significant(next, dustFraction);
+      if (n < pieces) {
+        if (current !== solid) current.delete();
+        current = next;
+        pieces = n;
+        blocks.push({ i: c.i, j: c.j, volume: block.volume() });
+      } else {
+        next.delete();
+      }
+    }
+    return { solid: current === solid ? Manifold.union([solid]) : current, blocks, pieces };
   } finally {
     scope.dispose();
   }
