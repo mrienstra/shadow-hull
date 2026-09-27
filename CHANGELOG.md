@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-27 (letter cube wording; shared font upload)
+
+- The letter cube's options use the same plain wording as the word looks:
+  "Letter shapes: stretched to fill each face / kept in proportion", "Which way
+  up: sits on a table / any way up / exactly as typed", "Warn about walls
+  thinner than", "Let letters swap sides", "Prefer one piece"; "Side" instead of
+  "Right"; "Make it" instead of "Generate".
+- Uploading a font moved to the shared font row. It works for every look,
+  regenerates the current one, and clears a Google Font. Uploaded fonts stay
+  out of share links, as before.
+- No subagents used.
+
 ## 2026-09-27 (no-supports option; prefer compact)
 
 - "Support rods" knob on every word look: allowed where needed (default) or

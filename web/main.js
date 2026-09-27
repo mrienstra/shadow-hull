@@ -232,20 +232,23 @@ fontChoice.addEventListener('change', async () => {
   uploadedFont = null;
   clearGoogleFont();
   await call({ type: 'font', url: FONT_URLS[`../fonts/${f.file}`] });
-  form.font.value = '';
+  $('#font-upload').value = '';
   status.textContent = `Font: ${f.name}`;
   if (mode === 'letters') form.requestSubmit();
   else generateWords(false);
 });
 
-form.font.addEventListener('change', async () => {
-  const file = form.font.files[0];
+$('#font-upload').addEventListener('change', async () => {
+  const file = $('#font-upload').files[0];
   if (!file) return;
   const data = await file.arrayBuffer();
+  clearGoogleFont();
   uploadedFont = data.slice(0);
   await call({ type: 'font', data }, [data]);
   status.textContent = `Font: ${file.name}`;
-  form.requestSubmit();
+  $('#words-status').textContent = `Font: ${file.name}`;
+  if (mode === 'letters') form.requestSubmit();
+  else generateWords(false);
 });
 
 form.addEventListener('submit', async (e) => {
@@ -709,7 +712,7 @@ async function useGoogleFont(idOrFamily, weight, { quiet = false } = {}) {
     say(`Loading ${f.family} ${w}…`);
     await call({ type: 'font', url });
     uploadedFont = null;
-    form.font.value = '';
+    $('#font-upload').value = '';
     googleFont = { id: f.id, family: f.family, weight: w, url };
     gfont.value = f.family;
     gweight.replaceChildren(...f.weights.map((x) => new Option(String(x), String(x))));
