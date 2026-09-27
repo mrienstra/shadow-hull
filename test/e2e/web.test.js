@@ -67,6 +67,10 @@ test('two-words mode streams designs and shows a heart block with three views', 
   await page.goto(url);
   await page.waitForSelector('#candidates button[aria-pressed="true"]', { timeout: 60_000 });
   await page.click('#tab-words');
+  // Only the active mode's controls are visible.
+  assert.equal(await page.isVisible('#form'), false, 'three-letters form hidden');
+  assert.equal(await page.isVisible('#candidates'), false);
+  assert.equal(await page.isVisible('#words-form'), true);
   // Default sections: blocks (none and ❤ on top, three cases) and stacked columns.
   await page.waitForFunction(() => /designs in/.test(document.querySelector('#words-status').textContent), null, { timeout: 180_000 });
   const titles = await page.$$eval('#designs button .title', (els) => els.map((e) => e.textContent));
@@ -80,8 +84,57 @@ test('two-words mode streams designs and shows a heart block with three views', 
   assert.equal(await page.isDisabled('#download'), false);
   await page.check('#colour-faces');
   await page.click('.toolbar [data-view="top"]');
-  // Switching back to three letters still works.
+  // Switching back to three letters still works, and hides the words controls.
   await page.click('#tab-letters');
   await page.waitForSelector('#candidates button[aria-pressed="true"]', { timeout: 60_000 });
+  assert.equal(await page.isVisible('#words-form'), false, 'words form hidden');
+  assert.equal(await page.isVisible('#designs'), false);
+  assert.deepEqual(errors, []);
+});
+
+test('shared links restore the page state (both modes)', async () => {
+  const page = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  // Three letters: a non-default word set, font and a non-first candidate.
+  await page.goto(url);
+  await page.waitForSelector('#candidates button[aria-pressed="true"]', { timeout: 60_000 });
+  await page.selectOption('#font-choice', 'anton');
+  await page.waitForFunction(() => /Tried/.test(document.querySelector('#status').textContent) && document.querySelector('#font-choice').value === 'anton');
+  // Let the automatic first selection finish writing the hash, then pick another.
+  await page.waitForFunction(() => new URLSearchParams(location.hash.slice(1)).get('font') === 'anton' && new URLSearchParams(location.hash.slice(1)).has('pick'));
+  await page.waitForTimeout(500);
+  const before = await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get('pick'));
+  await page.locator('#candidates button').nth(2).click();
+  await page.waitForFunction((p) => new URLSearchParams(location.hash.slice(1)).get('pick') !== p, before);
+  const lettersUrl = page.url();
+  const picked = await page.textContent('#candidates button[aria-pressed="true"] .letters');
+  assert.equal(picked, await page.textContent('#candidates li:nth-child(3) .letters'));
+
+  // Two words: switch, pick a specific design.
+  await page.click('#tab-words');
+  await page.fill('input[name="wordA"]', 'Ada');
+  await page.fill('input[name="wordB"]', 'Bo');
+  await page.click('#words-go');
+  await page.waitForFunction(() => /designs in/.test(document.querySelector('#words-status').textContent), null, { timeout: 180_000 });
+  await page.locator('#designs button', { hasText: 'upper, top ❤' }).click();
+  await page.waitForFunction(() => new URLSearchParams(location.hash.slice(1)).get('ti') === 'upper, top ❤');
+  const wordsUrl = page.url();
+
+  // Open each link fresh.
+  const p2 = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+  p2.on('pageerror', (e) => errors.push(e.message));
+  await p2.goto(wordsUrl);
+  await p2.waitForFunction(() => document.querySelectorAll('#shadow-panels figure').length === 3, null, { timeout: 120_000 });
+  assert.equal(await p2.getAttribute('#tab-words', 'aria-selected'), 'true');
+  assert.equal(await p2.inputValue('input[name="wordA"]'), 'Ada');
+  assert.equal(await p2.inputValue('#font-choice'), 'anton');
+  assert.match(await p2.textContent('#word-stats'), /^upper, top ❤/);
+  await p2.goto('about:blank');
+  await p2.goto(lettersUrl);
+  await p2.waitForSelector('#candidates button[aria-pressed="true"]', { timeout: 60_000 });
+  assert.equal(await p2.getAttribute('#tab-letters', 'aria-selected'), 'true');
+  assert.equal(await p2.inputValue('#font-choice'), 'anton');
+  assert.equal(await p2.textContent('#candidates button[aria-pressed="true"] .letters'), picked);
   assert.deepEqual(errors, []);
 });

@@ -24,6 +24,8 @@
 }
 
 * { box-sizing: border-box; }
+/* The hidden attribute must win over display rules like form { display: grid }. */
+[hidden] { display: none !important; }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
   font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -135,3 +137,5 @@ figure svg.wide { aspect-ratio: auto; height: auto; max-height: 180px; }
   .viewer { height: calc(100vh - 24px); }
   .shadows { max-height: calc(100vh - 24px); overflow: auto; }
 }
+#share-status { margin: 0; font-size: 12px; color: var(--muted); min-height: 0; }
+#share-status:empty { display: none; }

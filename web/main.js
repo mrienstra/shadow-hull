@@ -204,10 +204,16 @@ function readForm() {
   };
 }
 
+let selectedCandidate = null, selectToken = 0;
 async function select(candidate, button) {
   for (const b of document.querySelectorAll('#candidates button')) b.setAttribute('aria-pressed', String(b === button));
+  const token = ++selectToken;
   const r = await call({ type: 'build', candidate, opts: lastOpts });
-  if (mode !== 'letters') return; // switched to two words while this was building
+  // Builds take a moment; if another candidate was picked meanwhile, or the
+  // mode changed, this result is stale and must not overwrite the newer one.
+  if (token !== selectToken || mode !== 'letters') return;
+  selectedCandidate = candidate;
+  writeHash();
   guide = r.guide;
   stl = r.stl;
   $('#download').disabled = false;
@@ -273,7 +279,11 @@ form.addEventListener('submit', async (e) => {
       li.append(b);
       list.append(li);
     });
-    await select(r.candidates[0], list.querySelector('button'));
+    // A shared link may name a candidate; otherwise take the best.
+    const want = pendingPick && r.candidates.findIndex((c) => JSON.stringify([c.assignment, c.transforms]) === pendingPick);
+    pendingPick = null;
+    const k = want > 0 ? want : 0;
+    await select(r.candidates[k], list.querySelectorAll('button')[k]);
   } catch (err) {
     status.textContent = `Error: ${err.message}`;
   } finally {
@@ -327,6 +337,7 @@ function setMode(next) {
   $('#download').disabled = true;
   if (meshObj) { scene.remove(meshObj); meshObj = null; }
   if (box) { scene.remove(box); box = null; }
+  writeHash();
   if (words && !designsHost.children.length) wordsForm.requestSubmit();
   if (!words) form.requestSubmit();
 }
@@ -379,7 +390,13 @@ function generateWords(everything = false) {
       b.addEventListener('click', () => selectWordDesign(item, b));
       designsHost.append(b);
       wordsStatus.textContent = `${m.n} design${m.n === 1 ? '' : 's'} so far (${(m.ms / 1000).toFixed(0)} s)…`;
-      if (first) { first = false; selectWordDesign(item, b); }
+      if (sharedRecipe && JSON.stringify(item.recipe) === sharedRecipe) {
+        // The design a shared link opened: highlight it without rebuilding.
+        selectedButton?.setAttribute('aria-pressed', 'false');
+        b.setAttribute('aria-pressed', 'true');
+        selectedButton = b;
+        first = false;
+      } else if (first && !sharedRecipe) { first = false; selectWordDesign(item, b); }
     } else if (m.type === 'done') {
       wordsStatus.textContent = `${m.n} designs in ${(m.ms / 1000).toFixed(0)} s.`;
       $('#words-stop').disabled = true;
@@ -390,10 +407,14 @@ function generateWords(everything = false) {
   });
 }
 
+let selectedItem = null, sharedRecipe = null;
 function selectWordDesign(item, button) {
   selectedButton?.setAttribute('aria-pressed', 'false');
-  button.setAttribute('aria-pressed', 'true');
+  button?.setAttribute('aria-pressed', 'true');
   selectedButton = button;
+  selectedItem = item;
+  if (button) sharedRecipe = null; // a click replaces whatever a link asked for
+  writeHash();
   // Builds run on a separate worker so they don't wait behind a running gallery.
   const builder = selectWordDesign.worker ??= (() => {
     const w = new Worker(new URL('./words-worker.js', import.meta.url), { type: 'module' });
@@ -465,4 +486,79 @@ $('#words-stop').addEventListener('click', () => {
   wordsStatus.textContent = `Stopped · ${designsHost.querySelectorAll('button').length} designs.`;
 });
 
-form.requestSubmit();
+// ---- Shareable state in the URL hash -----------------------------------------
+// #m=letters&font=bungee&t=G|E|B&size=40&fit=stretch&tf=upright&perm=1&conn=1&thick=1&pick=[...]
+// #m=words&font=kanit-black&a=Finola&b=Bryan&sec=blocks,stacked&fam=...&case=...&rows=...&tops=❤&angles=...&r={recipe}&ti=title
+let pendingPick = null;
+const boxes = (name, root) => [...root.querySelectorAll(`input[name="${name}"]`)];
+function writeHash() {
+  const h = new URLSearchParams();
+  h.set('m', mode);
+  if (!uploadedFont) h.set('font', fontChoice.value);
+  if (mode === 'letters') {
+    const f = new FormData(form);
+    h.set('t', VIEW_NAMES.map((v) => f.get(v) ?? '').join('|'));
+    h.set('size', f.get('size')); h.set('fit', f.get('fit')); h.set('tf', f.get('transforms'));
+    h.set('perm', f.get('permute') === 'on' ? '1' : '0'); h.set('conn', f.get('preferConnected') === 'on' ? '1' : '0');
+    h.set('thick', f.get('minThickness'));
+    if (selectedCandidate) h.set('pick', JSON.stringify([selectedCandidate.assignment, selectedCandidate.transforms]));
+  } else {
+    const f = new FormData(wordsForm);
+    h.set('a', f.get('wordA')); h.set('b', f.get('wordB'));
+    for (const [key, name] of [['sec', 'section'], ['fam', 'family'], ['case', 'case'], ['rows', 'rows']]) h.set(key, checked(name).join(','));
+    h.set('tops', f.get('tops')); h.set('angles', f.get('angles'));
+    if (selectedItem) { h.set('r', JSON.stringify(selectedItem.recipe)); h.set('ti', selectedItem.title); }
+  }
+  history.replaceState(null, '', `#${h}`);
+}
+
+function readHash() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (!h.has('m')) return null;
+  if (h.get('font') && FONTS.some((f) => f.id === h.get('font'))) fontChoice.value = h.get('font');
+  if (h.get('m') === 'letters') {
+    const t = (h.get('t') ?? '').split('|');
+    VIEW_NAMES.forEach((v, i) => { if (t[i] != null) form[v].value = t[i]; });
+    for (const [key, name] of [['size', 'size'], ['fit', 'fit'], ['tf', 'transforms'], ['thick', 'minThickness']]) if (h.has(key)) form[name].value = h.get(key);
+    if (h.has('perm')) form.permute.checked = h.get('perm') === '1';
+    if (h.has('conn')) form.preferConnected.checked = h.get('conn') === '1';
+    pendingPick = h.get('pick');
+    return 'letters';
+  }
+  wordsForm.wordA.value = h.get('a') ?? wordsForm.wordA.value;
+  wordsForm.wordB.value = h.get('b') ?? wordsForm.wordB.value;
+  for (const [key, name] of [['sec', 'section'], ['fam', 'family'], ['case', 'case'], ['rows', 'rows']]) {
+    if (!h.has(key)) continue;
+    const on = new Set(h.get(key).split(',').filter(Boolean));
+    for (const i of boxes(name, wordsForm)) i.checked = on.has(i.value);
+  }
+  if (h.has('tops')) wordsForm.tops.value = h.get('tops');
+  if (h.has('angles')) wordsForm.angles.value = h.get('angles');
+  if (h.has('r')) sharedRecipe = h.get('r');
+  return { mode: 'words', title: h.get('ti') ?? 'Shared design' };
+}
+
+$('#share').addEventListener('click', async () => {
+  writeHash();
+  const note = uploadedFont ? ' (the uploaded font isn’t included; the link uses the default font)' : '';
+  try {
+    await navigator.clipboard.writeText(location.href);
+    $('#share-status').textContent = `Link copied${note}.`;
+  } catch {
+    $('#share-status').textContent = `Copy this link${note}: ${location.href}`;
+  }
+});
+for (const el of [form, wordsForm]) el.addEventListener('change', () => writeHash());
+
+// Start from a shared link, if any: restore the fonts, inputs and mode first.
+const shared = readHash();
+if (shared) await call({ type: 'font', url: FONT_URLS[`../fonts/${FONTS.find((f) => f.id === fontChoice.value).file}`] });
+if (shared?.mode === 'words') {
+  setMode('words'); // starts the gallery (and highlights the shared design when it streams in)
+  if (sharedRecipe) {
+    const item = { title: shared.title, recipe: JSON.parse(sharedRecipe) };
+    selectWordDesign(item, null);
+  }
+}
+
+if (!shared || shared === 'letters') form.requestSubmit();

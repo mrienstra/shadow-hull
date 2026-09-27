@@ -21,5 +21,6 @@ when done. Owner requests are marked (owner).
 - Legibility score: junction-weighted coverage; OCR/classifier later.
 - Variable-font axes (Roboto Flex) as a deformation space.
 - Web: move long galleries to a pool of workers (sections in parallel).
-- Web: share/permalink a design (recipe in the URL).
+- Web: shorter share links (chain recipes carry the whole layout; could be
+  compressed, or referenced by index into a deterministic gallery).
 - Ranking of trip-let candidates by the voxel thin-feature check (top few).

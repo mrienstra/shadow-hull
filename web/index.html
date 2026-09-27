@@ -109,6 +109,7 @@
         <button data-view="top">Top</button>
         <button data-view="iso">3/4</button>
         <label class="check colour-toggle" title="Each face takes the colour of the view whose letter outline it follows: orange = front letter's walls, blue = right, purple = top. The flat face you see head-on is cut by another view's letter, so it shows that view's colour."><input type="checkbox" id="colour-faces"> Colour by view</label>
+        <button id="share" title="Copy a link to this page state (mode, text, font, options and the selected design)">Share link</button>
         <button id="download" disabled>Download STL</button>
       </div>
     </section>
@@ -117,6 +118,7 @@
       <h2>Shadows</h2>
       <label class="check toggle"><input type="checkbox" id="show-missing" checked> Show missing parts</label>
       <p class="legend"><span><span class="sw shadow"></span>shadow</span> <span class="extra"><span class="sw missing"></span>missing from letter</span> <span class="extra"><span class="sw target"></span>letter outline</span></p>
+      <p id="share-status" role="status"></p>
       <p id="print-check"></p>
       <div id="shadow-panels"></div>
     </section>

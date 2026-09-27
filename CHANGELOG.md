@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-27 (web: mode-specific controls, shareable links)
+
+- Fixed: both modes' controls were always shown. `form { display: grid }`
+  overrode the `hidden` attribute; `[hidden] { display: none !important }`.
+  The e2e test now checks visibility (mutation-checked: it fails without the fix).
+- Shareable state in the URL hash, updated as you work: mode, font, inputs,
+  options, and the selection (three letters: the candidate; two words: the
+  design's recipe and title, which a link builds straight away while the list
+  regenerates). "Share link" copies it; an uploaded font can't be included,
+  and the button says so.
+- Fixed: in three-letters mode a slow build for an earlier click could finish
+  after a later click and overwrite the view and selection (builds take ~2 s
+  with the thin-part check). Only the latest selection may finish now.
+- e2e: a round trip of shared links in both modes.
+- No subagents used.
+
 ## 2026-09-27 (web: Two words mode; gallery in core)
 
 - `src/core/gallery.js`: every word-pair variant (chain families, blocks with
