@@ -1,37 +1,28 @@
 #!/usr/bin/env node
-// Explore layouts for a word pair and write an HTML report (3D view + both
-// shadows per layout) to reports/<a>-<b>.html. Exploration tool, not product.
-// Usage: node scripts/explore-words.js Finola Bryan [--font kanit-black] [--rows 1,2,3]
-//        [--cases upper,lower,title,mixed] [--fits shared,fill] [--presets touching,spaced]
-//        [--join none|hull|plate|bridges|hull+bridges|...] [--tracking=-0.06]
+// Explore layouts for a word pair and write an HTML report (3D view + shadows
+// per design) to reports/<a>-<b>.html. The designs come from src/core/gallery.js,
+// which the web page uses too. Exploration tool, not product.
+// Usage: node scripts/explore-words.js Finola Bryan [--font kanit-black]
+//        [--sections families,blocks,angles,spans,stacked] [--presets touching,spaced,...]
+//        [--cases upper,lower,title,mixed] [--rows 1,2,3] [--tops none,❤] [--angles 75,60,45]
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
-import { getManifold, loadFont, worldToLocal, faceRuns } from '../src/core/index.js';
-import { describeLayout, rankLayouts } from '../src/core/wordpair.js';
-import { SPACING, designWordPair, realizeDesign, realizeBlock, designSpanColumn, realizeSpanColumn, realizeStackedColumn, searchTopFit } from '../src/core/design.js';
-import { glyphSilhouette } from '../src/core/block.js';
+import { getManifold, loadFont } from '../src/core/index.js';
+import { generateGallery, buildRecipe, designView, disposeContext, DEFAULT_GALLERY } from '../src/core/gallery.js';
 
 const { values: o, positionals: [wordA, wordB] } = parseArgs({
   allowPositionals: true,
   options: {
-    font: { type: 'string', default: 'kanit-black' }, rows: { type: 'string', default: '1,2,3' },
-    cases: { type: 'string', default: 'upper,lower,title,mixed' }, fits: { type: 'string', default: 'shared,fill' },
-    // Spacing families shown side by side (see PRESETS below).
-    presets: { type: 'string', default: 'touching,spaced,grid,grid-mono,column,column-touching' },
-    'max-chunk': { type: 'string', default: '3' },
-    candidates: { type: 'string', default: '3' }, // search results per style built and re-ranked by quality
-    // Block section: whole words front and side, top view none or a shape
-    // (characters from the Noto Emoji outline font, holes filled). '' = skip.
+    font: { type: 'string', default: 'kanit-black' },
+    sections: { type: 'string', default: DEFAULT_GALLERY.sections.join(',') },
+    presets: { type: 'string', default: DEFAULT_GALLERY.families.join(',') },
+    cases: { type: 'string', default: DEFAULT_GALLERY.cases.join(',') },
+    rows: { type: 'string', default: DEFAULT_GALLERY.rows.join(',') },
     tops: { type: 'string', default: 'none,❤' },
-    // Blocks at other angles between the two word views (degrees; '' = skip).
-    angles: { type: 'string', default: '75,60,45' },
-    // Which sections to render: families (the spacing families / --presets),
-    // blocks (--tops), angles (--angles), spans (tall letter), stacked (stacked
-    // column, shorter word's letters all taller; with and without a heart).
-    sections: { type: 'string', default: 'families,blocks,angles,spans,stacked' },
-    join: { type: 'string', default: 'hull+bridges' }, // none | hull | plate | bridges, combined with '+'
-
+    angles: { type: 'string', default: DEFAULT_GALLERY.angles.join(',') },
+    candidates: { type: 'string', default: String(DEFAULT_GALLERY.candidates) },
+    join: { type: 'string', default: DEFAULT_GALLERY.join },
   },
 });
 if (!wordA || !wordB) { console.error('Usage: explore-words.js WORD_A WORD_B [options]'); process.exit(1); }
@@ -40,127 +31,49 @@ const FONTS_DIR = new URL('../fonts/', import.meta.url);
 const fonts = JSON.parse(await readFile(new URL('fonts.json', FONTS_DIR), 'utf8'));
 const entry = fonts.find((f) => f.id === o.font);
 const font = loadFont(await readFile(entry ? fileURLToPath(new URL(entry.file, FONTS_DIR)) : o.font));
+const shapeFont = loadFont(await readFile(fileURLToPath(new URL('shapes/NotoEmoji.ttf', FONTS_DIR))));
 const wasm = await getManifold();
-const H = 20;
-// Face colours by what carved them (see faceRuns). Order matters: index into PALETTE in the page.
+const ctx = { wasm, font, shapeFont, height: 20 };
+const list = (x) => (x ? x.split(',') : []);
+
+// Face colours by what carved them. Order matters: index into PALETTE in the page.
 const LABELS = ['front', 'right', 'top', 'box', 'connector', null];
 const pct = (x) => `${(x * 100).toFixed(1)}%`;
 const svgPath = (polys) => polys.map((p) => 'M' + p.map(([x, y]) => `${x.toFixed(2)},${(-y).toFixed(2)}`).join('L') + 'Z').join('');
 const entries = [];
-const sections = new Set(o.sections.split(','));
-for (const spacing of sections.has('families') ? o.presets.split(',') : []) {
-  const t0 = performance.now();
-  const designs = designWordPair(wasm, font, wordA, wordB, {
-    spacing, join: o.join, height: H, candidates: Number(o.candidates),
-    cases: o.cases.split(','), rows: o.rows.split(',').map(Number), fits: o.fits.split(','), maxChunk: Number(o['max-chunk']),
-  });
-  console.error(`${spacing}: ${designs.length} styles in ${((performance.now() - t0) / 1000).toFixed(0)} s`);
-  // Show styles in a stable order (case, then rows) rather than by quality.
-  const order = ['upper', 'lower', 'title', 'mixed'];
-  designs.sort((a, b) => order.indexOf(a.layout.caseMode) - order.indexOf(b.layout.caseMode) || a.layout.rows.length - b.layout.rows.length);
-  for (const { style, layout, metrics: m, runnersUp } of designs) {
-    const d = realizeDesign(wasm, font, layout, { spacing, join: o.join, height: H });
-    const rerank = runnersUp.some((r) => rankLayouts(r.layout, layout) < 0) ? ' · re-ranked: search’s first choice scored lower' : '';
-    entries.push(card(d, SPACING[spacing].label, style, describeLayout(layout), o.join, rerank));
-    d.dispose();
-  }
-}
-
-// Block layouts: whole words, touching letters, top view none or a shape.
-if (sections.has('blocks') && o.tops) {
-  const emoji = loadFont(await readFile(fileURLToPath(new URL('shapes/NotoEmoji.ttf', FONTS_DIR))));
-  for (const top of o.tops.split(',')) {
-    const shape = top === 'none' ? null : glyphSilhouette(wasm, emoji, top);
-    for (const caseMode of ['upper', 'lower', 'title']) {
-      const d = realizeBlock(wasm, font, wordA, wordB, { caseMode, spacing: 'touching', top: shape && { shape, fit: 'stretch' }, join: 'bridges', height: H });
-      const topNote = shape ? ` · top ${top} ${pct(d.metrics.views.top.coverage)} shown` : '';
-      entries.push(card(d, 'Block (whole words, touching; top view: none or a shape)', `${caseMode}, top ${top}`, `${wordA} × ${wordB}${shape ? ' × ' + top : ''}`, 'bridges', topNote));
-      d.dispose();
-    }
-    shape?.delete();
-  }
-}
-
-// Blocks with the side view at other angles (single row, touching, uppercase and mixed-free cases).
-if (sections.has('angles') && o.angles) {
-  for (const angle of o.angles.split(',').map(Number)) {
-    for (const caseMode of ['upper', 'title']) {
-      const d = realizeBlock(wasm, font, wordA, wordB, { caseMode, spacing: 'touching', join: 'bridges', height: H, angle });
-      entries.push(card(d, 'Block, other view angles (the side word is read from this many degrees round from the front)', `${caseMode}, ${angle}°`, `${wordA} × ${wordB} at ${angle}°`, 'bridges'));
-      d.dispose();
-    }
-  }
-}
-
-// Columns with spanning letters: best span assignment per spacing × fit.
-if (sections.has('spans')) {
-  const shorter = [...wordA].length >= [...wordB].length ? wordB : wordA;
-  for (const spacing of ['touching', 'spaced']) {
-    for (const fit of ['stretch', 'uniform']) {
-      const [best, ...rest] = designSpanColumn(wasm, font, wordA, wordB, { spacing, fit, height: H });
-      const label = [...shorter.toUpperCase()].map((c, i) => (best.spans[i] > 1 ? `${c}×${best.spans[i]}` : c)).join(' ');
-      const d = realizeSpanColumn(wasm, font, wordA, wordB, best.spans, { spacing, fit, height: H });
-      entries.push(card(d, 'Column, tall letter (the shorter word’s letter spans rows instead of the longer word doubling up)', `${spacing}, ${fit === 'stretch' ? 'stretched' : 'drop-cap'}`, `spans: ${label}`, 'hull+bridges', ` · best of ${rest.length + 1} span choices`));
-      d.dispose();
-    }
-  }
-}
-
-// Column variants with everything touching: stacked (the shorter word's letters
-// all taller, no pairing) and a heart over the column (best rotation × scale).
-if (sections.has('stacked')) {
-  const emoji = loadFont(await readFile(fileURLToPath(new URL('shapes/NotoEmoji.ttf', FONTS_DIR))));
-  const heart = glyphSilhouette(wasm, emoji, '❤');
-  const shorter = [...wordA].length >= [...wordB].length ? wordB : wordA;
-  const k = Math.max([...wordA].length, [...wordB].length) / [...shorter].length;
-  const label = 'Column variants, touching (stacked: every letter of the shorter word taller; ❤: heart seen from above)';
-  for (const fit of ['stretch', 'uniform']) {
-    const d = realizeStackedColumn(wasm, font, wordA, wordB, { fit, height: H });
-    entries.push(card(d, label, `stacked, ${fit === 'stretch' ? 'taller' : 'taller and wider'}`, `${shorter.toUpperCase()} letters ${((k - 1) * 100).toFixed(0)}% ${fit === 'stretch' ? 'taller' : 'larger'}`, 'bridges'));
-    d.dispose();
-  }
-  const [bestSpans] = designSpanColumn(wasm, font, wordA, wordB, { spacing: 'touching', fit: 'stretch', height: H });
-  const spanLabel = [...shorter.toUpperCase()].map((c, i) => (bestSpans.spans[i] > 1 ? `${c}×${bestSpans.spans[i]}` : c)).join(' ');
-  const builds = [
-    ['tall letter + ❤', `spans: ${spanLabel}`, (top) => realizeSpanColumn(wasm, font, wordA, wordB, bestSpans.spans, { spacing: 'touching', fit: 'stretch', height: H, top })],
-    ['stacked + ❤', `${shorter.toUpperCase()} letters ${((k - 1) * 100).toFixed(0)}% taller`, (top) => realizeStackedColumn(wasm, font, wordA, wordB, { fit: 'stretch', height: H, top })],
-  ];
-  for (const [style, text, build] of builds) {
-    const [best, ...rest] = searchTopFit(build, heart);
-    const d = build({ shape: heart, rotate: best.rotate, scale: best.scale });
-    entries.push(card(d, label, style, `${text} · heart rotated ${best.rotate}°${best.scale !== 1 ? `, ×${best.scale}` : ''}`, 'bridges', ` · heart ${pct(d.metrics.views.top.coverage)} shown · best of ${rest.length + 1} rotations × sizes`));
-    d.dispose();
-  }
-  heart.delete();
-}
-
-function card(d, preset, style, text, join, note = '') {
-  const m = d.metrics;
+const t0 = performance.now();
+for (const item of generateGallery(ctx, wordA, wordB, {
+  sections: list(o.sections), families: list(o.presets), cases: list(o.cases), rows: list(o.rows).map(Number),
+  tops: list(o.tops).map((t) => (t === 'none' ? null : t)), angles: list(o.angles).map(Number),
+  candidates: Number(o.candidates), join: o.join,
+})) {
+  const d = buildRecipe(ctx, wordA, wordB, item.recipe);
+  const v = designView(wasm, d);
+  d.dispose();
+  const m = v.metrics;
+  const join = item.recipe.kind === 'chain' ? item.recipe.join : 'bridges';
   const views = {};
-  for (const v of ['front', 'right', 'top']) {
-    const own = d.cells.map((c) => c.shapes[v]).filter(Boolean);
-    if (!own.length) continue;
-    const shadow = d.joined.transform(worldToLocal(v, d.frames)).project();
-    const target = wasm.CrossSection.union(own);
-    const missing = target.subtract(shadow);
-    const { min, max } = target.bounds();
-    const cap = d.frames?.[v] ? `side, ${d.frames[v].side}` : v;
-    views[v] = { cap, shadow: svgPath(shadow.toPolygons()), missing: svgPath(missing.toPolygons()), box: [min[0], -max[1], max[0] - min[0], max[1] - min[1]] };
-    for (const x of [shadow, target, missing]) x.delete();
+  for (const [k, x] of Object.entries(v.views)) {
+    const xs = x.target.flat();
+    const [x0, x1] = [Math.min(...xs.map((p) => p[0])), Math.max(...xs.map((p) => p[0]))];
+    const [y0, y1] = [Math.min(...xs.map((p) => p[1])), Math.max(...xs.map((p) => p[1]))];
+    views[k] = { cap: x.label, shadow: svgPath(x.shadow), missing: svgPath(x.missing), box: [x0, -y1, x1 - x0, y1 - y0] };
   }
-  const mesh = d.joined.getMesh();
   const verts = [];
-  for (let i = 0; i < mesh.vertProperties.length; i += mesh.numProp) verts.push(...[0, 1, 2].map((k) => Math.round(mesh.vertProperties[i + k] * 100) / 100));
-  return {
-    preset, style, text,
+  for (let i = 0; i < v.mesh.vertProperties.length; i += v.mesh.numProp) verts.push(...[0, 1, 2].map((k) => Math.round(v.mesh.vertProperties[i + k] * 100) / 100));
+  entries.push({
+    preset: item.section, style: item.title, text: item.text,
     stats: `quality ${m.quality.toFixed(3)} · worst letter ${pct(m.coverage)} · least visible ${m.visibleMin < 1 ? `${m.leastVisible} ${pct(m.visibleMin)}` : 'all 100%'}`
       + ` · most contact ${m.contactMax > 0 ? `${m.mostContact} ${pct(m.contactMax)}` : 'none'} · stretch ${(m.stretch * 100).toFixed(0)}% · ${m.pieces} piece${m.pieces > 1 ? 's' : ''}`
-      + (join === 'none' ? '' : ` → ${m.finalPieces} after ${join} (${m.blocks ? `${m.blocks} hull block${m.blocks === 1 ? '' : 's'}, ` : ''}${m.rods} rod${m.rods === 1 ? '' : 's'}${m.rods ? `, longest ${m.longestRod.toFixed(1)} mm` : ''}; extra shadow ${pct(m.stray.front)} / ${pct(m.stray.right)})`)
-      + ` · ${m.size.map((x) => x.toFixed(0)).join(' × ')} mm${note}`,
-    views, verts, tris: Array.from(mesh.triVerts),
-    runs: faceRuns(mesh).map((r) => [r.start, r.count, LABELS.indexOf(r.label)]),
-  };
+      + ` → ${m.finalPieces} after ${join} (${m.blocks ? `${m.blocks} hull block${m.blocks === 1 ? '' : 's'}, ` : ''}${m.rods} rod${m.rods === 1 ? '' : 's'}${m.rods ? `, longest ${m.longestRod.toFixed(1)} mm` : ''}; extra shadow ${pct(m.stray.front ?? 0)} / ${pct(m.stray.right ?? 0)})`
+      + ` · ${m.size.map((x) => x.toFixed(0)).join(' × ')} mm${item.note ? ` · ${item.note}` : ''}`,
+    views, verts, tris: Array.from(v.mesh.triVerts),
+    runs: v.runs.map((r) => [r.start, r.count, LABELS.indexOf(r.label)]),
+  });
+  process.stderr.write('.');
 }
+disposeContext(ctx);
+console.error(`\n${entries.length} designs in ${((performance.now() - t0) / 1000).toFixed(0)} s`);
 
 const html = `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${wordA} × ${wordB}</title>
