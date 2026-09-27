@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-09-27 (release prep)
+
+- README.md (what it is, synonyms, quick start, fonts, papers and prior work)
+  and an MIT LICENSE (the bundled fonts keep their OFL licenses). package.json
+  gets the license, repository and a broader description.
+- Checked the Quick start in a fresh clone: install, tests, CLI, report
+  script, web build.
+- Subagent ledger: one Fable agent fact-checked the README's references (URLs,
+  bibliographic details, synonyms, GEB cover, Debris). **Worth it**: everything
+  checked out except one wording ("strokes" → "parts" for 2CATteam's
+  generator), and it confirmed a softening I'd already made ("uses the term
+  shadow hull", not "coins").
+
 ## 2026-09-27 (example words)
 
 - The example pair "Finola" × "Bryan" refers to the lead agents of NBC's

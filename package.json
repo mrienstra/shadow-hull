@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Generate trip-lets: solids whose shadows along three axes are three different letters.",
+  "description": "Solids whose shadows read as letters, words or shapes from different sides (GEB-style trip-lets, visual hulls, 3D ambigrams).",
   "bin": {
     "shadow-hull": "src/cli.js"
   },
@@ -28,5 +28,10 @@
   "devDependencies": {
     "playwright-core": "^1.63.0",
     "vite": "^8.3.1"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mrienstra/shadow-hull.git"
   }
 }
