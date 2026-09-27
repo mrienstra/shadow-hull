@@ -82,15 +82,15 @@ export function designQuality(m, w = QUALITY_WEIGHTS) {
  * and blocks). Takes ownership of `solid` and `cells` via dispose().
  * @returns { cells, solid (letters only), joined, metrics, dispose() }
  */
-export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods = {}, height = 20, stretch = 0, imbalance = 0 } = {}) {
-  const base = measureComposition(wasm, solid, cells);
+export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods = {}, height = 20, stretch = 0, imbalance = 0, frames } = {}) {
+  const base = measureComposition(wasm, solid, cells, { frames });
   const vis = letterVisibility(wasm, cells, { height });
   let joined = solid, bridges = [], blocks = [];
   const replace = (next) => { if (joined !== solid) joined.delete(); joined = next; };
   if (join.includes('hull') && cells.length > 1) { const h = hullJoin(wasm, joined, cells); replace(h.solid); blocks = h.blocks; }
   if (join.includes('plate')) replace(basePlate(wasm, joined, cells));
   if (join.includes('bridges')) { const b = bridgePieces(wasm, joined, rods); replace(b.solid); bridges = b.bridges; }
-  const stray = strayShadow(wasm, solid, joined, cells);
+  const stray = strayShadow(wasm, solid, joined, cells, { frames });
   const parts = joined.decompose();
   const finalPieces = parts.filter((x) => x.volume() >= 1e-3 * joined.volume()).length;
   for (const x of parts) x.delete();
@@ -107,7 +107,7 @@ export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods =
   };
   metrics.quality = designQuality(metrics);
   return {
-    cells, solid, joined, metrics,
+    cells, solid, joined, metrics, frames,
     dispose: () => { if (joined !== solid) joined.delete(); solid.delete(); disposeCells(cells); },
   };
 }
@@ -127,11 +127,11 @@ export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = '
  * shape. spacing 'touching' (letters just touch) or 'spaced' (visible gaps,
  * joined by low level rods).
  */
-export function realizeBlock(wasm, font, wordA, wordB, { caseMode = 'upper', spacing = 'spaced', top = null, join = 'bridges', height = 20 } = {}) {
+export function realizeBlock(wasm, font, wordA, wordB, { caseMode = 'upper', spacing = 'spaced', top = null, join = 'bridges', height = 20, angle = 90 } = {}) {
   const fam = SPACING[spacing];
-  const cells = blockCells(wasm, font, wordA, wordB, { height, caseMode, kiss: fam.layout.kiss, top });
-  const solid = buildComposition(wasm, cells);
-  return finishDesign(wasm, cells, solid, { join, rods: fam.rods, height });
+  const { cells, frames } = blockCells(wasm, font, wordA, wordB, { height, caseMode, kiss: fam.layout.kiss, top, angle });
+  const solid = buildComposition(wasm, cells, { frames });
+  return finishDesign(wasm, cells, solid, { join, rods: fam.rods, height, frames });
 }
 
 /** Style key of a layout: case mode × number of rows. */

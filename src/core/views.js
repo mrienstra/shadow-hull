@@ -16,15 +16,30 @@ export const VIEW_NAMES = /** @type {const} */ (['front', 'right', 'top']);
 
 const OPPOSITE = { '-Y': '+Y', '+X': '-X', '+Z': '-Z' };
 
+/**
+ * A vertical view at azimuth `deg` around the Z axis: the viewer stands in
+ * direction D = (sin φ, -cos φ, 0) from the object, so φ = 0 is the front
+ * view (viewer at -Y) and φ = 90 the right view (viewer at +X). Up is +Z and
+ * U = Z × D, keeping the frame right-handed (U × V = D).
+ */
+export function viewAtAzimuth(deg) {
+  const r = (deg * Math.PI) / 180;
+  const D = [Math.sin(r), -Math.cos(r), 0];
+  return { U: [-D[1], D[0], 0], V: [0, 0, 1], D, side: `${deg}°` };
+}
+
+/** A view's frame: a view name (optionally overridden by `frames`) or a frame object. */
+export const frameOf = (view, frames) => (typeof view === 'object' ? view : (frames?.[view] ?? VIEWS[view]));
+
 /** Local (glyph-plane x, y, extrusion z) -> world, as a column-major Mat4. */
-export function localToWorld(view) {
-  const { U, V, D } = VIEWS[view];
+export function localToWorld(view, frames) {
+  const { U, V, D } = frameOf(view, frames);
   return [...U, 0, ...V, 0, ...D, 0, 0, 0, 0, 1];
 }
 
 /** World -> local (the transpose, since the frame is orthonormal). */
-export function worldToLocal(view) {
-  const { U, V, D } = VIEWS[view];
+export function worldToLocal(view, frames) {
+  const { U, V, D } = frameOf(view, frames);
   return [U[0], V[0], D[0], 0, U[1], V[1], D[1], 0, U[2], V[2], D[2], 0, 0, 0, 0, 1];
 }
 

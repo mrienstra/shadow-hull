@@ -24,6 +24,8 @@ const { values: o, positionals: [wordA, wordB] } = parseArgs({
     // Block section: whole words front and side, top view none or a shape
     // (characters from the Noto Emoji outline font, holes filled). '' = skip.
     tops: { type: 'string', default: 'none,❤' },
+    // Blocks at other angles between the two word views (degrees; '' = skip).
+    angles: { type: 'string', default: '75,60,45' },
     join: { type: 'string', default: 'hull+bridges' }, // none | hull | plate | bridges, combined with '+'
 
   },
@@ -72,17 +74,29 @@ if (o.tops) {
   }
 }
 
+// Blocks with the side view at other angles (single row, touching, uppercase and mixed-free cases).
+if (o.angles) {
+  for (const angle of o.angles.split(',').map(Number)) {
+    for (const caseMode of ['upper', 'title']) {
+      const d = realizeBlock(wasm, font, wordA, wordB, { caseMode, spacing: 'touching', join: 'bridges', height: H, angle });
+      entries.push(card(d, 'Block, other view angles (the side word is read from this many degrees round from the front)', `${caseMode}, ${angle}°`, `${wordA} × ${wordB} at ${angle}°`, 'bridges'));
+      d.dispose();
+    }
+  }
+}
+
 function card(d, preset, style, text, join, note = '') {
   const m = d.metrics;
   const views = {};
   for (const v of ['front', 'right', 'top']) {
     const own = d.cells.map((c) => c.shapes[v]).filter(Boolean);
     if (!own.length) continue;
-    const shadow = d.joined.transform(worldToLocal(v)).project();
+    const shadow = d.joined.transform(worldToLocal(v, d.frames)).project();
     const target = wasm.CrossSection.union(own);
     const missing = target.subtract(shadow);
     const { min, max } = target.bounds();
-    views[v] = { shadow: svgPath(shadow.toPolygons()), missing: svgPath(missing.toPolygons()), box: [min[0], -max[1], max[0] - min[0], max[1] - min[1]] };
+    const cap = d.frames?.[v] ? `side, ${d.frames[v].side}` : v;
+    views[v] = { cap, shadow: svgPath(shadow.toPolygons()), missing: svgPath(missing.toPolygons()), box: [min[0], -max[1], max[0] - min[0], max[1] - min[1]] };
     for (const x of [shadow, target, missing]) x.delete();
   }
   const mesh = d.joined.getMesh();
@@ -144,7 +158,7 @@ for (const e of DATA) {
   const grid = sections.get(e.preset);
   const card = document.createElement('div'); card.className = 'card';
   const svg = (v, cap) => '<div><svg viewBox="' + e.views[v].box.join(' ') + '"><path class="s" d="' + e.views[v].shadow + '"/><path class="m" d="' + e.views[v].missing + '"/></svg><div class="cap">' + cap + '</div></div>';
-  card.innerHTML = '<h2></h2><div class="t"></div><div class="s"></div><div class="view"></div><div class="shadows">' + svg('front', 'front') + svg('right', 'right') + (e.views.top ? svg('top', 'top') : '') + '</div>';
+  card.innerHTML = '<h2></h2><div class="t"></div><div class="s"></div><div class="view"></div><div class="shadows">' + svg('front', e.views.front.cap) + svg('right', e.views.right.cap) + (e.views.top ? svg('top', 'top') : '') + '</div>';
   card.querySelector('h2').textContent = e.style; card.querySelector('.t').textContent = e.text; card.querySelector('.s').textContent = e.stats;
   grid.append(card);
   const view = card.querySelector('.view');

@@ -11,6 +11,7 @@
  * heart's lobes and tip).
  */
 import { glyphRun } from './glyph.js';
+import { viewAtAzimuth } from './views.js';
 
 /**
  * A glyph as a filled silhouette (CrossSection, font units, y up). With
@@ -49,9 +50,13 @@ const CASE = {
  * @param opts.caseMode upper | lower | title | as
  * @param opts.kiss letter spacing (em overlap at the closest point; negative = gap)
  * @param opts.top { shape: CrossSection (any units), fit: 'stretch' | 'contain' } or null
- * @returns cells (compose.js format, with per-letter outlines)
+ * @param opts.angle degrees between the two word views (90 = front and right).
+ *   Other angles centre both words on the vertical axis; the footprint becomes
+ *   a parallelogram, and a top shape isn't supported (it would need fitting
+ *   to that parallelogram).
+ * @returns { cells (compose.js format, with per-letter outlines), frames }
  */
-export function blockCells(wasm, font, wordA, wordB, { height = 20, caseMode = 'upper', kiss = -0.06, tolerance, top = null } = {}) {
+export function blockCells(wasm, font, wordA, wordB, { height = 20, caseMode = 'upper', kiss = -0.06, tolerance, top = null, angle = 90 } = {}) {
   const words = [CASE[caseMode](wordA), CASE[caseMode](wordB)];
   const runs = words.map((w) => glyphRun(font, w, { tolerance, kiss }));
   // One vertical frame for both words so baselines match.
@@ -71,11 +76,21 @@ export function blockCells(wasm, font, wordA, wordB, { height = 20, caseMode = '
     front: new wasm.CrossSection(A.letters.flatMap((l) => l.pts), 'NonZero'),
     right: new wasm.CrossSection(B.letters.flatMap((l) => l.pts), 'NonZero'),
   };
-  if (top?.shape) shapes.top = fitInto(top.shape, [0, A.width], [0, B.width], top.fit);
-  return [{
-    box: { min: [0, 0, 0], max: [A.width, B.width, height] },
-    shapes,
-    letters: { front: A.letters, right: B.letters },
-    label: `${words[0]}/${words[1]}`,
-  }];
+  if (angle === 90) {
+    if (top?.shape) shapes.top = fitInto(top.shape, [0, A.width], [0, B.width], top.fit);
+    return {
+      cells: [{ box: { min: [0, 0, 0], max: [A.width, B.width, height] }, shapes, letters: { front: A.letters, right: B.letters }, label: `${words[0]}/${words[1]}` }],
+      frames: undefined,
+    };
+  }
+  if (top?.shape) throw new Error('Top shapes need angle 90 for now');
+  // Centre both words on the vertical axis, so the prisms cross at the origin.
+  const centre = (W, pts, cs) => ({ pts: pts.map((l) => ({ ch: l.ch, pts: l.pts.map((c) => c.map(([x, y]) => [x - W / 2, y])) })), cs: cs.translate([-W / 2, 0]) });
+  const a = centre(A.width, A.letters, shapes.front), b = centre(B.width, B.letters, shapes.right);
+  shapes.front.delete(); shapes.right.delete();
+  const R = (A.width + B.width) / Math.sin((angle * Math.PI) / 180); // generous: the box must not clip
+  return {
+    cells: [{ box: { min: [-R, -R, 0], max: [R, R, height] }, shapes: { front: a.cs, right: b.cs }, letters: { front: a.pts, right: b.pts }, label: `${words[0]}/${words[1]} @${angle}°` }],
+    frames: { right: viewAtAzimuth(angle) },
+  };
 }

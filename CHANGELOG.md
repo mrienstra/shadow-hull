@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-26 (other view angles, blocks)
+
+- `viewAtAzimuth(deg)` gives a vertical view at any azimuth (0 = front, 90 = right,
+  still right-handed). `frameOf` / `localToWorld` / `worldToLocal` take a
+  `frames` override, threaded through `buildComposition`, `measureComposition`,
+  `strayShadow`, `fullHull` and `finishDesign`.
+- Blocks at other angles (`realizeBlock({ angle })`): both words centred on the
+  vertical axis. Finola × Bryan, touching uppercase, 90° → 20°: coverage
+  unchanged (front 99.8%, side 100%) and nothing outside, as the shared-z argument
+  predicts; the footprint grows as 1/sin θ (99 × 88 mm at 90°, 99 × 223 mm at
+  45°, 99 × 529 mm at 20°). Test checks azimuth 90 = the right view and that
+  coverage is unchanged at 50°.
+- Report: "Block, other view angles" section (`--angles 75,60,45`); shadow panels
+  use the design's frames and label angled views.
+- No subagents used.
+
 ## 2026-09-26 (block layouts; shapes on the third axis)
 
 - `block.js`: "normal" layouts. Whole word A front, whole word B side (single

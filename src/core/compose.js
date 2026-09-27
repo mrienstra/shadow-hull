@@ -17,8 +17,11 @@ function extent(cells) {
   return m;
 }
 
-/** Union of all cells. Caller owns the returned Manifold. */
-export function buildComposition(wasm, cells) {
+/**
+ * Union of all cells. Caller owns the returned Manifold. `frames` overrides
+ * view frames (e.g. { right: viewAtAzimuth(60) } for non-orthogonal views).
+ */
+export function buildComposition(wasm, cells, { frames } = {}) {
   const { Manifold } = wasm;
   const scope = new Scope();
   try {
@@ -29,7 +32,7 @@ export function buildComposition(wasm, cells) {
       for (const v of VIEW_NAMES) {
         if (!shapes[v]) continue;
         const prism = scope.add(extrudeCentered(wasm, shapes[v], length));
-        parts.push(scope.add(prism.transform(localToWorld(v))));
+        parts.push(scope.add(prism.transform(localToWorld(v, frames))));
       }
       return scope.add(Manifold.intersection(parts));
     });
@@ -45,13 +48,13 @@ export function buildComposition(wasm, cells) {
  * be ~0), worstCell (lowest per-cell coverage, i.e. the weakest letter/chunk).
  * Views with no shapes report only the shadow area.
  */
-export function measureComposition(wasm, solid, cells) {
+export function measureComposition(wasm, solid, cells, { frames } = {}) {
   const { CrossSection } = wasm;
   const scope = new Scope();
   try {
     const views = {};
     for (const v of VIEW_NAMES) {
-      const shadow = scope.add(scope.add(solid.transform(worldToLocal(v))).project());
+      const shadow = scope.add(scope.add(solid.transform(worldToLocal(v, frames))).project());
       const own = cells.map((c) => c.shapes[v]).filter(Boolean);
       if (!own.length) { views[v] = { constrained: false, shadowArea: shadow.area() }; continue; }
       const target = scope.add(CrossSection.union(own));

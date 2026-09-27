@@ -123,7 +123,7 @@ export function bridgePieces(wasm, solid, { radius = 0.8, dustFraction = 1e-3, l
  * Extra shadow a joined solid casts beyond the letters-only solid, per
  * constrained view, as a fraction of that view's target area.
  */
-export function strayShadow(wasm, lettersSolid, joinedSolid, cells) {
+export function strayShadow(wasm, lettersSolid, joinedSolid, cells, { frames } = {}) {
   const scope = new Scope();
   try {
     const out = {};
@@ -131,8 +131,8 @@ export function strayShadow(wasm, lettersSolid, joinedSolid, cells) {
       const own = cells.map((c) => c.shapes[v]).filter(Boolean);
       if (!own.length) continue;
       const target = scope.add(wasm.CrossSection.union(own));
-      const a = scope.add(scope.add(lettersSolid.transform(worldToLocal(v))).project());
-      const b = scope.add(scope.add(joinedSolid.transform(worldToLocal(v))).project());
+      const a = scope.add(scope.add(lettersSolid.transform(worldToLocal(v, frames))).project());
+      const b = scope.add(scope.add(joinedSolid.transform(worldToLocal(v, frames))).project());
       out[v] = scope.add(b.subtract(a)).area() / target.area();
     }
     return out;
@@ -148,7 +148,7 @@ export function strayShadow(wasm, lettersSolid, joinedSolid, cells) {
  * coverage from above, and material taken from H never adds shadow.
  * Caller owns the result.
  */
-export function fullHull(wasm, cells) {
+export function fullHull(wasm, cells, { frames } = {}) {
   const { Manifold, CrossSection } = wasm;
   const scope = new Scope();
   try {
@@ -160,7 +160,7 @@ export function fullHull(wasm, cells) {
       const own = cells.map((c) => c.shapes[v]).filter(Boolean);
       if (!own.length) continue;
       const word = scope.add(CrossSection.union(own));
-      prisms.push(scope.add(scope.add(extrudeCentered(wasm, word, length)).transform(localToWorld(v))));
+      prisms.push(scope.add(scope.add(extrudeCentered(wasm, word, length)).transform(localToWorld(v, frames))));
     }
     return Manifold.intersection(prisms);
   } finally {

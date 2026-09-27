@@ -33,3 +33,18 @@ test('block: whole words front and side, heart on top, one piece', () => {
     assert.equal(hearted.metrics.finalPieces, 1);
   } finally { plain.dispose(); hearted.dispose(); heart.delete(); }
 });
+
+test('block at other view angles: same coverage, nothing outside, longer footprint', async () => {
+  const { viewAtAzimuth, VIEWS } = await import('../src/core/views.js');
+  const r = viewAtAzimuth(90);
+  for (const k of ['U', 'V', 'D']) r[k].forEach((x, i) => assert.ok(Math.abs(x - VIEWS.right[k][i]) < 1e-12, `azimuth 90 = right view (${k})`));
+  const right = realizeBlock(wasm, font, 'Finola', 'Bryan', { spacing: 'touching', angle: 90 });
+  const oblique = realizeBlock(wasm, font, 'Finola', 'Bryan', { spacing: 'touching', angle: 50 });
+  try {
+    for (const v of ['front', 'right']) {
+      assert.ok(Math.abs(right.metrics.views[v].coverage - oblique.metrics.views[v].coverage) < 1e-3, `${v} coverage unchanged`);
+      assert.ok(oblique.metrics.views[v].outside < 1e-3, `${v} nothing outside`);
+    }
+    assert.ok(Math.max(...oblique.metrics.size) > Math.max(...right.metrics.size));
+  } finally { right.dispose(); oblique.dispose(); }
+});
