@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-09-26 (word pairs: speed, joining)
+
+- Profiled the word-pair search: 93% of the time went to per-cell 3D builds counting
+  fragments. `scan.js` now counts a two-view cell's pieces by scanline slicing
+  (union-find across slices). It agrees with 3D on 444/450 random cells; the rest
+  are resolution effects or dust-sized slivers (~0.004 mm³). One frame and cell
+  cache are shared across rows and line splits. Finola × Bryan: 100.7 s → 1.6 s
+  (chunks ≤2), 230 s → 7 s (≤3). The 3D check reports dust (<0.1% volume) apart.
+- `join.js`: `basePlate` (slab under the bottom row, sunk 0.3 mm into the letters;
+  faces that only touch stay separate pieces in Manifold), `bridgePieces` (rods
+  along a minimum spanning tree of closest-point distances), `strayShadow`.
+  Finola × Bryan, best per style: plate joins single-row layouts at 7–12% extra
+  shadow (the bar). Bridges join every layout into one piece at ≤3% extra shadow,
+  longest rod ≤8 mm (joining everything to the largest piece needed up to 30 mm).
+- Report script: `--join none|plate|bridges|plate+bridges` (default bridges).
+- No subagents used.
+
 ## 2026-09-26 (word pairs: exploration)
 
 - Fixed manifold-3d JS `extrude` leaks (~0.4 MB per glyph extrusion), which had

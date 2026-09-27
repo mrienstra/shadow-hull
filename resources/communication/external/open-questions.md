@@ -47,7 +47,8 @@ survival). See `CLAUDE.md` and `resources/research/`.
 6. **Joining word-pair cells into one printable piece.** Neighbouring cells in
    a diagonal chain only touch where both letters have ink in the overlap
    corner, so layouts come out in 2–5 pieces even with overlapping cells.
-   Options: a base plate (it adds a bar under both words' shadows), thin
-   connectors hidden inside both shadows, a per-pair overlap chosen to
-   guarantee contact, or making connectivity a search objective. What do
-   makers and the literature do, and which keeps both readings cleanest?
+   Tried: a base plate (7–12% extra shadow; doesn't reach stacked rows) and
+   rods along a minimum spanning tree of closest points (always one piece,
+   ≤3% extra shadow, rods ≤8 mm). Open: can connectors hide entirely *inside*
+   both shadows (a rod whose projections fall within ink in both views), and
+   should connectivity steer the layout search itself?
