@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-09-27 (UI reorganisation: status)
+
+- Stage 5 (taste controls): "Allow stretching letters" is a knob on every look
+  where it applies (off by default). Every design is joined into one piece
+  automatically, so no "prefer one piece" control. `ui-map.md` records what's
+  done and what's open.
+
 ## 2026-09-27 (UI stage 3: thumbnails)
 
 - Results list entries show a small 3/4-view thumbnail. A third worker builds

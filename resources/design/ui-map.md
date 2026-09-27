@@ -1,7 +1,14 @@
 # Lay of the land: what the tool can make, and how to reach it (2026-09-27)
 
-An inventory before reorganising the web UI. It covers what exists, where the
-controls live, and where the structure fights the user. No decisions yet.
+An inventory made before reorganising the web UI. It covers what existed,
+where the controls lived, and where the structure fought the user.
+
+**Status (later on 2026-09-27):** the reorganisation in section 5 is done
+in stages. There's a look menu with per-look knobs (the cube is a look), a
+fast first result plus "More variants", thumbnails, plain-language checks, and
+"allow stretching" as a knob. Sections 1–4 below describe the page *before*;
+`test/looks.test.js` keeps every look in section 1 reachable. What's left:
+see the end of section 5.
 
 ## 1. The looks we can make, and how to reach each today
 
@@ -97,6 +104,12 @@ angles and columns ignore them and use fixed internal sets.
 - **Explicit taste controls**: allow stretching yes/no, prefer one piece,
   prefer compact.
 - **Three letters as just another look** ("cube") in the same flow.
+
+Done: look-first menu, one vocabulary, fast first result + more variants,
+thumbnails, plain-language checks, stretch as a knob, cube as a look.
+Not done / open: a "prefer compact" or "fewer supports" preference; the
+cube's own options still use the old wording (fit, orientations); the report
+script still groups by the old sections (it uses `gallery.js`, not looks).
 
 ## 6. Other entry points (for reference)
 
