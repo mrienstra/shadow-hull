@@ -5,9 +5,10 @@
  *   footprints. Its top is raised to the lowest point every bottom-row cell
  *   reaches (plus `embed`, so they overlap rather than just touch). It adds a bar under both words'
  *   shadows.
- * - bridges: join each loose piece to the main body with a thin rod between
- *   their closest points (sampled mesh vertices). Generic: works for any
- *   solid. The rods may add small stray marks to the shadows.
+ * - bridges: join loose pieces with thin rods, straight (along x, y or z)
+ *   and landing on flat faces where possible, else between the closest
+ *   points. Generic: works for any solid. The rods may add thin stray lines
+ *   to the shadows.
  *
  * Both return a new Manifold (caller owns it); neither consumes its inputs.
  */
@@ -74,44 +75,191 @@ function closestPair(P, Q, lowWeight = 0, zBase = 0, levelWeight = 0) {
   return best;
 }
 
-/** A square rod of half-width r from p to q (overshooting into both ends). */
-function rod(wasm, p, q, r) {
+/**
+ * A round rod (12-sided) of radius r from p to q, extended `overshoot` past
+ * both ends so it sinks into the pieces it joins.
+ */
+function rod(wasm, p, q, r, overshoot = r) {
+  const d = q.map((x, i) => x - p[i]);
+  const len = Math.hypot(...d) || 1;
+  const u = d.map((x) => x / len);
+  // Two unit vectors perpendicular to u.
+  const a = Math.abs(u[0]) < 0.9 ? [1, 0, 0] : [0, 1, 0];
+  const cross = (x, y) => [x[1] * y[2] - x[2] * y[1], x[2] * y[0] - x[0] * y[2], x[0] * y[1] - x[1] * y[0]];
+  const norm = (x) => { const l = Math.hypot(...x); return x.map((c) => c / l); };
+  const e1 = norm(cross(u, a)), e2 = cross(u, e1);
   const pts = [];
-  for (const c of [p, q]) {
-    for (const dx of [-r, r]) for (const dy of [-r, r]) for (const dz of [-r, r]) pts.push([c[0] + dx, c[1] + dy, c[2] + dz]);
+  for (const [c, s] of [[p, -overshoot], [q, overshoot]]) {
+    for (let k = 0; k < 12; k++) {
+      const t = (k / 12) * 2 * Math.PI, cs = Math.cos(t) * r, sn = Math.sin(t) * r;
+      pts.push([0, 1, 2].map((i) => c[i] + u[i] * s + e1[i] * cs + e2[i] * sn));
+    }
   }
   return wasm.Manifold.hull(pts);
 }
 
+/** Triangles of each piece as flat arrays (for ray casting). */
+function triangles(m) {
+  const { vertProperties: vp, triVerts: tv, numProp } = m.getMesh();
+  const out = new Float64Array(tv.length * 3);
+  for (let i = 0; i < tv.length; i++) for (let c = 0; c < 3; c++) out[i * 3 + c] = vp[tv[i] * numProp + c];
+  return out;
+}
+
 /**
- * Join all pieces with rods along a minimum spanning tree of closest-point
- * distances (Kruskal), so each rod is as short as possible (joining every
- * piece to the largest one can need long rods). `lowWeight` biases rods
- * towards the bottom (see closestPair). Pieces smaller than `dustFraction`
- * of the volume are dropped instead.
- * @returns { solid, bridges: [{ from, to, length }] }
+ * Straight rods along one axis between pieces i and j. Rays along `axis` on a
+ * grid over where both pieces' bounding boxes overlap (across the axis); a
+ * rod runs between consecutive hits of i and j (so only empty space lies
+ * between). A rod counts only if its whole end, plus a margin, lands on a
+ * nearly flat face of both pieces (rays on rings around it hit within
+ * `slope` × ring radius of its ends, about 20°): so rods stand clear of
+ * rounded corners and edges. Among the shortest, the one with the most such
+ * room around it wins.
+ * @returns { p, q, length, clearance } or null
  */
-export function bridgePieces(wasm, solid, { radius = 0.8, dustFraction = 1e-3, lowWeight = 0, levelWeight = 0, maxPoints = 1500 } = {}) {
+function straightRod(tris, boxes, i, j, axis, r, { margin = 0.4, slope = 0.35, grid = 20 } = {}) {
+  const [a, b] = [0, 1, 2].filter((k) => k !== axis);
+  const R = r + margin;
+  const lo = [Math.max(boxes[i].min[a], boxes[j].min[a]) + R, Math.max(boxes[i].min[b], boxes[j].min[b]) + R];
+  const hi = [Math.min(boxes[i].max[a], boxes[j].max[a]) - R, Math.min(boxes[i].max[b], boxes[j].max[b]) - R];
+  if (!(lo[0] < hi[0] && lo[1] < hi[1])) return null;
+  // Bucket every piece's triangles that reach the region (grown by 4R for clearance tests).
+  const g = 4 * R, B = grid;
+  const bl = [lo[0] - g, lo[1] - g], bs = [(hi[0] - lo[0] + 2 * g) / B, (hi[1] - lo[1] + 2 * g) / B];
+  const buckets = Array.from({ length: B * B }, () => []);
+  tris.forEach((t, piece) => {
+    for (let k = 0; k < t.length; k += 9) {
+      let u0 = Infinity, u1 = -Infinity, v0 = Infinity, v1 = -Infinity;
+      for (let c = 0; c < 9; c += 3) {
+        u0 = Math.min(u0, t[k + c + a]); u1 = Math.max(u1, t[k + c + a]);
+        v0 = Math.min(v0, t[k + c + b]); v1 = Math.max(v1, t[k + c + b]);
+      }
+      const x0 = Math.max(0, Math.floor((u0 - bl[0]) / bs[0])), x1 = Math.min(B - 1, Math.floor((u1 - bl[0]) / bs[0]));
+      const y0 = Math.max(0, Math.floor((v0 - bl[1]) / bs[1])), y1 = Math.min(B - 1, Math.floor((v1 - bl[1]) / bs[1]));
+      for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) buckets[x * B + y].push(piece, k);
+    }
+  });
+  // The gap between i and j along the ray at (u, v): [start, end] or null.
+  const gap = (u, v) => {
+    const x = Math.floor((u - bl[0]) / bs[0]), y = Math.floor((v - bl[1]) / bs[1]);
+    if (x < 0 || y < 0 || x >= B || y >= B) return null;
+    const hits = [];
+    const bk = buckets[x * B + y];
+    for (let n = 0; n < bk.length; n += 2) {
+      const t = tris[bk[n]], k = bk[n + 1];
+      const [ua, va, ub, vb, uc, vc] = [t[k + a], t[k + b], t[k + 3 + a], t[k + 3 + b], t[k + 6 + a], t[k + 6 + b]];
+      const det = (vb - vc) * (ua - uc) + (uc - ub) * (va - vc);
+      if (Math.abs(det) < 1e-12) continue;
+      const l1 = ((vb - vc) * (u - uc) + (uc - ub) * (v - vc)) / det;
+      const l2 = ((vc - va) * (u - uc) + (ua - uc) * (v - vc)) / det;
+      const l3 = 1 - l1 - l2;
+      if (l1 < -1e-9 || l2 < -1e-9 || l3 < -1e-9) continue;
+      hits.push([l1 * t[k + axis] + l2 * t[k + 3 + axis] + l3 * t[k + 6 + axis], bk[n]]);
+    }
+    hits.sort((h, k) => h[0] - k[0]);
+    let best = null;
+    for (let n = 0; n + 1 < hits.length; n++) {
+      const [s, pa] = hits[n], [e, pb] = hits[n + 1];
+      if ((pa === i && pb === j) || (pa === j && pb === i)) {
+        if (!best || e - s < best[1] - best[0]) best = [s, e, pa === i];
+      }
+    }
+    return best;
+  };
+  // Nearly flat around (u, v) out to radius rr: rays on a ring meet the same gap ends.
+  const flat = (u, v, c, rr) => {
+    const tol = slope * rr;
+    for (let k = 0; k < 12; k++) {
+      const t = (k / 12) * 2 * Math.PI;
+      const h = gap(u + rr * Math.cos(t), v + rr * Math.sin(t));
+      if (!h || Math.abs(h[0] - c[0]) > tol || Math.abs(h[1] - c[1]) > tol) return false;
+    }
+    return true;
+  };
+  const N = 16, cands = [];
+  for (let x = 0; x <= N; x++) {
+    for (let y = 0; y <= N; y++) {
+      const u = lo[0] + ((hi[0] - lo[0]) * x) / N, v = lo[1] + ((hi[1] - lo[1]) * y) / N;
+      const c = gap(u, v);
+      if (c) cands.push({ u, v, c, length: c[1] - c[0] });
+    }
+  }
+  cands.sort((p, q) => p.length - q.length);
+  const good = [];
+  for (const cd of cands.slice(0, 80)) {
+    if (good.length && cd.length > good[0].length + 0.05) break;
+    if (!flat(cd.u, cd.v, cd.c, R) || !flat(cd.u, cd.v, cd.c, R / 2)) continue;
+    // Room to spare: how far the flat area extends beyond the margin.
+    let clearance = 1;
+    for (const f of [1.5, 2, 3, 4]) { if (flat(cd.u, cd.v, cd.c, R * f)) clearance = f; else break; }
+    good.push({ ...cd, clearance });
+  }
+  if (!good.length) return null;
+  // Most room; among equals, the one nearest their middle (not the first found).
+  const most = Math.max(...good.map((g) => g.clearance));
+  const tied = good.filter((g) => g.clearance === most);
+  const mu = tied.reduce((m, g) => m + g.u, 0) / tied.length, mv = tied.reduce((m, g) => m + g.v, 0) / tied.length;
+  const found = tied.reduce((x, g) => (Math.hypot(g.u - mu, g.v - mv) < Math.hypot(x.u - mu, x.v - mv) ? g : x));
+  const at = (w) => { const pt = [0, 0, 0]; pt[a] = found.u; pt[b] = found.v; pt[axis] = w; return pt; };
+  const [pi, pj] = found.c[2] ? [at(found.c[0]), at(found.c[1])] : [at(found.c[1]), at(found.c[0])];
+  return { p: pi, q: pj, length: found.length, clearance: found.clearance, straight: true };
+}
+
+/**
+ * Join all pieces with thin rods along a minimum spanning tree (Kruskal), so
+ * each rod is as short as possible. Rods are straight (along x, y or z) and
+ * land on flat faces clear of rounded corners wherever possible; a diagonal
+ * rod between the closest points is the fallback (costed as `diagonalCost` ×
+ * its length + 2 mm, so a somewhat longer straight rod is preferred).
+ * `lowWeight` / `levelWeight` bias rods towards the bottom / towards level
+ * (see closestPair). Pieces smaller than `dustFraction` of the volume are
+ * dropped instead. Rods are thin (default 0.6 mm across): placeholders for,
+ * say, clear acrylic rod or fishing line, which barely shadow.
+ * @returns { solid, bridges: [{ from, to, length, straight }] }
+ */
+export function bridgePieces(wasm, solid, { radius = 0.3, dustFraction = 1e-3, lowWeight = 0, levelWeight = 0, maxPoints = 1500, diagonalCost = 1.5 } = {}) {
   const { Manifold } = wasm;
   const scope = new Scope();
   try {
     const total = solid.volume();
     const parts = solid.decompose().map((p) => scope.add(p)).filter((p) => p.volume() >= dustFraction * total);
+    if (parts.length < 2) return { solid: Manifold.union(parts), bridges: [] };
     const pts = parts.map((p) => vertices(p, maxPoints));
+    const tris = parts.map(triangles);
+    const boxes = parts.map((p) => p.boundingBox());
     const zBase = solid.boundingBox().min[2];
-    const edges = [];
+    const bias = (p, q) => lowWeight * (Math.max(p[2], q[2]) - zBase) + levelWeight * Math.abs(p[2] - q[2]);
+    // Cheap bound first (closest sampled points), the straight-rod search only
+    // for pairs Kruskal actually reaches (lazy: re-queue with the true cost).
+    const queue = [];
     for (let i = 0; i < parts.length; i++) {
-      for (let j = i + 1; j < parts.length; j++) edges.push([i, j, ...closestPair(pts[i], pts[j], lowWeight, zBase, levelWeight)]);
+      for (let j = i + 1; j < parts.length; j++) {
+        const [cost, p, q, d] = closestPair(pts[i], pts[j], lowWeight, zBase, levelWeight);
+        queue.push({ i, j, cost, diag: { p, q, length: d, cost: diagonalCost * cost + 2 }, exact: false });
+      }
     }
-    edges.sort((a, b) => a[2] - b[2]);
     const parent = parts.map((_, i) => i);
     const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
     const bridges = [], rods = [];
-    for (const [i, j, , p, q, length] of edges) {
-      if (find(i) === find(j)) continue;
-      parent[find(i)] = find(j);
-      rods.push(scope.add(tagged(scope.add(rod(wasm, p, q, radius)), 'connector')));
-      bridges.push({ from: p, to: q, length });
+    while (queue.length) {
+      queue.sort((x, y) => x.cost - y.cost);
+      const e = queue.shift();
+      if (find(e.i) === find(e.j)) continue;
+      if (!e.exact) {
+        let best = { ...e.diag, straight: false };
+        for (const axis of [2, 0, 1]) {
+          const s = straightRod(tris, boxes, e.i, e.j, axis, radius);
+          if (s && s.length + bias(s.p, s.q) < best.cost) best = { ...s, cost: s.length + bias(s.p, s.q) };
+        }
+        queue.push({ ...e, cost: best.cost, best, exact: true });
+        continue;
+      }
+      parent[find(e.i)] = find(e.j);
+      const { p, q, length, straight } = e.best;
+      // Straight rods land on nearly flat faces: sink them past any slope. Diagonal
+      // ones end at corners: sink them further.
+      rods.push(scope.add(tagged(scope.add(rod(wasm, p, q, radius, straight ? 0.6 : 2 * radius)), 'connector')));
+      bridges.push({ from: p, to: q, length, straight });
     }
     return { solid: Manifold.union([...parts, ...rods]), bridges };
   } finally {

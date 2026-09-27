@@ -39,6 +39,25 @@ test('bridgePieces joins everything with short rods', () => {
   } finally { solid.delete(); joined.delete(); disposeCells(cells); }
 });
 
+test('bridgePieces uses a straight rod landing clear of edges when pieces overlap across a gap', () => {
+  // A 10×10×5 slab, and a 4×10×5 bar 2 mm above its left end: the rod must be
+  // vertical, 2 mm long, and stand inside both footprints with room to spare.
+  const { Manifold } = wasm;
+  const low = Manifold.cube([10, 10, 5], false);
+  const high = Manifold.cube([4, 10, 5], false).translate([0, 0, 7]);
+  const solid = Manifold.union(low, high);
+  const { solid: joined, bridges } = bridgePieces(wasm, solid, { radius: 0.3 });
+  try {
+    assert.equal(joined.decompose().length, 1);
+    assert.equal(bridges.length, 1);
+    const [{ from, to, length, straight }] = bridges;
+    assert.ok(straight, 'straight rod');
+    assert.ok(Math.abs(length - 2) < 1e-6, `length ${length}`);
+    assert.ok(Math.abs(from[0] - to[0]) < 1e-9 && Math.abs(from[1] - to[1]) < 1e-9, 'vertical');
+    assert.ok(from[0] > 0.7 && from[0] < 3.3 && from[1] > 0.7 && from[1] < 9.3, `clear of edges: ${from}`);
+  } finally { low.delete(); high.delete(); solid.delete(); joined.delete(); }
+});
+
 test('hullJoin joins pieces through the full hull with zero extra shadow', async () => {
   const { hullJoin, fullHull } = await import('../src/core/join.js');
   const rect = (a0, a1) => new wasm.CrossSection([[[a0, 0], [a1, 0], [a1, 10], [a0, 10]]], 'NonZero');

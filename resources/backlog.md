@@ -9,6 +9,11 @@ when done. Owner requests are marked (owner).
   automatic joining.
 - STEP export (exact B-rep) via opencascade.js or the Python port + build123d.
 
+## Support rods
+- L-shaped rods (two straight legs) for pieces that sit diagonally to each
+  other, as in pairs in a row, which still get a diagonal rod.
+- A rod thickness choice (e.g. 0.6 mm placeholder vs a sturdier printable rod).
+
 ## Layouts and shapes
 - Other view angles for *chain* layouts and grids (blocks have them now):
   cells' boxes become parallelograms; hull join and the 2D scoring carry over.

@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-09-27 (thinner, straighter support rods)
+
+- Owner request (NO × YA tower: a chunky diagonal rod from a rounded corner):
+  thinner rods, straight where possible, inset from rounded corners, since a
+  careful maker might use clear acrylic rod or fishing line instead.
+- Rods are now round and 0.6 mm across (were 1.6 mm square).
+- `bridgePieces` first looks for a **straight rod along x, y or z**: rays
+  cast through the pieces' triangles on a grid where the two pieces overlap
+  across that axis. A rod runs between consecutive hits of the two pieces (so
+  only empty space lies between). It counts only if rings of rays around it
+  (at its radius + 0.4 mm and half that) meet both pieces within a ~20°
+  slope, so its ends sit on nearly flat faces, clear of rounded corners. Among
+  the shortest, the one with the most such room wins; ties go to the middle.
+  A diagonal rod between the closest points remains the fallback, costed
+  1.5× + 2 mm so a somewhat longer straight rod wins. The straight-rod search
+  runs lazily, only for pairs the spanning tree reaches.
+- NO × YA now gets one vertical 1.4 mm rod under the N's left leg, on the O's
+  flat top. Pairs in a row still use (thin) diagonal rods: neighbouring
+  pieces sit diagonally, so no single straight rod reaches.
+- Test: a bar above a slab gets a vertical 2 mm rod, clear of the edges.
+- No subagents used.
+
 ## 2026-09-27 (tower knobs that did nothing)
 
 - The owner noticed Tower → Spacing: gapped had no effect. An audit of every
