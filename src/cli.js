@@ -3,7 +3,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import {
-  getManifold, loadFont, silhouette, buildTriplet, search, toBinarySTL, viewingGuide, thicknessCheck, VIEW_NAMES,
+  getManifold, loadFont, silhouette, buildTriplet, search, toBinarySTL, viewingGuide, thicknessCheck, thinFeatures, VIEW_NAMES,
 } from './core/index.js';
 
 const FONTS_DIR = new URL('../fonts/', import.meta.url);
@@ -87,7 +87,7 @@ async function main() {
     console.log(JSON.stringify({ texts, tried: ranked.length, ms, candidates: top.map((c) => ({ ...c, guide: viewingGuide(c.assignment, c.transforms) })) }, null, 2));
   } else {
     console.log(`Tried ${ranked.length} candidates in ${ms.toFixed(0)} ms. Coverage = share of each letter the shadow actually shows.`);
-    if (minThickness > 0) console.log(`≥${minThickness}mm: THIN = some part or neck is thinner than ${minThickness} mm.`);
+    if (minThickness > 0) console.log(`≥${minThickness}mm: THIN = a neck thinner than ${minThickness} mm splits the solid (fast check; the best candidate also gets a full check below).`);
     console.log();
     const thick = minThickness > 0 ? `  ≥${minThickness}mm` : '';
     console.log('  #  ' + VIEW_NAMES.map((v) => v.padEnd(16)).join('') + 'worst  pieces' + thick);
@@ -102,6 +102,17 @@ async function main() {
     });
     const g = viewingGuide(top[0].assignment, top[0].transforms);
     console.log('\nBest: ' + VIEW_NAMES.map((v) => `${JSON.stringify(g[v].text)} seen from ${g[v].from}${g[v].rotation ? ` (rotated ${g[v].rotation}° CCW)` : ''}`).join(', '));
+    if (minThickness > 0) {
+      // Voxel opening on the best candidate: also catches thin fins/blades that don't split the solid.
+      const shapes = Object.fromEntries(VIEW_NAMES.map((v) => [v, silhouette(wasm, font, top[0].assignment[v], { size, fit: o.fit })]));
+      const solid = buildTriplet(wasm, shapes, top[0].transforms, { size });
+      const thin = thinFeatures(solid, { minThickness });
+      solid.delete();
+      for (const s of Object.values(shapes)) s.delete();
+      console.log(thin.regions.length
+        ? `Thin parts (< ${minThickness} mm): ${thin.regions.length}, ${thin.thinVolume.toFixed(1)} mm³ total; largest ${thin.regions[0].volume.toFixed(1)} mm³ near (${thin.regions[0].center.map((c) => c.toFixed(0)).join(', ')})`
+        : `No parts thinner than ${minThickness} mm.`);
+    }
     const bad = VIEW_NAMES.filter((v) => top[0].metrics.views[v].outside > 1e-6 * size * size);
     if (bad.length) console.warn(`WARNING: shadow extends outside target in ${bad.join(', ')} (orientation bug?)`);
   }

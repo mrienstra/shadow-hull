@@ -13,3 +13,4 @@ export {
   CUBE_SYMMETRIES, applySymmetry, orbitRepresentatives, configKey, stabilizer, d4Compose,
 } from './symmetry.js';
 export { toBinarySTL } from './stl.js';
+export { thinFeatures, voxelize } from './voxel.js';

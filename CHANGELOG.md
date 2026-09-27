@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-26 (thin-feature check)
+
+- `voxel.js`: `thinFeatures` finds material thinner than the minimum wall by
+  voxel morphological opening (slice, then scanline voxelize, then three 3D
+  Euclidean distance transforms). It reports residue reaching deeper than r past
+  the opened surface, so ordinary sharp edges (~0.41 r of shaving) pass and
+  wedges sharper than ~60° are flagged. About 2 s per 40 mm trip-let at 0.2 mm
+  voxels. Manifold's exact Minkowski opening took 27–60 s.
+- This answers the critique in `-pk3`: the erosion-split check misses thin
+  appendages. It mattered for our own best GEB in Bungee: it has a 0.43 mm
+  wall (verified on cross-sections) that the old check passed.
+- CLI prints it for the best candidate; the page's print-check line includes it.
+  Search ranking doesn't use it yet (too slow for every candidate).
+
 ## 2026-09-26 (external brief)
 
 - `resources/communication/external/brief-2026-09-26.md`: a self-contained brief

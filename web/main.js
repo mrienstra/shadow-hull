@@ -139,13 +139,14 @@ function showPrintCheck(metrics, t) {
   const el = $('#print-check');
   const pieces = metrics.pieces === 1 ? 'One piece' : `${metrics.pieces} separate pieces`;
   let thick = '';
+  const thin = t && (t.erodedPieces !== metrics.pieces || t.thinRegions > 0);
   if (t) {
-    thick = t.erodedPieces === metrics.pieces
+    thick = !thin
       ? ` · no part thinner than ${t.minThickness} mm`
-      : ` · has parts thinner than ${t.minThickness} mm`;
+      : ` · ${t.thinRegions || 'some'} part${t.thinRegions === 1 ? '' : 's'} thinner than ${t.minThickness} mm (${t.thinVolume.toFixed(1)} mm³)`;
   }
   el.textContent = pieces + thick;
-  el.className = metrics.pieces !== 1 || (t && t.erodedPieces !== metrics.pieces) ? 'warn' : '';
+  el.className = metrics.pieces !== 1 || thin ? 'warn' : '';
 }
 
 // "Show missing parts" toggle; remembered per browser when storage is available.

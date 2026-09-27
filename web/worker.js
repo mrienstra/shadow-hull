@@ -2,7 +2,7 @@
 import wasmUrl from 'manifold-3d/manifold.wasm?url';
 import defaultFontUrl from '../fonts/ArchivoBlack-Regular.ttf?url';
 import {
-  getManifold, loadFont, search, silhouette, buildTriplet, measure, thicknessCheck, toBinarySTL, viewingGuide, Scope, VIEW_NAMES,
+  getManifold, loadFont, search, silhouette, buildTriplet, measure, thicknessCheck, thinFeatures, toBinarySTL, viewingGuide, Scope, VIEW_NAMES,
   d4, d4Mat3, worldToLocal,
 } from '../src/core/index.js';
 
@@ -35,6 +35,11 @@ function buildCandidate(wasm, { assignment, transforms }, { size, fit, minThickn
       views[v] = { target: upright(target), shadow: upright(shadow), missing: upright(missing) };
     }
     const thickness = minThickness > 0 ? thicknessCheck(wasm, shapes, transforms, { size, minThickness }) : null;
+    if (thickness) {
+      const thin = thinFeatures(solid, { minThickness });
+      thickness.thinRegions = thin.regions.length;
+      thickness.thinVolume = thin.thinVolume;
+    }
     const mesh = solid.getMesh();
     return {
       numProp: mesh.numProp,
