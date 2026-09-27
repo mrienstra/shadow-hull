@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { getManifold, loadFont, worldToLocal } from '../src/core/index.js';
 import { letterVisibility } from '../src/core/compose.js';
-import { exploreWordPair, realizeLayout, describeLayout, rankScore } from '../src/core/wordpair.js';
+import { exploreWordPair, realizeLayout, describeLayout, rankLayouts } from '../src/core/wordpair.js';
 import { basePlate, bridgePieces, strayShadow, hullJoin } from '../src/core/join.js';
 
 const { values: o, positionals: [wordA, wordB] } = parseArgs({
@@ -60,7 +60,7 @@ for (const p of all) {
 const pct = (x) => `${(x * 100).toFixed(1)}%`;
 const svgPath = (polys) => polys.map((p) => 'M' + p.map(([x, y]) => `${x.toFixed(2)},${(-y).toFixed(2)}`).join('L') + 'Z').join('');
 for (const [style, ps] of groups) {
-  ps.sort((p, q) => rankScore(p.score, q.score));
+  ps.sort(rankLayouts);
   const p = ps[0];
   const r = realizeLayout(wasm, font, p, { height: H, ...preset.layout });
   const vis = letterVisibility(wasm, r.cells, { height: H });

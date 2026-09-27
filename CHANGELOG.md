@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-26 (report rendering, grid tie-break)
+
+- Report: one shared WebGL canvas draws every on-screen 3D view into its card
+  (Chrome allows ~16 contexts per page; with 24 cards the first 8 were lost).
+- Balanced grid splits (FIN/OLA × BRY/AN, FI/NO/LA × BR/YA/N) scored exactly the
+  same as the lopsided winners (F/INOLA) but lost on split order. `rankLayouts`
+  now breaks ties by line imbalance, so grids show up in the report.
+- No subagents used.
+
 ## 2026-09-26 (touching vs spaced; contact metric)
 
 - Owner feedback: with touching letters, flat stems merge. The i next to l reads

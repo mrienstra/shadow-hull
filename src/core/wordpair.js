@@ -315,6 +315,14 @@ export function rankScore(p, q) {
     || p.merged - q.merged || p.lower - q.lower || q.coverage - p.coverage;
 }
 
+/**
+ * Order for whole layouts: rankScore, then balanced lines (grid-like
+ * FIN/OLA before F/INOLA; otherwise equal scores fall back to split order).
+ */
+export function rankLayouts(p, q) {
+  return rankScore(p.score, q.score) || (p.imbalance ?? 0) - (q.imbalance ?? 0);
+}
+
 function pareto(items, limit) {
   const front = items.filter((p) => !items.some((q) => q !== p && dominates(q.score, p.score)));
   // Deduplicate equal scores (keep first), then cap by coverage.
@@ -413,7 +421,9 @@ export function exploreWordPair(wasm, font, wordA, wordB, opts = {}) {
               rows: [...p.rows, { a: q.cells.map((c) => c.a), b: q.cells.map((c) => c.b), fit: q.cells.map((c) => c.fit), frame: q.frame, cells: q.cells }],
             }))), frontLimit);
           }
-          for (const p of partial) results.push({ ...p, caseMode, lines: [la, lb] });
+          // Line imbalance: how uneven each word's lines are (0 = a true grid, e.g. FIN/OLA).
+          const imbalance = [la, lb].reduce((t, ls) => { const n = ls.map((x) => [...x].length); return t + Math.max(...n) - Math.min(...n); }, 0);
+          for (const p of partial) results.push({ ...p, caseMode, lines: [la, lb], imbalance });
         }
       }
     }

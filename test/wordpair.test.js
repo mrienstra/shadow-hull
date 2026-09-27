@@ -76,3 +76,13 @@ test('kiss spacing keeps every Finola/Bryan letter at least 90% visible', () => 
     } finally { r.dispose(); fixed.dispose(); }
   });
 });
+
+test('equal-scoring layouts prefer balanced (grid) line splits', async () => {
+  const { exploreWordPair, rankLayouts, rankScore } = await import('../src/core/wordpair.js');
+  const all = exploreWordPair(wasm, font, 'Finola', 'Bryan', { rows: [2], cases: ['upper'], fits: ['shared', 'fill'], maxChunk: 3, byStyle: true });
+  all.sort(rankLayouts);
+  const tied = all.filter((p) => rankScore(p.score, all[0].score) === 0);
+  assert.ok(tied.length > 1, 'several line splits tie on score');
+  assert.equal(all[0].imbalance, Math.min(...tied.map((p) => p.imbalance)));
+  assert.deepEqual(all[0].lines[0].map((x) => x.length), [3, 3]); // FIN / OLA
+});
