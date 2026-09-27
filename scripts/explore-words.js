@@ -17,7 +17,7 @@ const { values: o, positionals: [wordA, wordB] } = parseArgs({
     font: { type: 'string', default: 'kanit-black' }, rows: { type: 'string', default: '1,2,3' },
     cases: { type: 'string', default: 'upper,lower,title,mixed' }, fits: { type: 'string', default: 'shared,fill' },
     // Spacing families shown side by side (see PRESETS below).
-    presets: { type: 'string', default: 'touching,spaced,grid,grid-mono' },
+    presets: { type: 'string', default: 'touching,spaced,grid,grid-mono,column,column-touching' },
     'max-chunk': { type: 'string', default: '3' },
     candidates: { type: 'string', default: '3' }, // search results per style built and re-ranked by quality
     join: { type: 'string', default: 'hull+bridges' }, // none | hull | plate | bridges, combined with '+'

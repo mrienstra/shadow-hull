@@ -20,6 +20,7 @@ import { basePlate, bridgePieces, strayShadow, hullJoin } from './join.js';
  *   joined by level rods near the baseline (they read like ligatures).
  * - grid: equal-length rows, every letter in a fixed column slot.
  * - grid-mono: grid, letters widened towards the slot width (≤1.5×).
+ * - column / column-touching: one letter pair per row, stacked into a tower.
  */
 export const SPACING = {
   touching: {
@@ -33,6 +34,16 @@ export const SPACING = {
   grid: {
     label: 'Grid',
     search: { grid: true, rows: [2, 3] }, layout: { grid: { fit: 'center' }, lineGap: 'kiss', overlap: -1.2, kiss: -0.06 }, rods: { lowWeight: 1, levelWeight: 3 },
+  },
+  // Single column: one letter pair per row (rows = the shorter word's length;
+  // the longer word doubles up somewhere), rows centred into a tower.
+  column: {
+    label: 'Column (one letter per row)',
+    search: { rows: 'column' }, layout: { gap: 'kiss', lineGap: 'kiss', overlap: -1.2, kiss: -0.06, align: 'center' }, rods: { lowWeight: 0, levelWeight: 0 },
+  },
+  'column-touching': {
+    label: 'Column, touching',
+    search: { rows: 'column' }, layout: { gap: 'kiss', lineGap: 'kiss', overlap: 0.3, kiss: 0.01, align: 'center' }, rods: {},
   },
   'grid-mono': {
     label: 'Grid, monospaced (letters widened towards their slot, at most 1.5×)',
@@ -115,8 +126,10 @@ export function designWordPair(wasm, font, wordA, wordB, opts = {}) {
     cases = ['upper', 'lower', 'title', 'mixed'], rows = [1, 2, 3], fits = ['shared', 'fill'], maxChunk = 3,
   } = opts;
   const fam = SPACING[spacing];
+  const search = { ...fam.search };
+  if (search.rows === 'column') search.rows = [Math.min([...wordA].length, [...wordB].length)];
   const all = exploreWordPair(wasm, font, wordA, wordB, {
-    cases, rows, fits, maxChunk, byStyle: true, height, kiss: fam.layout.kiss, ...fam.search,
+    cases, rows, fits, maxChunk, byStyle: true, height, kiss: fam.layout.kiss, ...search,
   });
   const groups = new Map();
   for (const p of all) {

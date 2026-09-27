@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-26 (single column)
+
+- `column` and `column-touching` families: one letter pair per row (rows = the
+  shorter word's length), rows centred into a tower. Finola × Bryan: 5 rows,
+  with the longer word doubling up where the search scores best (e.g. OL).
+  Spaced columns score 0.97–0.98 (upper/mixed) with 5 short rods; touching
+  columns merge stems (contact up to 130%).
+- No subagents used.
+
 ## 2026-09-26 (design pipeline in core; quality ranking)
 
 - `src/core/design.js`: the word-pair pipeline moved out of the report script

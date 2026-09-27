@@ -4,7 +4,8 @@ Ideas and requests not yet started, newest first. Move items to CHANGELOG.md
 when done. Owner requests are marked (owner).
 
 ## Layouts and shapes
-- (owner) **Single column**: letters stacked vertically, one per row (rows = letters).
+- Column variant: when words differ in length, let one letter of the shorter
+  word span two rows (tall letter) instead of doubling up letters of the longer one.
 - (owner) **More "normal" layouts**: explore single-row only, with different
   relative view angles (non-orthogonal; any two vertical views still share z,
   so the interval arithmetic carries over; see brief-2026-09-26-synthesis.md).
