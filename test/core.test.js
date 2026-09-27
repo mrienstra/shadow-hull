@@ -177,3 +177,17 @@ test('glyph self-symmetries are detected and folded into the dedupe', async () =
   assert.equal(reps.length, 11);
   assert.ok(Math.abs(all[0].metrics.minCoverage - reps[0].metrics.minCoverage) < 1e-9);
 });
+
+test('extrudeCentered does not leak WASM memory (manifold-3d extrude workaround)', async () => {
+  const { extrudeCentered } = await import('../src/core/manifold.js');
+  const poly = Array.from({ length: 400 }, (_, i) => [10 * Math.cos((i / 400) * 2 * Math.PI), 10 * Math.sin((i / 400) * 2 * Math.PI)]);
+  const cs = new wasm.CrossSection([poly], 'NonZero');
+  const run = (n) => { for (let k = 0; k < n; k++) { const m = extrudeCentered(wasm, cs, 50); m.volume(); m.delete(); } };
+  run(200); // let the heap reach steady state
+  const before = process.memoryUsage().rss;
+  run(1000);
+  const grown = (process.memoryUsage().rss - before) / 1e6;
+  cs.delete();
+  // The unpatched wrapper leaks ~0.37 MB per call here (~370 MB for 1000 calls).
+  assert.ok(grown < 60, `RSS grew ${grown.toFixed(0)} MB over 1000 extrusions`);
+});

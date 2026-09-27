@@ -37,3 +37,32 @@ export class Scope {
     this.#objs.length = 0;
   }
 }
+
+/**
+ * Extrude a CrossSection to `height`, centred on z = 0. Caller owns the result.
+ *
+ * Works around two leaks in manifold-3d's JS `CrossSection.extrude` (3.5.4):
+ * with `center: true` it never frees the uncentred intermediate manifold, and
+ * it never frees the temporary polygon vector from `_ToPolygons()`. Together
+ * these leak ~0.4 MB per call for a glyph, which crashes long searches
+ * ("memory access out of bounds"). Uses the wrapper's internals when present,
+ * otherwise the public API without `center`.
+ */
+export function extrudeCentered(wasm, cs, height) {
+  let raw;
+  if (typeof wasm._Extrude === 'function' && typeof cs._ToPolygons === 'function') {
+    const polys = cs._ToPolygons();
+    try {
+      raw = wasm._Extrude(polys, height, 0, 0, { x: 1, y: 1 });
+    } finally {
+      polys.delete();
+    }
+  } else {
+    raw = cs.extrude(height);
+  }
+  try {
+    return raw.translate([0, 0, -height / 2]);
+  } finally {
+    raw.delete();
+  }
+}
