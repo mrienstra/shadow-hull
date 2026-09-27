@@ -3,3 +3,4 @@ node_modules/
 !test/fixtures/*.stl
 .DS_Store
 dist/
+reports/

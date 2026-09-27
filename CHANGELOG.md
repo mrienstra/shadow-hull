@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-09-26 (word pairs: exploration)
+
+- Fixed manifold-3d JS `extrude` leaks (~0.4 MB per glyph extrusion), which had
+  crashed long searches with "memory access out of bounds". `extrudeCentered`
+  plus a regression test (mutation-checked).
+- `compose.js`: solids as unions of cells (each a small trip-let in its own
+  box), measured per view and per cell.
+- `wordpair.js`: two words, front and right. For two views, coverage is exact
+  2D arithmetic: a letter's ink at height z shows iff its partner has ink at z,
+  and each connected blob covers one interval of heights. The search is a
+  dynamic program over chunk pairings (sequence-alignment style) with a Pareto front of
+  coverage / stretch / fragments / merged letters / lowercase count. Options:
+  case (upper, lower, title, per-letter mixed), per-cell vertical fit (shared
+  baseline or stretched to row height), rows (stacking). Per-cell fragments
+  (e.g. stranded i-dots) come from a small 3D build, computed only for cells that
+  survive the 2D pre-filter.
+- `scripts/explore-words.js`: HTML report (3D + both shadows) of the best layout per
+  style, written to `reports/` (gitignored).
+- Findings (Finola × Bryan, Kanit Black): uppercase and per-letter mixed case
+  reach 100% with no stretch (mixed: `FINoLA × BRYaN`); lowercase needs 40–80%
+  stretch; title case loses the i-dot. Letters that merge into one chunk often
+  leave floating fragments. A fixed overlap of 0.2 × height swallows narrow letters.
+- `resources/communication/external/open-questions.md`: running list of
+  questions for outside review.
+- Subagent ledger: one Sonnet Explore agent read `../omelet-megatype`. **Cheap,
+  and worth it for a clear no**: canvas-level scaling only, no license, nothing
+  to port. That saved me reading the repo myself.
+
 ## 2026-09-26 (fonts, missing-parts toggle)
 
 - Benchmark set: `test/fixtures/benchmark-words.json`, 16 triples using all 26

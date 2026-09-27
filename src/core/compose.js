@@ -1,0 +1,84 @@
+/**
+ * Compositions: a solid built as the union of cells, each a small trip-let in
+ * its own box. This generalises buildTriplet (one cell filling a cube) to
+ * words: e.g. a diagonal chain of letter pairs, stacked rows, grids.
+ *
+ * A cell is { box: { min: [x, y, z], max: [x, y, z] }, shapes: { front?, right?, top? } }.
+ * Each shape is a CrossSection already placed in that view's local 2D frame
+ * (see views.js): front = (X, Z), right = (Y, Z), top = (X, Y). A missing shape
+ * leaves that view unconstrained inside the box. Shapes are not consumed.
+ */
+import { Scope, extrudeCentered } from './manifold.js';
+import { VIEW_NAMES, localToWorld, worldToLocal } from './views.js';
+
+function extent(cells) {
+  let m = 0;
+  for (const { box } of cells) for (const v of [...box.min, ...box.max]) m = Math.max(m, Math.abs(v));
+  return m;
+}
+
+/** Union of all cells. Caller owns the returned Manifold. */
+export function buildComposition(wasm, cells) {
+  const { Manifold } = wasm;
+  const scope = new Scope();
+  try {
+    const length = 4 * extent(cells) + 1; // prisms long enough to cross every box
+    const solids = cells.map(({ box, shapes }) => {
+      const size = box.max.map((x, i) => x - box.min[i]);
+      const parts = [scope.add(scope.add(Manifold.cube(size, false)).translate(box.min))];
+      for (const v of VIEW_NAMES) {
+        if (!shapes[v]) continue;
+        const prism = scope.add(extrudeCentered(wasm, shapes[v], length));
+        parts.push(scope.add(prism.transform(localToWorld(v))));
+      }
+      return scope.add(Manifold.intersection(parts));
+    });
+    return Manifold.union(solids);
+  } finally {
+    scope.dispose();
+  }
+}
+
+/**
+ * Compare each constrained view's shadow with the union of its cells' shapes.
+ * Per view: coverage (1 = every target shape fully shown), outside (should
+ * be ~0), worstCell (lowest per-cell coverage, i.e. the weakest letter/chunk).
+ * Views with no shapes report only the shadow area.
+ */
+export function measureComposition(wasm, solid, cells) {
+  const { CrossSection } = wasm;
+  const scope = new Scope();
+  try {
+    const views = {};
+    for (const v of VIEW_NAMES) {
+      const shadow = scope.add(scope.add(solid.transform(worldToLocal(v))).project());
+      const own = cells.map((c) => c.shapes[v]).filter(Boolean);
+      if (!own.length) { views[v] = { constrained: false, shadowArea: shadow.area() }; continue; }
+      const target = scope.add(CrossSection.union(own));
+      const missing = scope.add(target.subtract(shadow)).area();
+      const outside = scope.add(shadow.subtract(target)).area();
+      const worstCell = Math.min(...own.map((s) => 1 - scope.add(s.subtract(shadow)).area() / s.area()));
+      views[v] = { constrained: true, coverage: 1 - missing / target.area(), worstCell, missing, outside };
+    }
+    const parts = solid.decompose();
+    const pieces = parts.length;
+    for (const p of parts) p.delete();
+    const { min, max } = solid.boundingBox();
+    const constrained = VIEW_NAMES.filter((v) => views[v].constrained);
+    return {
+      views,
+      minCoverage: Math.min(...constrained.map((v) => views[v].coverage)),
+      worstCell: Math.min(...constrained.map((v) => views[v].worstCell)),
+      pieces,
+      volume: solid.volume(),
+      size: max.map((x, i) => x - min[i]),
+    };
+  } finally {
+    scope.dispose();
+  }
+}
+
+/** Free every shape in a list of cells. */
+export function disposeCells(cells) {
+  for (const c of cells) for (const s of Object.values(c.shapes)) s?.delete();
+}
