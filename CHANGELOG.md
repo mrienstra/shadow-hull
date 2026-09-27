@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-09-27 (column variants: heart from above; stacked, all taller)
+
+- Heart over a column: `spanColumnCells` / `stackedColumnCells` take a top
+  shape (`placeTop`: rotate, scale to the footprint). `searchTopFit` tries
+  rotations × sizes; ties within 0.005 quality prefer upright, then 45° steps.
+  Finola × Bryan, touching, tall Y: front 99.9%, side 99.7–100%, heart
+  99.7–100% at any rotation (45° is slightly worse at 98.4%). A touching column
+  has ink at nearly every height, so the heart trims almost nothing, and from
+  above it fills the heart.
+- Stacked column (`stackedColumnCells`): both words stacked whole, the shorter
+  word's letters all taller so the stacks match (Bryan ~1.2×; 1.197 with the
+  0.3 mm row overlap) — no per-row pairing. Touching: 100% / 100%, one piece,
+  no rods (stems touch between rows, as in every touching layout). 'uniform'
+  also widens them.
+- Report: `--sections families,blocks,angles,spans,stacked`; new "Column
+  variants" section.
+- No subagents used.
+
 ## 2026-09-27 (colour faces by the view that carved them)
 
 - `manifold.js`: `tagged(m, label)` registers a solid's original ID under a label;

@@ -35,9 +35,10 @@ const CASE = {
  * @param spans row span of each letter of the shorter word (sums to the longer word's length)
  * @param opts.gap vertical gap between rows (mm; negative = overlap)
  * @param opts.fit 'stretch' | 'uniform' for spanning letters
+ * @param opts.top optional top-view shape over the column (see placeTop)
  * @returns cells (compose.js format, per-letter outlines), front = word A, right = word B
  */
-export function spanColumnCells(wasm, font, wordA, wordB, spans, { height = 20, gap = 1.2, fit = 'stretch', caseMode = 'upper', tolerance } = {}) {
+export function spanColumnCells(wasm, font, wordA, wordB, spans, { height = 20, gap = 1.2, fit = 'stretch', caseMode = 'upper', tolerance, top = null } = {}) {
   const [a, b] = [CASE[caseMode](wordA), CASE[caseMode](wordB)].map((w) => [...w]);
   const aLong = a.length >= b.length;
   const [long, short] = aLong ? [a, b] : [b, a];
@@ -90,5 +91,74 @@ export function spanColumnCells(wasm, font, wordA, wordB, spans, { height = 20, 
     });
     row += span;
   });
+  if (top?.shape) {
+    // One top shape over the whole column, shared by every cell.
+    const hx = Math.max(...cells.map((c) => c.box.max[0])), hy = Math.max(...cells.map((c) => c.box.max[1]));
+    for (const c of cells) c.shapes.top = placeTop(top, hx, hy);
+  }
   return cells;
+}
+
+/**
+ * Stacked block: both words stacked vertically (one letter per row), each as
+ * a whole, with no per-row pairing. The shorter word's rows are stretched so
+ * both stacks have the same height (Finola × Bryan: Bryan's letters 1.2×
+ * taller). With touching rows each stack is continuous ink, so letters lose
+ * only where the other stack has a gap at that height.
+ * @param opts.fit 'stretch' (taller only) | 'uniform' (taller and wider)
+ * @param opts.top { shape: CrossSection, rotate: degrees, scale: × footprint }
+ * @returns cells (compose.js format; one cell)
+ */
+export function stackedColumnCells(wasm, font, wordA, wordB, { height = 20, gap = -0.3, fit = 'stretch', caseMode = 'upper', tolerance, top = null } = {}) {
+  const [a, b] = [CASE[caseMode](wordA), CASE[caseMode](wordB)].map((w) => [...w]);
+  const glyph = (ch) => glyphRun(font, ch, { tolerance })[0];
+  const ga = a.map(glyph), gb = b.map(glyph);
+  const pts = [...ga, ...gb].flatMap((g) => g.contours.flat());
+  const em = font.unitsPerEm, cap = font.tables.os2?.sCapHeight || 0.7 * em;
+  let yMin = Math.min(...pts.map((p) => p[1])), yMax = Math.max(...pts.map((p) => p[1]));
+  if (yMin > -0.03 * em) yMin = 0;
+  if (Math.abs(yMax - cap) < 0.03 * em) yMax = cap;
+  const s = height / (yMax - yMin);
+  const total = Math.max(a.length, b.length) * height + (Math.max(a.length, b.length) - 1) * gap;
+  const stack = (glyphs) => {
+    const rowH = (total - (glyphs.length - 1) * gap) / glyphs.length;
+    const k = rowH / height; // 1 for the longer word, e.g. 1.2 for the shorter
+    return glyphs.map((g, j) => {
+      const xs = g.contours.flat().map((p) => p[0]);
+      const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+      const z0 = total - (j + 1) * rowH - j * gap;
+      const sx = fit === 'uniform' ? s * k : s, sy = s * k;
+      return { ch: g.ch, pts: g.contours.map((c) => c.map(([x, y]) => [(x - cx) * sx, z0 + (y - yMin) * sy])), stretch: k };
+    });
+  };
+  const A = stack(ga), B = stack(gb);
+  const half = (letters) => Math.max(...letters.flatMap((l) => l.pts.flat().map((p) => Math.abs(p[0]))));
+  const hx = half(A), hy = half(B);
+  const shapes = {
+    front: new wasm.CrossSection(A.flatMap((l) => l.pts), 'NonZero'),
+    right: new wasm.CrossSection(B.flatMap((l) => l.pts), 'NonZero'),
+  };
+  if (top?.shape) shapes.top = placeTop(top, hx, hy);
+  return [{
+    box: { min: [-hx, -hy, 0], max: [hx, hy, total] },
+    shapes,
+    letters: { front: A.map(({ ch, pts }) => ({ ch, pts })), right: B.map(({ ch, pts }) => ({ ch, pts })) },
+    label: `${a.join('')}/${b.join('')} stacked`,
+    stretch: Math.max(...[...A, ...B].map((l) => l.stretch)) - 1,
+  }];
+}
+
+/**
+ * A top-view shape for a column: rotated by top.rotate degrees about the
+ * vertical axis, then scaled so its bounding box is top.scale × the column's
+ * footprint (hx, hy half-extents), centred on the axis.
+ */
+export function placeTop(top, hx, hy) {
+  const rotated = top.shape.rotate(top.rotate ?? 0);
+  const { min, max } = rotated.bounds();
+  const k = top.scale ?? 1;
+  const sx = (2 * hx * k) / (max[0] - min[0]), sy = (2 * hy * k) / (max[1] - min[1]);
+  const out = rotated.translate([-(min[0] + max[0]) / 2, -(min[1] + max[1]) / 2]).scale([sx, sy]);
+  rotated.delete();
+  return out;
 }

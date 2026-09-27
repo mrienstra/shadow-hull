@@ -11,7 +11,7 @@
 import { letterVisibility, buildComposition, measureComposition, disposeCells } from './compose.js';
 import { exploreWordPair, layoutCells, rankLayouts } from './wordpair.js';
 import { blockCells } from './block.js';
-import { compositions, spanColumnCells } from './column.js';
+import { compositions, spanColumnCells, stackedColumnCells } from './column.js';
 import { basePlate, bridgePieces, strayShadow, hullJoin } from './join.js';
 
 /**
@@ -197,12 +197,45 @@ export function designSpanColumn(wasm, font, wordA, wordB, { spacing = 'touching
 }
 
 /** Build one spanning column (see designSpanColumn); caller disposes. */
-export function realizeSpanColumn(wasm, font, wordA, wordB, spans, { spacing = 'touching', fit = 'stretch', caseMode = 'upper', height = 20, join = 'hull+bridges', gap } = {}) {
+export function realizeSpanColumn(wasm, font, wordA, wordB, spans, { spacing = 'touching', fit = 'stretch', caseMode = 'upper', height = 20, join = 'hull+bridges', gap, top = null } = {}) {
   const fam = SPACING[spacing];
-  const cells = spanColumnCells(wasm, font, wordA, wordB, spans, { height, gap: gap ?? (spacing === 'touching' ? -0.3 : 1.2), fit, caseMode });
+  const cells = spanColumnCells(wasm, font, wordA, wordB, spans, { height, gap: gap ?? (spacing === 'touching' ? -0.3 : 1.2), fit, caseMode, top });
   const solid = buildComposition(wasm, cells);
   // Stretch: how much taller than a normal row the tallest spanning letter is.
   const stretch = Math.max(...spans) - 1;
   return finishDesign(wasm, cells, solid, { join, rods: fam.rods, height, stretch: fit === 'stretch' ? stretch : 0 });
+}
+
+/** Build a stacked block (see column.js stackedColumnCells); caller disposes. */
+export function realizeStackedColumn(wasm, font, wordA, wordB, { spacing = 'touching', fit = 'stretch', caseMode = 'upper', height = 20, join = 'bridges', top = null } = {}) {
+  const fam = SPACING[spacing];
+  const cells = stackedColumnCells(wasm, font, wordA, wordB, { height, gap: spacing === 'touching' ? -0.3 : 1.2, fit, caseMode, top });
+  const solid = buildComposition(wasm, cells);
+  return finishDesign(wasm, cells, solid, { join, rods: fam.rods, height, stretch: fit === 'stretch' ? cells[0].stretch : 0 });
+}
+
+/**
+ * Best rotation/scale of a top shape over a column design: tries each
+ * rotation × scale, and keeps the best by designQuality (which includes the
+ * top view's coverage via the worst view), treating differences under 0.005
+ * as ties broken towards upright, then 45° steps, then natural size. `build(top)` must return a design
+ * (realizeSpanColumn / realizeStackedColumn with that top).
+ * @returns [{ rotate, scale, metrics }] best first
+ */
+export function searchTopFit(build, shape, { rotations = [0, 15, 30, 45, 60, 75, 90, 135, 180, 225, 270, 315], scales = [1, 1.15, 1.3] } = {}) {
+  const out = [];
+  for (const rotate of rotations) {
+    for (const scale of scales) {
+      const d = build({ shape, rotate, scale });
+      out.push({ rotate, scale, metrics: d.metrics });
+      d.dispose();
+    }
+  }
+  // Quality within 0.005 counts as a tie: then prefer an upright shape, then
+  // 45° steps, then the natural size (a 0.3% gain isn't worth a tilted heart).
+  const bucket = (q) => Math.round(q / 0.005);
+  const niceness = (r) => (r % 360 === 0 ? 0 : r % 45 === 0 ? 1 : 2);
+  return out.sort((a, b) => bucket(b.metrics.quality) - bucket(a.metrics.quality)
+    || niceness(a.rotate) - niceness(b.rotate) || a.scale - b.scale || b.metrics.quality - a.metrics.quality);
 }
 

@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { getManifold, loadFont, worldToLocal, faceRuns } from '../src/core/index.js';
 import { describeLayout, rankLayouts } from '../src/core/wordpair.js';
-import { SPACING, designWordPair, realizeDesign, realizeBlock, designSpanColumn, realizeSpanColumn } from '../src/core/design.js';
+import { SPACING, designWordPair, realizeDesign, realizeBlock, designSpanColumn, realizeSpanColumn, realizeStackedColumn, searchTopFit } from '../src/core/design.js';
 import { glyphSilhouette } from '../src/core/block.js';
 
 const { values: o, positionals: [wordA, wordB] } = parseArgs({
@@ -26,8 +26,10 @@ const { values: o, positionals: [wordA, wordB] } = parseArgs({
     tops: { type: 'string', default: 'none,❤' },
     // Blocks at other angles between the two word views (degrees; '' = skip).
     angles: { type: 'string', default: '75,60,45' },
-    // Columns where the shorter word's letters span rows (instead of the longer doubling up).
-    spans: { type: 'boolean', default: true },
+    // Which sections to render: families (the spacing families / --presets),
+    // blocks (--tops), angles (--angles), spans (tall letter), stacked (stacked
+    // column, shorter word's letters all taller; with and without a heart).
+    sections: { type: 'string', default: 'families,blocks,angles,spans,stacked' },
     join: { type: 'string', default: 'hull+bridges' }, // none | hull | plate | bridges, combined with '+'
 
   },
@@ -45,7 +47,8 @@ const LABELS = ['front', 'right', 'top', 'box', 'connector', null];
 const pct = (x) => `${(x * 100).toFixed(1)}%`;
 const svgPath = (polys) => polys.map((p) => 'M' + p.map(([x, y]) => `${x.toFixed(2)},${(-y).toFixed(2)}`).join('L') + 'Z').join('');
 const entries = [];
-for (const spacing of o.presets.split(',')) {
+const sections = new Set(o.sections.split(','));
+for (const spacing of sections.has('families') ? o.presets.split(',') : []) {
   const t0 = performance.now();
   const designs = designWordPair(wasm, font, wordA, wordB, {
     spacing, join: o.join, height: H, candidates: Number(o.candidates),
@@ -64,7 +67,7 @@ for (const spacing of o.presets.split(',')) {
 }
 
 // Block layouts: whole words, touching letters, top view none or a shape.
-if (o.tops) {
+if (sections.has('blocks') && o.tops) {
   const emoji = loadFont(await readFile(fileURLToPath(new URL('shapes/NotoEmoji.ttf', FONTS_DIR))));
   for (const top of o.tops.split(',')) {
     const shape = top === 'none' ? null : glyphSilhouette(wasm, emoji, top);
@@ -79,7 +82,7 @@ if (o.tops) {
 }
 
 // Blocks with the side view at other angles (single row, touching, uppercase and mixed-free cases).
-if (o.angles) {
+if (sections.has('angles') && o.angles) {
   for (const angle of o.angles.split(',').map(Number)) {
     for (const caseMode of ['upper', 'title']) {
       const d = realizeBlock(wasm, font, wordA, wordB, { caseMode, spacing: 'touching', join: 'bridges', height: H, angle });
@@ -90,7 +93,7 @@ if (o.angles) {
 }
 
 // Columns with spanning letters: best span assignment per spacing × fit.
-if (o.spans) {
+if (sections.has('spans')) {
   const shorter = [...wordA].length >= [...wordB].length ? wordB : wordA;
   for (const spacing of ['touching', 'spaced']) {
     for (const fit of ['stretch', 'uniform']) {
@@ -101,6 +104,34 @@ if (o.spans) {
       d.dispose();
     }
   }
+}
+
+// Column variants with everything touching: stacked (the shorter word's letters
+// all taller, no pairing) and a heart over the column (best rotation × scale).
+if (sections.has('stacked')) {
+  const emoji = loadFont(await readFile(fileURLToPath(new URL('shapes/NotoEmoji.ttf', FONTS_DIR))));
+  const heart = glyphSilhouette(wasm, emoji, '❤');
+  const shorter = [...wordA].length >= [...wordB].length ? wordB : wordA;
+  const k = Math.max([...wordA].length, [...wordB].length) / [...shorter].length;
+  const label = 'Column variants, touching (stacked: every letter of the shorter word taller; ❤: heart seen from above)';
+  for (const fit of ['stretch', 'uniform']) {
+    const d = realizeStackedColumn(wasm, font, wordA, wordB, { fit, height: H });
+    entries.push(card(d, label, `stacked, ${fit === 'stretch' ? 'taller' : 'taller and wider'}`, `${shorter.toUpperCase()} letters ${((k - 1) * 100).toFixed(0)}% ${fit === 'stretch' ? 'taller' : 'larger'}`, 'bridges'));
+    d.dispose();
+  }
+  const [bestSpans] = designSpanColumn(wasm, font, wordA, wordB, { spacing: 'touching', fit: 'stretch', height: H });
+  const spanLabel = [...shorter.toUpperCase()].map((c, i) => (bestSpans.spans[i] > 1 ? `${c}×${bestSpans.spans[i]}` : c)).join(' ');
+  const builds = [
+    ['tall letter + ❤', `spans: ${spanLabel}`, (top) => realizeSpanColumn(wasm, font, wordA, wordB, bestSpans.spans, { spacing: 'touching', fit: 'stretch', height: H, top })],
+    ['stacked + ❤', `${shorter.toUpperCase()} letters ${((k - 1) * 100).toFixed(0)}% taller`, (top) => realizeStackedColumn(wasm, font, wordA, wordB, { fit: 'stretch', height: H, top })],
+  ];
+  for (const [style, text, build] of builds) {
+    const [best, ...rest] = searchTopFit(build, heart);
+    const d = build({ shape: heart, rotate: best.rotate, scale: best.scale });
+    entries.push(card(d, label, style, `${text} · heart rotated ${best.rotate}°${best.scale !== 1 ? `, ×${best.scale}` : ''}`, 'bridges', ` · heart ${pct(d.metrics.views.top.coverage)} shown · best of ${rest.length + 1} rotations × sizes`));
+    d.dispose();
+  }
+  heart.delete();
 }
 
 function card(d, preset, style, text, join, note = '') {

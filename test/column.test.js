@@ -35,3 +35,21 @@ test('touching spanning column is one piece with near-full coverage', () => {
   assert.equal(best.metrics.pieces, 1);
   assert.ok(best.metrics.coverage > 0.99, `coverage ${best.metrics.coverage}`);
 });
+
+test('stacked column: shorter word 20% taller, one piece; heart over it fits', async () => {
+  const { realizeStackedColumn, searchTopFit } = await import('../src/core/design.js');
+  const { glyphSilhouette } = await import('../src/core/block.js');
+  const emoji = loadFont(await readFile(new URL('../fonts/shapes/NotoEmoji.ttf', import.meta.url)));
+  const d = realizeStackedColumn(wasm, font, 'Finola', 'Bryan', { fit: 'stretch' });
+  try {
+    assert.equal(d.metrics.pieces, 1);
+    assert.ok(d.metrics.coverage > 0.99);
+    assert.ok(Math.abs(d.metrics.stretch - 0.2) < 0.01, `Bryan ~20% taller (${d.metrics.stretch}; the 0.3 mm row overlap shifts it slightly)`);
+  } finally { d.dispose(); }
+  const heart = glyphSilhouette(wasm, emoji, '❤');
+  try {
+    const [best] = searchTopFit((top) => realizeStackedColumn(wasm, font, 'Finola', 'Bryan', { top }), heart, { rotations: [0, 45, 75], scales: [1] });
+    assert.equal(best.rotate, 0, 'upright wins ties');
+    assert.ok(best.metrics.views.top.coverage > 0.99);
+  } finally { heart.delete(); }
+});
