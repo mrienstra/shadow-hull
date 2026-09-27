@@ -39,3 +39,14 @@ test('alignLines ranks letter-by-letter (no fragments) first for equal-length up
   // Merging letters can buy a little coverage, but strands fragments.
   assert.ok(front.some((p) => p.cells.length < 5 && p.score.fragments > 0));
 });
+
+test('scanline fragment counts agree with 3D on common letter pairs', async () => {
+  const { cellFragments, cellFragmentsScan } = await import('../src/core/wordpair.js');
+  const frame = rowFrame(font, [...'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz']);
+  const pairs = [['F', 'B'], ['i', 'r'], ['LA', 'N'], ['o', 'a'], ['NO', 'Y'], ['fi', 'b'], ['M', 'W']];
+  for (const [a, b] of pairs) {
+    for (const fit of ['shared', 'fill']) {
+      assert.equal(cellFragmentsScan(font, a, b, frame, fit), cellFragments(wasm, font, a, b, frame, fit), `${a}/${b} ${fit}`);
+    }
+  }
+});

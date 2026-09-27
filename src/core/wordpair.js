@@ -18,6 +18,7 @@
  * The top view is unconstrained.
  */
 import { textContours } from './glyph.js';
+import { cellPieces } from './scan.js';
 import { buildComposition, measureComposition, disposeCells } from './compose.js';
 
 const inkCache = new WeakMap();
@@ -40,9 +41,11 @@ export function ink(font, text, tolerance) {
 }
 
 /** Place contours: x' = x0 + (x - xFrom) * sx, y' = y0 + (y - yFrom) * sy. */
-function placed(wasm, contours, [xFrom, yFrom], [x0, y0], [sx, sy]) {
-  const pts = contours.map((c) => c.map(([x, y]) => [x0 + (x - xFrom) * sx, y0 + (y - yFrom) * sy]));
-  return new wasm.CrossSection(pts, 'NonZero');
+function placePoints(contours, [xFrom, yFrom], [x0, y0], [sx, sy]) {
+  return contours.map((c) => c.map(([x, y]) => [x0 + (x - xFrom) * sx, y0 + (y - yFrom) * sy]));
+}
+function placed(wasm, contours, from, to, scale) {
+  return new wasm.CrossSection(placePoints(contours, from, to, scale), 'NonZero');
 }
 
 /** Vertical frame [yMin, yMax] (font units) shared by a row: all texts' ink. */
@@ -164,6 +167,20 @@ export function cellFragments(wasm, font, ta, tb, frame, fit, { height = 20, tol
   }
 }
 
+/**
+ * Same as cellFragments, but by scanline slicing in plain JS (see scan.js):
+ * ~100x faster, may over-count a connection thinner than one slice.
+ */
+export function cellFragmentsScan(font, ta, tb, frame0, fit, { height = 20, tolerance, levels = 200 } = {}) {
+  const ga = ink(font, ta, tolerance), gb = ink(font, tb, tolerance);
+  const frame = [Math.min(frame0[0], ga.yMin, gb.yMin), Math.max(frame0[1], ga.yMax, gb.yMax)];
+  const shared = height / (frame[1] - frame[0]);
+  const va = vertical(ga, frame, height, fit), vb = vertical(gb, frame, height, fit);
+  const a = placePoints(ga.contours, [ga.xMin, va.from], [0, 0], [shared, va.s]);
+  const b = placePoints(gb.contours, [gb.xMin, vb.from], [0, 0], [shared, vb.s]);
+  return Math.max(0, cellPieces(a, b, 0, height, levels) - 1);
+}
+
 // ---- Search -----------------------------------------------------------------
 
 /** All ways to cut `s` into `k` non-empty contiguous pieces. */
@@ -249,24 +266,23 @@ export function alignLines(wasm, font, lineA, lineB, opts = {}) {
   const { caseMode = 'upper', fits = ['shared'], maxChunk = 3, frontLimit = 12, height = 20, tolerance } = opts;
   const A = [...CASES[caseMode === 'mixed' ? 'as' : caseMode](lineA)], B = [...CASES[caseMode === 'mixed' ? 'as' : caseMode](lineB)];
   const frameTexts = caseMode === 'mixed' ? [...A, ...B].flatMap((c) => [c.toUpperCase(), c.toLowerCase()]) : [...A, ...B];
-  const frame = rowFrame(font, frameTexts, tolerance);
-  const cellCache = new Map();
+  // A caller searching many line splits passes one frame and cache for all of
+  // them (same row height scale everywhere, and cells are scored once).
+  const frame = opts.frame ?? rowFrame(font, frameTexts, tolerance);
+  const cellCache = opts.cache ?? new Map();
   const cellOptions = (ca, cb) => {
-    const key = `${ca}|${cb}`;
+    const key = `${caseMode}|${ca}|${cb}|${frame}|${fits}|${height}`;
     if (!cellCache.has(key)) {
       const out = [];
       for (const va of caseVariants(ca, caseMode)) for (const vb of caseVariants(cb, caseMode)) for (const fit of fits) {
         const s = scoreCell(wasm, font, va, vb, frame, fit, { height, tolerance });
+        const fragments = cellFragmentsScan(font, va, vb, frame, fit, { height, tolerance });
         out.push({
           a: va, b: vb, fit, cell: s,
-          score: { coverage: s.coverage, distortion: s.distortion, fragments: 0, merged: [...va].length + [...vb].length - 2, lower: lowercaseCount(va) + lowercaseCount(vb) },
+          score: { coverage: s.coverage, distortion: s.distortion, fragments, merged: [...va].length + [...vb].length - 2, lower: lowercaseCount(va) + lowercaseCount(vb) },
         });
       }
-      // Fragments need a 3D build, so count them only for the options that
-      // survive the cheap 2D objectives (plus a margin), then prune again.
-      const survivors = pareto(out, 3 * frontLimit);
-      for (const o of survivors) o.score.fragments = cellFragments(wasm, font, o.a, o.b, frame, o.fit, { height, tolerance });
-      cellCache.set(key, pareto(survivors, frontLimit));
+      cellCache.set(key, pareto(out, frontLimit));
     }
     return cellCache.get(key);
   };
@@ -305,17 +321,23 @@ export function alignLines(wasm, font, lineA, lineB, opts = {}) {
 export function exploreWordPair(wasm, font, wordA, wordB, opts = {}) {
   const { cases = ['upper', 'lower', 'title', 'mixed'], rows: rowCounts = [1, 2], frontLimit = 12, byStyle = false } = opts;
   const results = [];
+  const cache = new Map();
   for (const caseMode of cases) {
     // Title case applies to whole words, so do it before splitting into lines.
     const [wa, wb] = caseMode === 'title' ? [CASES.title(wordA), CASES.title(wordB)] : [wordA, wordB];
     const lineMode = caseMode === 'title' ? 'as' : caseMode;
+    // One vertical frame per case mode: every row has the same scale.
+    const letters = [...wa, ...wb];
+    const frame = rowFrame(font, lineMode === 'mixed'
+      ? letters.flatMap((c) => [c.toUpperCase(), c.toLowerCase()])
+      : letters.map((c) => (CASES[lineMode] ?? CASES.as)(c)), opts.tolerance);
     for (const r of rowCounts) {
       if (r > Math.min([...wa].length, [...wb].length)) continue;
       for (const la of splits(wa, r)) {
         for (const lb of splits(wb, r)) {
           let partial = [{ score: ZERO, rows: [] }];
           for (let j = 0; j < r; j++) {
-            const aligned = alignLines(wasm, font, la[j], lb[j], { ...opts, caseMode: lineMode, frontLimit });
+            const aligned = alignLines(wasm, font, la[j], lb[j], { ...opts, caseMode: lineMode, frontLimit, frame, cache });
             partial = pareto(partial.flatMap((p) => aligned.map((q) => ({
               score: combine(p.score, q.score),
               rows: [...p.rows, { a: q.cells.map((c) => c.a), b: q.cells.map((c) => c.b), fit: q.cells.map((c) => c.fit), frame: q.frame, cells: q.cells }],

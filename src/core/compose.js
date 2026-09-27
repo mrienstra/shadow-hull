@@ -60,8 +60,12 @@ export function measureComposition(wasm, solid, cells) {
       const worstCell = Math.min(...own.map((s) => 1 - scope.add(s.subtract(shadow)).area() / s.area()));
       views[v] = { constrained: true, coverage: 1 - missing / target.area(), worstCell, missing, outside };
     }
+    // Pieces below 0.1% of the volume are dust (slivers where two letters
+    // barely touch); they would not survive printing, so count them apart.
     const parts = solid.decompose();
-    const pieces = parts.length;
+    const total = solid.volume();
+    const dust = parts.filter((p) => p.volume() < 1e-3 * total).length;
+    const pieces = parts.length - dust;
     for (const p of parts) p.delete();
     const { min, max } = solid.boundingBox();
     const constrained = VIEW_NAMES.filter((v) => views[v].constrained);
@@ -70,7 +74,8 @@ export function measureComposition(wasm, solid, cells) {
       minCoverage: Math.min(...constrained.map((v) => views[v].coverage)),
       worstCell: Math.min(...constrained.map((v) => views[v].worstCell)),
       pieces,
-      volume: solid.volume(),
+      dust,
+      volume: total,
       size: max.map((x, i) => x - min[i]),
     };
   } finally {
