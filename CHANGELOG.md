@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-26 (external brief)
+
+- `resources/communication/external/brief-2026-09-26.md`: a self-contained brief
+  for outside models (context, what works, measurements, six questions).
+  `open-questions.md` points to it; its Q1 (DP alignment) is marked done.
+- Subagent ledger: one Fable agent fact-checked the brief against the repo and
+  re-measured. **Earned its cost**: it caught a wrong explanation (the i-dot
+  isn't lost for lack of ink in "Bryan"; it's paired with r, and pairing it
+  with B strands it as a fragment), stale numbers (pieces 2–4 not 2–5; the plate
+  joins 3 of 4 single-row layouts at 5–12%, not all at 7–12%), a conflated
+  metric (Arial 7/16 is "sturdy", not "one piece"), and numbers from one
+  configuration stated as general. I re-measured the plate numbers and the i-dot
+  pairings myself before applying the fixes.
+
 ## 2026-09-26 (word pairs: speed, joining)
 
 - Profiled the word-pair search: 93% of the time went to per-cell 3D builds counting

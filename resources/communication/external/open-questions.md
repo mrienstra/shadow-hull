@@ -5,6 +5,9 @@ as questions come up. When there's a good set, tidy it into a short
 self-contained brief (context, what we've tried, what we measured, the
 question) for the owner to send out. Replies go in this folder too.
 
+Briefs: `brief-2026-09-26.md` (drafted; covers 2–6 below, plus search at
+scale for three words).
+
 Context for any brief: we generate solids whose orthogonal shadows spell
 letters or words (GEB-cover "trip-lets", visual hulls). The JS core uses
 manifold-3d, and each solid is an intersection of extruded glyph prisms. We
@@ -13,12 +16,9 @@ survival). See `CLAUDE.md` and `resources/research/`.
 
 ## Search / optimisation
 
-1. **Word pairs as sequence alignment.** Two views share only the vertical
-   axis, so each cell's coverage is local. We plan to segment both words into
-   aligned chunks with dynamic programming over cached cell scores (max-min
-   coverage, pairwise terms for neighbour overlap and connectivity). Is there
-   a better formulation? How do we fold in row splits (stacking) and grids
-   without enumerating everything?
+1. ~~**Word pairs as sequence alignment.**~~ Done: DP over chunk pairings
+   with a Pareto front (`wordpair.js`); row splits are enumerated outside it.
+   Still open: grids and three-word search (brief Q6).
 2. **Multi-objective ranking.** Coverage, letter distortion (stretching),
    connectivity/printability and compactness pull against each other. Is a
    Pareto front the right way to present results, and what are good default
