@@ -34,7 +34,8 @@ test('page generates GEB with complete shadows', async () => {
   assert.equal(captions.length, 3);
   for (const c of captions) assert.match(c, /100\.0%/, c);
   assert.equal(await page.isDisabled('#download'), false);
-  assert.equal(await page.textContent('#print-check'), 'One piece · no part thinner than 1 mm');
+  // GEB in Bungee is one piece but has a 0.43 mm wall, which the voxel check reports.
+  assert.match(await page.textContent('#print-check'), /^One piece · \d+ parts? thinner than 1 mm \([\d.]+ mm³\)$/);
 
   // The "Show missing parts" toggle hides the red areas and outlines.
   assert.equal(await page.isVisible('#shadow-panels .target'), true);
