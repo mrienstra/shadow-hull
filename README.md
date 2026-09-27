@@ -45,7 +45,7 @@ npm test               # unit tests (npm run check also runs browser and Python 
 
 node src/cli.js GEB -o geb.stl                 # three letters, best result as STL
 node src/cli.js --list-fonts
-node scripts/explore-words.js Finola Bryan     # HTML report of two-word designs → reports/
+node scripts/explore-words.js Finola Bryan     # HTML report of every look's variants → reports/
 ```
 
 The web page keeps its state in the URL, so "Share link" gives a link that

@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-09-27 (report by look; old gallery generator removed)
+
+- `scripts/explore-words.js` now generates every word look with "More
+  variants" (plus the tower and block with ❤), grouped by look under the web
+  page's labels and descriptions. Finola × Bryan: 86 designs in 134 s (was 68
+  in 217 s). Options: `--looks`, `--fast`, `--shape`.
+- Removed the section-based `generateGallery`, its constants and the worker's
+  `gallery` message: the page stopped using them at stage 2, and every variant
+  they made is a look (`test/looks.test.js`). `gallery.js` keeps the recipe
+  builder and `designView`.
+- `ui-map.md`: all open items from the reorganisation are done.
+- No subagents used.
+
 ## 2026-09-27 (letter cube wording; shared font upload)
 
 - The letter cube's options use the same plain wording as the word looks:

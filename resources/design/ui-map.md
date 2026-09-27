@@ -107,9 +107,9 @@ angles and columns ignore them and use fixed internal sets.
 
 Done: look-first menu, one vocabulary, fast first result + more variants,
 thumbnails, plain-language checks, stretch as a knob, cube as a look.
-Not done / open: a "prefer compact" or "fewer supports" preference; the
-cube's own options still use the old wording (fit, orientations); the report
-script still groups by the old sections (it uses `gallery.js`, not looks).
+Since done too: "Support rods: allowed / none" and "Prefer compact" knobs;
+the cube's options use the plain wording; the report script is grouped by
+look (the section-based `generateGallery` was removed; the looks cover it).
 
 ## 6. Other entry points (for reference)
 

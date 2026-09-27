@@ -1,30 +1,25 @@
 #!/usr/bin/env node
 // Explore layouts for a word pair and write an HTML report (3D view + shadows
-// per design) to reports/<a>-<b>.html. The designs come from src/core/gallery.js,
-// which the web page uses too. Exploration tool, not product.
+// per design) to reports/<a>-<b>.html, grouped by look. Exploration tool, not product.
 // Example words: Finola and Bryan, the lead agents (Finola Jones, Bryan Beneventi)
 // in NBC's sci-fi series Debris (2021) — a 6- and a 5-letter name with an i-dot.
 // Usage: node scripts/explore-words.js Finola Bryan [--font kanit-black]
-//        [--sections families,blocks,angles,spans,stacked] [--presets touching,spaced,...]
-//        [--cases upper,lower,title,mixed] [--rows 1,2,3] [--tops none,❤] [--angles 75,60,45]
+//        [--looks row,rows,grid,tower,block] [--fast] [--shape ❤]
+// Uses the same looks as the web page (src/core/looks.js), with "More variants".
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { parseArgs } from 'node:util';
 import { getManifold, loadFont } from '../src/core/index.js';
-import { generateGallery, buildRecipe, designView, disposeContext, DEFAULT_GALLERY } from '../src/core/gallery.js';
+import { buildRecipe, designView, disposeContext } from '../src/core/gallery.js';
+import { LOOKS, generateLook } from '../src/core/looks.js';
 
 const { values: o, positionals: [wordA, wordB] } = parseArgs({
   allowPositionals: true,
   options: {
     font: { type: 'string', default: 'kanit-black' },
-    sections: { type: 'string', default: DEFAULT_GALLERY.sections.join(',') },
-    presets: { type: 'string', default: DEFAULT_GALLERY.families.join(',') },
-    cases: { type: 'string', default: DEFAULT_GALLERY.cases.join(',') },
-    rows: { type: 'string', default: DEFAULT_GALLERY.rows.join(',') },
-    tops: { type: 'string', default: 'none,❤' },
-    angles: { type: 'string', default: DEFAULT_GALLERY.angles.join(',') },
-    candidates: { type: 'string', default: String(DEFAULT_GALLERY.candidates) },
-    join: { type: 'string', default: DEFAULT_GALLERY.join },
+    looks: { type: 'string', default: 'row,rows,grid,tower,block' }, // two-word looks to include
+    fast: { type: 'boolean', default: false }, // only each look's first result (no "More variants")
+    shape: { type: 'string', default: '❤' }, // also make the tower and block with this shape from above ('' = skip)
   },
 });
 if (!wordA || !wordB) { console.error('Usage: explore-words.js WORD_A WORD_B [options]'); process.exit(1); }
@@ -44,35 +39,41 @@ const pct = (x) => `${(x * 100).toFixed(1)}%`;
 const svgPath = (polys) => polys.map((p) => 'M' + p.map(([x, y]) => `${x.toFixed(2)},${(-y).toFixed(2)}`).join('L') + 'Z').join('');
 const entries = [];
 const t0 = performance.now();
-for (const item of generateGallery(ctx, wordA, wordB, {
-  sections: list(o.sections), families: list(o.presets), cases: list(o.cases), rows: list(o.rows).map(Number),
-  tops: list(o.tops).map((t) => (t === 'none' ? null : t)), angles: list(o.angles).map(Number),
-  candidates: Number(o.candidates), join: o.join,
-})) {
-  const d = buildRecipe(ctx, wordA, wordB, item.recipe);
-  const v = designView(wasm, d);
-  d.dispose();
-  const m = v.metrics;
-  const join = item.recipe.kind === 'chain' ? item.recipe.join : 'bridges';
-  const views = {};
-  for (const [k, x] of Object.entries(v.views)) {
-    const xs = x.target.flat();
-    const [x0, x1] = [Math.min(...xs.map((p) => p[0])), Math.max(...xs.map((p) => p[0]))];
-    const [y0, y1] = [Math.min(...xs.map((p) => p[1])), Math.max(...xs.map((p) => p[1]))];
-    views[k] = { cap: x.label, shadow: svgPath(x.shadow), missing: svgPath(x.missing), box: [x0, -y1, x1 - x0, y1 - y0] };
+const runs = [];
+for (const id of list(o.looks)) {
+  runs.push([id, {}]);
+  if (o.shape && (id === 'tower' || id === 'block')) runs.push([id, { shape: o.shape }]);
+}
+for (const [id, knobs] of runs) {
+  const look = LOOKS.find((l) => l.id === id);
+  const section = `${look.label}${knobs.shape ? ` with ${knobs.shape} from above` : ''} — ${look.blurb}`;
+  for (const item of generateLook(ctx, wordA, wordB, id, knobs, { more: !o.fast })) {
+    const d = buildRecipe(ctx, wordA, wordB, item.recipe);
+    const v = designView(wasm, d, { turn: item.recipe.turn ? -45 : 0 });
+    if (v.solid !== d.joined) v.solid.delete();
+    d.dispose();
+    const m = v.metrics;
+    const join = item.recipe.supports === 'none' ? 'no supports' : 'supports';
+    const views = {};
+    for (const [k, x] of Object.entries(v.views)) {
+      const xs = x.target.flat();
+      const [x0, x1] = [Math.min(...xs.map((p) => p[0])), Math.max(...xs.map((p) => p[0]))];
+      const [y0, y1] = [Math.min(...xs.map((p) => p[1])), Math.max(...xs.map((p) => p[1]))];
+      views[k] = { cap: x.label === 'right' ? 'side' : x.label, shadow: svgPath(x.shadow), missing: svgPath(x.missing), box: [x0, -y1, x1 - x0, y1 - y0] };
+    }
+    const verts = [];
+    for (let i = 0; i < v.mesh.vertProperties.length; i += v.mesh.numProp) verts.push(...[0, 1, 2].map((k) => Math.round(v.mesh.vertProperties[i + k] * 100) / 100));
+    entries.push({
+      preset: section, style: item.title, text: item.text,
+      stats: `quality ${m.quality.toFixed(3)} · worst letter ${pct(m.coverage)} · least visible ${m.visibleMin < 1 ? `${m.leastVisible} ${pct(m.visibleMin)}` : 'all 100%'}`
+        + ` · most contact ${m.contactMax > 0 ? `${m.mostContact} ${pct(m.contactMax)}` : 'none'} · stretch ${(m.stretch * 100).toFixed(0)}% · ${m.pieces} piece${m.pieces > 1 ? 's' : ''}`
+        + ` → ${m.finalPieces} (${join}; ${m.blocks ? `${m.blocks} hidden join${m.blocks === 1 ? '' : 's'}, ` : ''}${m.rods} rod${m.rods === 1 ? '' : 's'}${item.recipe.stand ? ', stand' : ''}${m.rods ? `, longest ${m.longestRod.toFixed(1)} mm` : ''}; extra shadow ${pct(m.stray.front ?? 0)} / ${pct(m.stray.right ?? 0)})`
+        + ` · ${m.size.map((x) => x.toFixed(0)).join(' × ')} mm${item.note ? ` · ${item.note}` : ''}`,
+      views, verts, tris: Array.from(v.mesh.triVerts),
+      runs: v.runs.map((r) => [r.start, r.count, LABELS.indexOf(r.label)]),
+    });
+    process.stderr.write('.');
   }
-  const verts = [];
-  for (let i = 0; i < v.mesh.vertProperties.length; i += v.mesh.numProp) verts.push(...[0, 1, 2].map((k) => Math.round(v.mesh.vertProperties[i + k] * 100) / 100));
-  entries.push({
-    preset: item.section, style: item.title, text: item.text,
-    stats: `quality ${m.quality.toFixed(3)} · worst letter ${pct(m.coverage)} · least visible ${m.visibleMin < 1 ? `${m.leastVisible} ${pct(m.visibleMin)}` : 'all 100%'}`
-      + ` · most contact ${m.contactMax > 0 ? `${m.mostContact} ${pct(m.contactMax)}` : 'none'} · stretch ${(m.stretch * 100).toFixed(0)}% · ${m.pieces} piece${m.pieces > 1 ? 's' : ''}`
-      + ` → ${m.finalPieces} after ${join} (${m.blocks ? `${m.blocks} hull block${m.blocks === 1 ? '' : 's'}, ` : ''}${m.rods} rod${m.rods === 1 ? '' : 's'}${m.rods ? `, longest ${m.longestRod.toFixed(1)} mm` : ''}; extra shadow ${pct(m.stray.front ?? 0)} / ${pct(m.stray.right ?? 0)})`
-      + ` · ${m.size.map((x) => x.toFixed(0)).join(' × ')} mm${item.note ? ` · ${item.note}` : ''}`,
-    views, verts, tris: Array.from(v.mesh.triVerts),
-    runs: v.runs.map((r) => [r.start, r.count, LABELS.indexOf(r.label)]),
-  });
-  process.stderr.write('.');
 }
 disposeContext(ctx);
 console.error(`\n${entries.length} designs in ${((performance.now() - t0) / 1000).toFixed(0)} s`);
@@ -100,7 +101,7 @@ path.s { fill:var(--ink); } path.m { fill:var(--miss); }
 .legend .sw { display:inline-block; width:12px; height:12px; border-radius:2px; margin-left:8px; }
 </style></head><body>
 <h1>${wordA} × ${wordB}</h1>
-<p class="sub">Best layout per style (${entry?.name ?? o.font}), chosen by “quality”: worst-letter coverage minus penalties for hidden letters, merged stems, stretch, extra shadow and uneven rows (src/core/design.js). “·” separates cells, “/” rows, “↕” = letter stretched to row height. Front reads ${wordA}, right reads ${wordB}; red = missing from the letter. “Least visible” = share of a letter not covered by neighbouring letters; “most contact” = outline touching other letters, in row heights (≳30% reads as merged). Joined with ${o.join}. Drag to rotate.</p>
+<p class="sub">Designs per look (${entry?.name ?? o.font}), as the web page's “More variants” makes them, ranked by “quality”: worst-letter coverage minus penalties for hidden letters, merged stems, stretch, extra shadow and uneven rows (src/core/design.js). “·” separates cells, “/” rows, “↕” = letter stretched to row height. Front reads ${wordA}, right reads ${wordB}; red = missing from the letter. “Least visible” = share of a letter not covered by neighbouring letters; “most contact” = outline touching other letters, in row heights (≳30% reads as merged). Drag to rotate.</p>
 <p class="legend"><label><input type="checkbox" id="colour" checked> Colour faces by the view that carved them:</label>
   <span class="sw" style="background:#e07b53"></span>front <span class="sw" style="background:#4c9be8"></span>side <span class="sw" style="background:#9b6fd6"></span>top
   <span class="sw" style="background:#b7b1a6"></span>bounding box <span class="sw" style="background:#6f6f6f"></span>connectors.
