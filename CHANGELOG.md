@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-09-27 (UI lay of the land)
+
+- `resources/design/ui-map.md`: an inventory before reorganising the web UI.
+  It maps each look to how to reach it today, lists the controls, shows what
+  applies to what, and lists where the structure fights the user, with
+  directions (not decided). Confirmed that TextTango's "pairs in a row on a
+  stand" is our spaced chain, 1 row, with stand and turn: STOP × WORK →
+  S+W, T+O, O+R, P+K.
+- No subagents used.
+
 ## 2026-09-27 (display stand; any Google Font)
 
 - `displayStand` (join.js): a rounded base from the convex hull of the design's

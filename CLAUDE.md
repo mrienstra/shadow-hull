@@ -39,6 +39,8 @@ and/or web) before deciding which to keep.
   when a finding is likely to be referred to again.
 - `CHANGELOG.md` — dated log of what changed and why.
 - `resources/backlog.md` — requests and ideas not yet started (owner requests marked).
+- `resources/design/ui-map.md` — inventory of looks, controls and UI pain
+  points (the starting point for reorganising the web UI).
 
 ## Example words
 
