@@ -217,12 +217,12 @@ export function realizeStackedColumn(wasm, font, wordA, wordB, { spacing = 'touc
 /**
  * Best rotation/scale of a top shape over a column design: tries each
  * rotation × scale, and keeps the best by designQuality (which includes the
- * top view's coverage via the worst view), treating differences under 0.005
+ * top view's coverage via the worst view), treating differences under 0.01
  * as ties broken towards upright, then 45° steps, then natural size. `build(top)` must return a design
  * (realizeSpanColumn / realizeStackedColumn with that top).
  * @returns [{ rotate, scale, metrics }] best first
  */
-export function searchTopFit(build, shape, { rotations = [0, 15, 30, 45, 60, 75, 90, 135, 180, 225, 270, 315], scales = [1, 1.15, 1.3] } = {}) {
+export function searchTopFit(build, shape, { rotations = [0, 15, 30, 45, 60, 75, 90, 135, 180, 225, 270, 315], scales = [1, 1.15, 1.3], tie = 0.01 } = {}) {
   const out = [];
   for (const rotate of rotations) {
     for (const scale of scales) {
@@ -231,11 +231,14 @@ export function searchTopFit(build, shape, { rotations = [0, 15, 30, 45, 60, 75,
       d.dispose();
     }
   }
-  // Quality within 0.005 counts as a tie: then prefer an upright shape, then
-  // 45° steps, then the natural size (a 0.3% gain isn't worth a tilted heart).
-  const bucket = (q) => Math.round(q / 0.005);
+  // Anything within `tie` of the best quality counts as tied: among those,
+  // prefer an upright shape, then 45° steps, then the natural size (e.g. one
+  // letter at 99.2% vs 99.9% isn't worth a tilted heart). The rest follow by quality.
+  const best = Math.max(...out.map((r) => r.metrics.quality));
   const niceness = (r) => (r % 360 === 0 ? 0 : r % 45 === 0 ? 1 : 2);
-  return out.sort((a, b) => bucket(b.metrics.quality) - bucket(a.metrics.quality)
-    || niceness(a.rotate) - niceness(b.rotate) || a.scale - b.scale || b.metrics.quality - a.metrics.quality);
+  const tied = (r) => r.metrics.quality >= best - tie;
+  return out.sort((a, b) => (tied(b) - tied(a))
+    || (tied(a) && (niceness(a.rotate) - niceness(b.rotate) || a.scale - b.scale))
+    || b.metrics.quality - a.metrics.quality);
 }
 

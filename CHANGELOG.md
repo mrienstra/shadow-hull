@@ -4,7 +4,8 @@
 
 - Heart over a column: `spanColumnCells` / `stackedColumnCells` take a top
   shape (`placeTop`: rotate, scale to the footprint). `searchTopFit` tries
-  rotations × sizes; ties within 0.005 quality prefer upright, then 45° steps.
+  rotations × sizes; ties within 0.01 quality prefer upright, then 45° steps
+  (upright costs one side letter 99.9% → 99.2% on the tall-Y column).
   Finola × Bryan, touching, tall Y: front 99.9%, side 99.7–100%, heart
   99.7–100% at any rotation (45° is slightly worse at 98.4%). A touching column
   has ink at nearly every height, so the heart trims almost nothing, and from
