@@ -2,6 +2,8 @@
 // Explore layouts for a word pair and write an HTML report (3D view + shadows
 // per design) to reports/<a>-<b>.html. The designs come from src/core/gallery.js,
 // which the web page uses too. Exploration tool, not product.
+// Example words: Finola and Bryan, the lead agents (Finola Jones, Bryan Beneventi)
+// in NBC's sci-fi series Debris (2021) — a 6- and a 5-letter name with an i-dot.
 // Usage: node scripts/explore-words.js Finola Bryan [--font kanit-black]
 //        [--sections families,blocks,angles,spans,stacked] [--presets touching,spaced,...]
 //        [--cases upper,lower,title,mixed] [--rows 1,2,3] [--tops none,❤] [--angles 75,60,45]

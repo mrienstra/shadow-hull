@@ -40,6 +40,13 @@ and/or web) before deciding which to keep.
 - `CHANGELOG.md` — dated log of what changed and why.
 - `resources/backlog.md` — requests and ideas not yet started (owner requests marked).
 
+## Example words
+
+"Finola" and "Bryan" throughout (tests, defaults, notes) refer to the lead
+agents in NBC's sci-fi series *Debris* (2021): Finola Jones and Bryan
+Beneventi. A handy pair: 6 and 5 letters, an i-dot, an L. Keep examples to
+fictional or generic names.
+
 ## Environment
 
 Node via fnm; in non-interactive shells first run

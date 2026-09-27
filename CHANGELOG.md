@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-27 (example words)
+
+- The example pair "Finola" × "Bryan" refers to the lead agents of NBC's
+  *Debris* (2021), Finola Jones and Bryan Beneventi. Noted in CLAUDE.md, the
+  report script and under the web page's word inputs. The repo and its history
+  were checked for anything tying the names to real people (none).
+- Subagent ledger: one Fable agent verified the *Debris* facts (network, year,
+  exact spellings, cast) against Wikipedia, Rotten Tomatoes and IMDb. Cheap and
+  **worth it**: it's a factual claim in reader-facing text, which CLAUDE.md says
+  to check.
+
 ## 2026-09-27 (web: mode-specific controls, shareable links)
 
 - Fixed: both modes' controls were always shown. `form { display: grid }`
