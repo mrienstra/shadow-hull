@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-09-26 (touching vs spaced; contact metric)
+
+- Owner feedback: with touching letters, flat stems merge. The i next to l reads
+  as a thick L, and in stacked rows the I under the F reads as a longer F stem.
+  The touching look is still wanted as one option.
+- `letterVisibility` now also reports `contact`: outline within 0.3 mm of another
+  letter, in row heights. Touching Finola × Bryan: I 125%, N 136% (merged
+  stems); with a 1.2 mm gap: 0%.
+- Fixed row stacking with `lineGap: 'kiss'`: it took the smaller of the two
+  views' moves, so rows collided in the other view (this hid 28% of an i).
+  It now takes the larger move: touching in one view, clear in the other.
+- `layoutCells` `align: 'center'` for rows. A negative `overlap` with 'kiss'
+  leaves a visible gap at the closest point.
+- `bridgePieces` `lowWeight` / `levelWeight`: rods prefer level spots near the
+  baseline, so they read like a thin broken underline.
+- Report shows two families side by side: **Touching** (0.3 mm overlap, left
+  rows; clean and solid; stems can merge; mostly zero-shadow hull joins) and
+  **Spaced** (1.2 mm gaps, centred rows; no contact, every letter 100%
+  visible; 5 level rods per layout, 2–5% extra shadow).
+- No subagents used.
+
 ## 2026-09-26 (kiss spacing, letter visibility)
 
 - Problem: fixed overlaps (0.2 × row height between cells, −0.06 em

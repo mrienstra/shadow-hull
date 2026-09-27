@@ -54,13 +54,21 @@ function vertices(m, max = 4000) {
   return out;
 }
 
-/** Closest pair between two point sets (brute force; inputs are sampled). */
-function closestPair(P, Q) {
-  let best = [Infinity, null, null];
+/**
+ * Cheapest pair between two point sets (brute force; inputs are sampled).
+ * Cost = distance + lowWeight × height above zBase of the higher endpoint
+ * + levelWeight × height difference of the endpoints, so positive weights
+ * prefer level rods near the baseline (they read like a ligature) over the
+ * geometrically closest spot.
+ * Returns [cost, p, q, length].
+ */
+function closestPair(P, Q, lowWeight = 0, zBase = 0, levelWeight = 0) {
+  let best = [Infinity, null, null, 0];
   for (const p of P) {
     for (const q of Q) {
-      const d = (p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2;
-      if (d < best[0]) best = [d, p, q];
+      const d = Math.sqrt((p[0] - q[0]) ** 2 + (p[1] - q[1]) ** 2 + (p[2] - q[2]) ** 2);
+      const cost = d + lowWeight * (Math.max(p[2], q[2]) - zBase) + levelWeight * Math.abs(p[2] - q[2]);
+      if (cost < best[0]) best = [cost, p, q, d];
     }
   }
   return best;
@@ -78,30 +86,32 @@ function rod(wasm, p, q, r) {
 /**
  * Join all pieces with rods along a minimum spanning tree of closest-point
  * distances (Kruskal), so each rod is as short as possible (joining every
- * piece to the largest one can need long rods). Pieces smaller than
- * `dustFraction` of the volume are dropped instead.
+ * piece to the largest one can need long rods). `lowWeight` biases rods
+ * towards the bottom (see closestPair). Pieces smaller than `dustFraction`
+ * of the volume are dropped instead.
  * @returns { solid, bridges: [{ from, to, length }] }
  */
-export function bridgePieces(wasm, solid, { radius = 0.8, dustFraction = 1e-3 } = {}) {
+export function bridgePieces(wasm, solid, { radius = 0.8, dustFraction = 1e-3, lowWeight = 0, levelWeight = 0, maxPoints = 1500 } = {}) {
   const { Manifold } = wasm;
   const scope = new Scope();
   try {
     const total = solid.volume();
     const parts = solid.decompose().map((p) => scope.add(p)).filter((p) => p.volume() >= dustFraction * total);
-    const pts = parts.map((p) => vertices(p));
+    const pts = parts.map((p) => vertices(p, maxPoints));
+    const zBase = solid.boundingBox().min[2];
     const edges = [];
     for (let i = 0; i < parts.length; i++) {
-      for (let j = i + 1; j < parts.length; j++) edges.push([i, j, ...closestPair(pts[i], pts[j])]);
+      for (let j = i + 1; j < parts.length; j++) edges.push([i, j, ...closestPair(pts[i], pts[j], lowWeight, zBase, levelWeight)]);
     }
     edges.sort((a, b) => a[2] - b[2]);
     const parent = parts.map((_, i) => i);
     const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
     const bridges = [], rods = [];
-    for (const [i, j, d2, p, q] of edges) {
+    for (const [i, j, , p, q, length] of edges) {
       if (find(i) === find(j)) continue;
       parent[find(i)] = find(j);
       rods.push(scope.add(rod(wasm, p, q, radius)));
-      bridges.push({ from: p, to: q, length: Math.sqrt(d2) });
+      bridges.push({ from: p, to: q, length });
     }
     return { solid: Manifold.union([...parts, ...rods]), bridges };
   } finally {

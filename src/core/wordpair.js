@@ -79,10 +79,12 @@ function vertical(g, frame, height, fit) {
  *   or 'kiss': each chunk just touches the previous one in each view,
  *   overlapping by opts.overlap (mm) at the closest point; opts.lineGap
  *   between rows (mm, or 'kiss' likewise); opts.fit default per-cell fit; opts.tracking / opts.kiss
- *   letter spacing inside chunks (em; see glyphRun).
+ *   letter spacing inside chunks (em; see glyphRun); opts.align 'left' |
+ *   'center' for rows. A negative opts.overlap with 'kiss' leaves a visible gap
+ *   of that size at the closest point instead.
  */
 export function layoutCells(wasm, font, layout, opts = {}) {
-  const { height = 20, gap = 0, lineGap = 0, fit = 'shared', tolerance, tracking, kiss, overlap = 0.3 } = opts;
+  const { height = 20, gap = 0, lineGap = 0, fit = 'shared', tolerance, tracking, kiss, overlap = 0.3, align = 'left' } = opts;
   const txt = { tolerance, tracking, kiss };
   const shiftPts = (pts, du, dv) => pts.map((c) => c.map(([u, v]) => [u + du, v + dv]));
   // Pass 1: each row laid out with its bottom at z = 0 (plain JS geometry).
@@ -115,9 +117,23 @@ export function layoutCells(wasm, font, layout, opts = {}) {
     });
     return out;
   });
+  // Centre each row's chain on the widest row, in both views, so short rows
+  // don't sit under the start of the row above.
+  if (align === 'center' && rows.length > 1) {
+    const extent = (row, k, pos, w) => Math.max(...row.map((c) => c[pos] + c[w])) - Math.min(...row.map((c) => c[pos]));
+    const wa = Math.max(...rows.map((r) => extent(r, 'a', 'x', 'wa'))), wb = Math.max(...rows.map((r) => extent(r, 'b', 'y', 'wb')));
+    for (const row of rows) {
+      const dx = (wa - extent(row, 'a', 'x', 'wa')) / 2, dy = (wb - extent(row, 'b', 'y', 'wb')) / 2;
+      for (const c of row) {
+        c.x += dx; c.y += dy;
+        c.a = c.a.map((l) => ({ ch: l.ch, pts: shiftPts(l.pts, dx, 0) }));
+        c.b = c.b.map((l) => ({ ch: l.ch, pts: shiftPts(l.pts, dy, 0) }));
+      }
+    }
+  }
   // Pass 2: stack rows top to bottom. With lineGap 'kiss', each row sits as
   // high as it can while its ink stays below the row above in *both* views,
-  // touching (overlapping by `overlap`) in at least one of them.
+  // touching (overlapping by `overlap`) in the tighter one.
   const tops = [0];
   for (let j = 1; j < rows.length; j++) {
     let top = tops[j - 1] - height - (lineGap === 'kiss' ? 0 : lineGap);
@@ -128,9 +144,11 @@ export function layoutCells(wasm, font, layout, opts = {}) {
         rows[j - 1].flatMap((c) => c[k].flatMap((l) => turn(l.pts, tops[j - 1] - height))),
         rows[j].flatMap((c) => c[k].flatMap((l) => turn(l.pts, 0))), overlap));
       const ok = needs.filter((d) => d != null);
-      // kissOffset gives how far down (in -z) row j must move from z-bottom 0;
-      // the smaller move keeps it touching in the view that needs it most.
-      if (ok.length) top = -Math.min(...ok) + height;
+      // kissOffset gives how far down (in -z) row j must move from z-bottom 0
+      // to just touch in each view. Take the larger move: the rows touch in one
+      // view and stay clear in the other (the smaller move would make them
+      // collide, and hide letters, in the other view).
+      if (ok.length) top = -Math.max(...ok) + height;
     }
     tops.push(top);
   }

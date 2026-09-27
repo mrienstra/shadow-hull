@@ -91,16 +91,20 @@ export function disposeCells(cells) {
 /**
  * How visible each letter is in its view: the share of its ink not covered
  * by any other letter's ink in the same view (overlapping neighbours can hide
- * a letter even when coverage is 100%). Needs cells with per-letter outlines
- * (`cell.letters[view] = [{ ch, pts }]`, as from layoutCells).
- * @returns { views: { front: [{ ch, visible }], ... }, worst: { ch, view, visible } }
+ * a letter even when coverage is 100%), and how much of its outline touches
+ * other letters: `contact` ≈ length of outline within `contactDistance` of
+ * another letter, in row heights. Touching along a whole stem (~1) makes two
+ * letters read as one (I next to L reads as a thick L). Needs cells with
+ * per-letter outlines (`cell.letters[view] = [{ ch, pts }]`, from layoutCells).
+ * @returns { views: { front: [{ ch, visible, contact }], ... }, worst, worstContact }
  */
-export function letterVisibility(wasm, cells) {
+export function letterVisibility(wasm, cells, { contactDistance = 0.3, height = 20 } = {}) {
   const { CrossSection } = wasm;
   const scope = new Scope();
   try {
     const views = {};
     let worst = { ch: null, view: null, visible: 1 };
+    let worstContact = { ch: null, view: null, contact: 0 };
     for (const v of VIEW_NAMES) {
       const letters = cells.flatMap((c) => c.letters?.[v] ?? []);
       if (!letters.length) continue;
@@ -108,13 +112,22 @@ export function letterVisibility(wasm, cells) {
       views[v] = letters.map((l, i) => {
         const others = shapes.filter((_, j) => j !== i);
         const own = shapes[i].area();
-        const hidden = others.length ? scope.add(scope.add(CrossSection.union(others)).intersect(shapes[i])).area() : 0;
+        let hidden = 0, contact = 0;
+        if (others.length) {
+          const rest = scope.add(CrossSection.union(others));
+          hidden = scope.add(rest.intersect(shapes[i])).area();
+          // Ink of this letter within contactDistance of another letter, beyond the
+          // overlap itself, divided by the distance ≈ length of outline in contact.
+          const near = scope.add(scope.add(rest.offset(contactDistance, 'Round')).intersect(shapes[i])).area();
+          contact = (near - hidden) / contactDistance / height;
+        }
         const visible = own > 0 ? 1 - hidden / own : 1;
         if (visible < worst.visible) worst = { ch: l.ch, view: v, visible };
-        return { ch: l.ch, visible };
+        if (contact > worstContact.contact) worstContact = { ch: l.ch, view: v, contact };
+        return { ch: l.ch, visible, contact };
       });
     }
-    return { views, worst };
+    return { views, worst, worstContact };
   } finally {
     scope.dispose();
   }
