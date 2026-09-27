@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-09-27 (prior art: TextTango)
+
+- Studied Lucandia/dual_letter_illusion (notes in
+  `resources/research/prior-art.md`, ideas in `resources/backlog.md`). Code is
+  GPL-3.0: ideas only.
+- Subagent ledger: one Sonnet agent cloned and read it. **Worth it**: an accurate
+  summary with file references and licence details, which saved me reading the
+  repo. I re-checked the key claims in `app.py` and added the one thing it
+  missed: the 45°/135° rotation means their straight row of pairs is our
+  diagonal chain turned 45° and set on a stand.
+
 ## 2026-09-27 (GitHub Pages)
 
 - `.github/workflows/pages.yml`: on every push to main, run the unit tests,

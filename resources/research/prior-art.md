@@ -61,3 +61,31 @@ became selectable in nightlies from 2024-09-28 and is now the snapshot default.
 
 Blocky, bold, monoline sans faces work best; high-contrast serif faces
 collapse. This comes from general ambigram advice, not trip-lets specifically.
+
+## Lucandia/dual_letter_illusion ("TextTango"), looked at 2026-09-27
+
+Read at commit 1a3eee1 (Sonnet subagent summary, key claims re-checked in
+`app/app.py`). Python + Streamlit + CadQuery (OpenCascade, exact B-rep), 211
+lines. **Code is GPL-3.0**, so ideas only, no copying into our MIT code. Its
+example models are CC BY-NC-SA 4.0.
+
+- Pairs letters strictly by position (`zip`): the longer word is truncated, with
+  no search and no coverage measure. A pair whose boolean fails is skipped.
+- Each letter is extruded and rotated to **45° and 135°**, and the pairs are
+  laid in a straight line along Y with a gap. So the two words are read from
+  front-left and front-right, and the row runs away from the viewer: our
+  diagonal chain, turned 45°.
+- A **rounded-rectangle base** under the whole row (height, padding and fillet
+  as sliders). It reads as a display stand, not a technical joiner.
+- Manual reinforcement: a mask string such as `X__X` puts a small pillar under
+  chosen letter pairs.
+- STL **or STEP** export (free with an exact B-rep kernel).
+- Fonts: ~1,657 Google Font families vendored into the repo (1.9 GB), picked
+  from a folder list. Quick-insert buttons for symbols (♥ ♦ ♣ ♠ ♪ ♫ ► ◄).
+- Standalone executables (PyInstaller).
+
+Worth borrowing (as our own implementations): a display-stand presentation
+(a rounded base along the chain, object turned 45°); any Google Font on demand
+(fetched, not vendored); symbol quick-insert for top shapes; a manual
+reinforcement override; STEP export (needs an OCC pipeline, e.g.
+opencascade.js or the Python port with build123d).
