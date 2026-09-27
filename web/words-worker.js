@@ -47,6 +47,15 @@ self.onmessage = async ({ data: msg }) => {
       await ensureFonts({ ...msg, needShapes: !!msg.recipe.top });
       const d = buildRecipe(ctx, msg.wordA, msg.wordB, msg.recipe);
       try {
+        if (msg.meshOnly) {
+          // Thumbnails: just the (turned) mesh, no shadows or STL.
+          const solid = msg.recipe.turn ? d.joined.rotate([0, 0, -45]) : d.joined;
+          const m = solid.getMesh();
+          const mesh = { numProp: m.numProp, vertProperties: m.vertProperties.slice(), triVerts: m.triVerts.slice() };
+          if (solid !== d.joined) solid.delete();
+          self.postMessage({ id: msg.id, type: 'mesh', mesh }, [mesh.vertProperties.buffer, mesh.triVerts.buffer]);
+          return;
+        }
         const { solid, ...view } = designView(ctx.wasm, d, { turn: msg.recipe.turn ? -45 : 0 });
         const stl = toBinarySTL(solid);
         if (solid !== d.joined) solid.delete();

@@ -174,3 +174,9 @@ ul.checks li.info { color: var(--muted); }
 details#word-stats { font-size: 12px; color: var(--muted); margin: 0 0 8px; }
 details#word-stats p { margin: 4px 0 0; }
 #designs .q { font-size: 11px; }
+
+/* Result thumbnails */
+#designs button { grid-template-columns: 72px 1fr auto; align-items: center; }
+#designs button img.thumb { grid-row: span 2; width: 72px; height: 48px; object-fit: contain; background: var(--bg); border-radius: 4px; }
+#designs button img.thumb:not([src]) { visibility: hidden; }
+#designs .text { grid-column: 2 / -1; }

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-09-27 (UI stage 3: thumbnails)
+
+- Results list entries show a small 3/4-view thumbnail. A third worker builds
+  each design's mesh in the background (mesh only), and one reused offscreen
+  renderer draws it. Thumbnails include the current stand/turn and refresh when
+  those change; a new search cancels the queue. List titles use short case names.
+- e2e: each look's first design gets a thumbnail.
+- No subagents used.
+
 ## 2026-09-27 (UI stage 4: plain-language checks)
 
 - Each design's panel shows a checklist: every letter fully shows / which

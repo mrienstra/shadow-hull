@@ -408,7 +408,12 @@ function setKnob(name, value) {
   knobValues[name] = value;
   for (const b of document.querySelectorAll(`.seg[data-knob="${name}"] button`)) b.setAttribute('aria-pressed', String(b.textContent === (LOOK[currentLook].knobs[name].labels?.[value] ?? String(value))));
   writeHash();
-  if (FINISH.has(name)) { if (selectedItem) selectWordDesign(selectedItem, selectedButton); return; }
+  if (FINISH.has(name)) {
+    if (selectedItem) selectWordDesign(selectedItem, selectedButton);
+    thumbReset();
+    for (const b of designsHost.querySelectorAll('button')) if (b._item) queueThumb(b._item, b);
+    return;
+  }
   clearTimeout(knobTimer);
   knobTimer = setTimeout(() => generateWords(false), 250);
 }
@@ -469,6 +474,7 @@ function generateWords(more = false) {
   currentWords = [wordA, wordB];
   designsHost.replaceChildren();
   selectedButton = null;
+  thumbReset();
   wordsStatus.textContent = more ? 'Trying more variants…' : 'Making it…';
   $('#words-stop').disabled = false;
   let first = true;
@@ -477,12 +483,14 @@ function generateWords(more = false) {
       const { item } = m;
       const b = document.createElement('button');
       b.type = 'button';
-      b.innerHTML = '<span class="title"></span><span class="q"></span><span class="text"></span>';
-      b.children[0].textContent = item.title;
+      b.innerHTML = '<img class="thumb" alt="" width="72" height="48"><span class="title"></span><span class="q"></span><span class="text"></span>';
+      b.querySelector('.title').textContent = item.title;
       const mm = item.metrics;
-      b.children[1].textContent = checkBadge(mm);
-      b.children[1].title = designChecks(mm).map((c) => `${c.ok ? '✓' : '•'} ${c.text}`).join('\n');
-      b.children[2].textContent = item.text + (item.note ? ` · ${item.note}` : '');
+      b.querySelector('.q').textContent = checkBadge(mm);
+      b.querySelector('.q').title = designChecks(mm).map((c) => `${c.ok ? '✓' : '•'} ${c.text}`).join('\n');
+      b.querySelector('.text').textContent = item.text + (item.note ? ` · ${item.note}` : '');
+      queueThumb(item, b);
+      b._item = item;
       b.addEventListener('click', () => selectWordDesign(item, b));
       designsHost.append(b);
       wordsStatus.textContent = `${m.n} design${m.n === 1 ? '' : 's'} so far (${(m.ms / 1000).toFixed(0)} s)…`;
@@ -611,6 +619,62 @@ $('#words-stop').addEventListener('click', () => {
   $('#words-stop').disabled = true;
   wordsStatus.textContent = `Stopped · ${designsHost.querySelectorAll('button').length} designs.`;
 });
+
+
+// ---- Thumbnails for the results list ------------------------------------------
+// A third worker builds each listed design's mesh in the background; one small
+// offscreen renderer draws a 3/4 view into an <img>. Restarting a search
+// cancels the queue (thumbGeneration).
+const THUMB_W = 144, THUMB_H = 96;
+let thumbWorker = null, thumbQueue = [], thumbBusy = false, thumbGeneration = 0, thumbRenderer = null;
+function thumbReset() { thumbGeneration++; thumbQueue = []; }
+function queueThumb(item, button) {
+  thumbQueue.push({ item, button, gen: thumbGeneration });
+  pumpThumbs();
+}
+function pumpThumbs() {
+  if (thumbBusy) return;
+  const job = thumbQueue.shift();
+  if (!job) return;
+  if (job.gen !== thumbGeneration) return pumpThumbs();
+  thumbBusy = true;
+  thumbWorker ??= new Worker(new URL('./words-worker.js', import.meta.url), { type: 'module' });
+  thumbWorker.onmessage = ({ data }) => {
+    thumbBusy = false;
+    if (data.type === 'mesh' && job.gen === thumbGeneration && job.button.isConnected) {
+      const img = job.button.querySelector('img.thumb');
+      if (img) img.src = renderThumb(data.mesh);
+    }
+    pumpThumbs();
+  };
+  const finish = { stand: !!knobValues.stand, turn: !!knobValues.turn };
+  thumbWorker.postMessage({ type: 'build', id: 0, meshOnly: true, wordA: currentWords[0], wordB: currentWords[1], recipe: { ...job.item.recipe, ...finish }, ...fontSource() });
+}
+function renderThumb({ numProp, vertProperties, triVerts }) {
+  thumbRenderer ??= new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+  thumbRenderer.setPixelRatio(2);
+  thumbRenderer.setSize(THUMB_W, THUMB_H, false);
+  const sceneT = new THREE.Scene();
+  sceneT.add(new THREE.HemisphereLight(0xffffff, 0x8888aa, 1.6));
+  const sunT = new THREE.DirectionalLight(0xffffff, 1.6); sunT.position.set(2, -3, 4); sceneT.add(sunT);
+  const pos = new Float32Array((vertProperties.length / numProp) * 3);
+  for (let i = 0, j = 0; i < vertProperties.length; i += numProp) { pos[j++] = vertProperties[i]; pos[j++] = vertProperties[i + 1]; pos[j++] = vertProperties[i + 2]; }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setIndex(new THREE.BufferAttribute(triVerts, 1));
+  geo.computeBoundingSphere();
+  const mesh = new THREE.Mesh(geo, material);
+  sceneT.add(mesh);
+  const c = geo.boundingSphere.center, r = geo.boundingSphere.radius;
+  const cam = new THREE.OrthographicCamera(-r * 1.5, r * 1.5, r, -r, 0.1, r * 20);
+  cam.up.set(0, 0, 1);
+  cam.position.set(c.x + r * 1.1 * 2, c.y - r * 1.6 * 2, c.z + r * 1.2 * 2);
+  cam.lookAt(c);
+  thumbRenderer.render(sceneT, cam);
+  const url = thumbRenderer.domElement.toDataURL('image/png');
+  geo.dispose();
+  return url;
+}
 
 // ---- Any Google Font (via Fontsource: TTF files on jsDelivr, CORS-enabled) ----
 // The bundled fonts were picked for this job; any Google Font can be loaded by

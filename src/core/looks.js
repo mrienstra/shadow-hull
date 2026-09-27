@@ -22,7 +22,9 @@ export { LOOKS, LOOK, lookKnobs };
 const pct = (x) => `${(x * 100).toFixed(1)}%`;
 const rowFamily = (spacing) => (spacing === 'touching' ? 'touching' : 'spaced');
 const finish = (k) => ({ stand: !!k.stand, turn: !!k.turn });
-const titleCase = (c) => CASES[c] ?? c;
+// Short case names for list titles (the knob labels are longer).
+const SHORT_CASES = { upper: 'Capitals', lower: 'lowercase', title: 'Title case', mixed: 'Mixed case' };
+const titleCase = (c) => SHORT_CASES[c] ?? CASES[c] ?? c;
 
 /**
  * Designs for one look, best first. Fast by default (one layout per setting);

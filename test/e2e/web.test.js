@@ -78,6 +78,8 @@ test('look menu: every two-word look makes a one-piece design; knobs and finish 
     assert.equal(await page.isVisible('#words-form'), true);
     await wordsDone(page);
     assert.match(await page.textContent('#print-check'), /One piece/, look);
+    // A thumbnail is rendered for the listed design.
+    await page.waitForSelector('#designs img.thumb[src^="data:image/png"]', { timeout: 60_000 });
   }
   // Word block with a heart from above: three views.
   await page.click('#looks button[data-look="block"]');
