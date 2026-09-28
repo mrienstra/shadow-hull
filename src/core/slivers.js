@@ -52,9 +52,10 @@ function intersect(a, b) {
  * scale); and scores (mm²) `knifeScore`, `cutScore`: each thin run's
  * footprint × (1 − length / t), so the thinner a sliver, the more it counts
  * (a volume would reward squashing a sliver thinner, e.g. L × A in Bungee).
- * Faces that exactly touch (zero thickness) count as the thinnest sliver.
+ * Faces that exactly touch (zero thickness) count as the thinnest sliver,
+ * scaled by `touch` (0 when a later trimming step removes such sheets).
  */
-export function columnSlivers(lettersA, lettersB, { t = 0.8, step = 0.1 } = {}) {
+export function columnSlivers(lettersA, lettersB, { t = 0.8, step = 0.1, touch = 1 } = {}) {
   const A = columns(lettersA, step), B = columns(lettersB, step);
   let knife = 0, cut = 0, volume = 0, knifeScore = 0, cutScore = 0;
   for (const ca of A) {
@@ -63,7 +64,7 @@ export function columnSlivers(lettersA, lettersB, { t = 0.8, step = 0.1 } = {}) 
       for (let k = 0; k < iv.length; k++) {
         const len = iv[k][1] - iv[k][0];
         volume += len;
-        if (len < t) { knife += len; knifeScore += 1 - len / t; }
+        if (len < t) { knife += len; knifeScore += len === 0 ? touch : 1 - len / t; }
         if (k > 0) { const gap = iv[k][0] - iv[k - 1][1]; if (gap < t) { cut += gap; cutScore += 1 - gap / t; } }
       }
     }

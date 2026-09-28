@@ -191,8 +191,8 @@ export function layoutCells(wasm, font, layout, opts = {}) {
   const guidesOf = (f, v) => (v ? fontGuides(f, (ch) => glyphRun(f, ch)[0]?.contours ?? []).map((y) => (y - v.from) * v.s) : []);
   const tidy = (a, b, va, vb) => {
     if (!tidyOpt) return { a, b };
-    const { mode, tol } = tidyOpt;
-    if (mode === 'pair') return tidyPair(a, b, { tol, guides: { a: guidesOf(font, va), b: guidesOf(fontB, vb) } });
+    const { mode, tol, ...more } = tidyOpt;
+    if (mode === 'pair') return tidyPair(a, b, { tol, ...more, guides: { a: guidesOf(font, va), b: guidesOf(fontB, vb) } });
     if (mode === 'corners') return alignCorners(a, b, { tol, maxStrain: 0.15 });
     return alignLevels(a, b, { tol });
   };

@@ -246,7 +246,7 @@ export function featureNearMisses(lettersA, lettersB, { t = 0.8, eps = 1e-3 } = 
 export function tidyPair(lettersA, lettersB, {
   tol = 3, near = 1, maxStrain = 0.3, maxBand = 0.2, strokeWeight = 2, lambda = 3, mu = 1,
   cutWeight = 0.3, minGain = 0.2, t = 0.8, step = 0.05, eps = 0.01, merge = 0.06, maxMoves = 3, trace = null,
-  guides = null, guideWeight = 3, guideTol = 0.25, clearCost = 2,
+  guides = null, guideWeight = 3, guideTol = 0.25, clearCost = 2, touch = 1,
 } = {}) {
   const orig = { a: lettersA, b: lettersB };
   const out = { a: lettersA, b: lettersB, moved: [], knots: { a: [], b: [] } };
@@ -275,7 +275,7 @@ export function tidyPair(lettersA, lettersB, {
   };
   const evaluate = (C, st) => {
     const lets = { a: warped('a', C.a), b: warped('b', C.b) };
-    const m = columnSlivers(lets.a, lets.b, { t, step: st });
+    const m = columnSlivers(lets.a, lets.b, { t, step: st, touch });
     const parts = { slivers: m.knifeScore + cutWeight * m.cutScore, distortion: lambda * distortion(C), heights: mu * heights(lets), guides: guideWeight * offGuide(C) };
     return { lets, m, parts, cost: parts.slivers + parts.distortion + parts.heights + parts.guides };
   };

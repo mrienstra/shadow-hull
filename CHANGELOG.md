@@ -31,6 +31,23 @@
   that one-font designs are unchanged (12 designs, 2 fonts, identical), re-ran
   the suites, and looked at its screenshots.
 
+## 2026-09-28 (tested: exact meets + trimming)
+
+- Owner asked to test tidy with exact meets plus trimming. Options added for
+  the experiment (defaults unchanged): tidy passes `eps` / `touch` through
+  (touch = weight of exactly touching faces in the sliver score).
+- Result (FINOLA × BRYAN, ray-cast check of the finished mesh, spots under
+  0.3 mm / zero-thickness):
+  Bungee: offsets 84 / 0, offsets + trim 57 / 43, exact + trim 58 / 66.
+  Kanit: offsets 646 / 1, offsets + trim 1614 / 203, exact + trim 1650 / 216.
+  Exact meets fix A × L's sliced L foot top (edges land exactly on the L's),
+  but the trimming step as built makes things worse: its box mask blows the
+  mesh up (2.7k → 50.6k triangles) and leaves zero-thickness faces where it
+  removes a plate. Also found: most of Kanit's thin spots are plates along
+  the letters' tops (front and side tops differ by 0.07–0.15 mm), which tidy
+  can't fix because it never moves a letter's top or bottom.
+- No subagents used.
+
 ## 2026-09-28 (trim knife edges: first version, off by default)
 
 - Owner: after tidying lines edges up, trim or round sharp edges only where
