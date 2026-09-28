@@ -143,8 +143,9 @@ if (!DATA.some((f) => f.id === font)) font = DATA[0].id;
 const $ = (id) => document.getElementById(id);
 const key = (f, m) => `${f}_${m[0]}${m[1]}_${String(m[2]).replace('-', 'm').replace('.', 'p')}`;
 
-function warp(d, lv, band, by) {
-  const knots = lv.map((z) => [z, z === band[0] || z === band[1] ? z + by : z]);
+// A move takes the band's edges to `to` (or shifts both by `by`, older data).
+function warp(d, lv, band, by, to = [band[0] + by, band[1] + by]) {
+  const knots = lv.map((z) => [z, z === band[0] ? to[0] : z === band[1] ? to[1] : z]);
   const map = (z) => {
     if (z <= knots[0][0]) return z;
     for (let k = 1; k < knots.length; k++) {
@@ -172,24 +173,24 @@ function score(label, a, b) {
 function card(f, m) {
   const idx = f.moves.indexOf(m);
   const [mv, ot, by, band, corner, strain] = m;
+  const to = m[11] ?? [band[0] + by, band[1] + by];
   const A = f.letters[mv], B = f.letters[ot];
   const gap = 3, W = A.w + gap + B.w;
-  const after = A.r.map((r) => warp(r, A.lv, band, by));
+  const after = A.r.map((r) => warp(r, A.lv, band, by, m[11]));
   const k = key(f.id, m), v = marks[k]?.v ?? '';
-  const edge = Math.abs(band[1] + by - corner) < Math.abs(band[0] + by - corner) ? band[1] : band[0];
   const el = document.createElement('article');
   el.className = 'card'; el.dataset.v = v; el.dataset.k = k;
   el.innerHTML = `
     <div class="head"><span class="pair"><em>${mv}</em> ← ${ot}</span><span class="by">${by < 0 ? '↓' : '↑'} ${Math.abs(by).toFixed(2)} mm · ${Math.round(strain * 100)}%</span></div>
     <svg viewBox="-1 -1 ${W + 2} 22" role="img" aria-label="${mv} moved ${by < 0 ? 'down' : 'up'} ${Math.abs(by).toFixed(2)} millimetres to meet ${ot}'s ${m[10] ?? 'corner'}">
-      <rect x="0" y="${20 - (band[1] + by)}" width="${A.w}" height="${band[1] - band[0]}" fill="var(--moved-soft)"/>
+      <rect x="0" y="${20 - to[1]}" width="${A.w}" height="${to[1] - to[0]}" fill="var(--moved-soft)"/>
       <path d="${path(after, 0)}" fill="var(--moved)" fill-rule="nonzero"/>
       <path d="${path(A.r, 0)}" fill="none" stroke="var(--before)" stroke-width="0.34" stroke-dasharray="0.7 0.45" stroke-linejoin="round"/>
       <path d="${path(B.r, A.w + gap)}" fill="var(--other)" fill-rule="nonzero"/>
       <line x1="-1" x2="${W + 1}" y1="${20 - corner}" y2="${20 - corner}" stroke="var(--corner)" stroke-width="0.22"/>
     </svg>
     <button type="button" class="solids" aria-label="Open the ${mv} and ${ot} solid in 3D, before and after" title="Open in 3D">${['Before', 'After'].map((t, slot) => `<span class="fig"><span class="img" style="${tile(f, idx, slot)}"></span><span class="cap">${t}</span></span>`).join('')}</button>
-    <p class="what">${mv}'s stroke ${band[0].toFixed(1)}–${band[1].toFixed(1)} mm moves ${by < 0 ? 'down' : 'up'}: its ${edge === band[1] ? 'top' : 'bottom'} meets ${ot}'s ${m[10] === 'edge' ? 'flat edge' : 'corner'} at ${corner.toFixed(1)} mm.</p>
+    <p class="what">${mv}'s band ${band[0].toFixed(1)}–${band[1].toFixed(1)} mm → ${to[0].toFixed(1)}–${to[1].toFixed(1)} mm${Math.abs((to[1] - to[0]) - (band[1] - band[0])) > 0.005 ? ` (${(to[1] - to[0]) > (band[1] - band[0]) ? 'taller' : 'shorter'} by ${Math.abs((to[1] - to[0]) - (band[1] - band[0])).toFixed(2)} mm)` : ''}: meets ${ot}'s ${m[10] === 'edge' ? 'flat edge' : 'corner'} at ${corner.toFixed(1)} mm.</p>
     <p class="scores">${score('Knives', m[6], m[7])} · ${score('cuts', m[8], m[9])}</p>
     <div class="votes">${['good', 'bad', 'unsure'].map((x) => `<button type="button" data-k="${x}" aria-pressed="${v === x}">${x[0].toUpperCase() + x.slice(1)}</button>`).join('')}</div>`;
   el.querySelector('.solids').addEventListener('click', (e) => open3d(f, m, e.currentTarget));
@@ -266,7 +267,7 @@ async function open3d(f, m, btn) {
     if (token !== viewToken || !d.open) return;
     await viewer.show({
       hosts: [$('v-before'), $('v-after')],
-      before: rings(A.r), after: rings(A.r.map((r) => warp(r, A.lv, band, by))), side: rings(B.r),
+      before: rings(A.r), after: rings(A.r.map((r) => warp(r, A.lv, band, by, m[11]))), side: rings(B.r),
       w: [A.w, B.w], h: 20, view: viewNow,
     });
     if (token !== viewToken || !d.open) { viewer.clear(); return; }

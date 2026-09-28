@@ -31,6 +31,21 @@
   that one-font designs are unchanged (12 designs, 2 fonts, identical), re-ran
   the suites, and looked at its screenshots.
 
+## 2026-09-28 (no stand, no rods by default; thinner slivers count worse)
+
+- Owner: no stand and no support rods by default. All two-word looks now
+  default to both off; gapped row, rows and grid then stay in separate pieces
+  and the page says so (rods or the stand join them). Tests that need one
+  piece ask for rods explicitly.
+- Owner spotted a very thin triangle in L × A: tidying had squashed a
+  0.47 mm plate to 0.12 mm, which the volume-based measure counted as better.
+  Now thin runs score by footprint × thinness, a band's edges may also move
+  separately (L × A: both onto the A's crossbar, no slivers left), horizontal
+  strokes resist thickness changes (the F's arm is still shifted, not
+  thinned), and the search uses a 0.1 mm grid. Details in
+  resources/research/letterform-tidy.md. Test added for L × A.
+- No subagents used.
+
 ## 2026-09-28 (tidy slivers: trade-off search)
 
 - `tidyPair` (new src/core/tidy.js, which now holds the letter-feature and

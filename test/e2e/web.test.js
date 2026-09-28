@@ -64,7 +64,7 @@ const wordsDone = (page) => page.waitForFunction(
   () => /in [\d.]+ s/.test(document.querySelector('#words-status').textContent) && document.querySelectorAll('#shadow-panels figure').length >= 2,
   null, { timeout: 180_000 });
 
-test('look menu: every two-word look makes a one-piece design; knobs and finish work', async () => {
+test('look menu: every two-word look builds (gapped ones in pieces by default); knobs and finish work', async () => {
   const page = await browser.newPage({ viewport: { width: 1400, height: 950 } });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -77,17 +77,19 @@ test('look menu: every two-word look makes a one-piece design; knobs and finish 
     assert.equal(await page.isVisible('#form'), false, 'cube form hidden');
     assert.equal(await page.isVisible('#words-form'), true);
     await wordsDone(page);
-    assert.match(await page.textContent('#print-check'), /One piece/, look);
+    // Default: no stand, no rods. Gapped looks stay in separate pieces and say
+    // so; touching towers and blocks are one piece.
+    assert.match(await page.textContent('#print-check'), ['row', 'rows', 'grid'].includes(look) ? /can’t connect/ : /One piece/, look);
     // A thumbnail is rendered for the listed design.
     await page.waitForSelector('#designs img.thumb[src^="data:image/png"]', { timeout: 60_000 });
   }
-  // Supports: none. Pairs in a row keep their stand by default, so still one piece, no rods.
+  // Pairs in a row: allowing support rods joins the pieces into one.
   await page.click('#looks button[data-look="row"]');
   await wordsDone(page);
-  await page.locator('.seg[data-knob="supports"] button', { hasText: 'None' }).click();
-  await page.waitForFunction(() => JSON.parse(new URLSearchParams(location.hash.slice(1)).get('k') ?? '{}').supports === 'none');
+  await page.locator('.seg[data-knob="supports"] button', { hasText: 'Allowed where needed' }).click();
+  await page.waitForFunction(() => JSON.parse(new URLSearchParams(location.hash.slice(1)).get('k') ?? '{}').supports === 'allowed');
   await wordsDone(page);
-  await page.waitForFunction(() => /One piece/.test(document.querySelector('#print-check').textContent) && !/rod/.test(document.querySelector('#print-check').textContent), null, { timeout: 60_000 });
+  await page.waitForFunction(() => /One piece/.test(document.querySelector('#print-check').textContent) && /rod/.test(document.querySelector('#print-check').textContent), null, { timeout: 60_000 });
   // Word block with a heart from above: three views.
   await page.click('#looks button[data-look="block"]');
   await wordsDone(page);

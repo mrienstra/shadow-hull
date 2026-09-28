@@ -23,22 +23,22 @@ test('every look has a label, blurb and knobs with defaults', () => {
     assert.ok(l.label && l.blurb, l.id);
     for (const [k, def] of Object.entries(l.knobs)) assert.ok('default' in def, `${l.id}.${k}`);
   }
-  assert.deepEqual(lookKnobs('row', { spacing: 'touching' }), { spacing: 'touching', case: 'upper', stretch: false, tidy: true, supports: 'allowed', stand: true, turn: true });
+  assert.deepEqual(lookKnobs('row', { spacing: 'touching' }), { spacing: 'touching', case: 'upper', stretch: false, tidy: true, supports: 'none', stand: false, turn: true });
 });
 
 // The ui-map's list of looks → how each is reached now, and what it must produce.
 const REACHABLE = [
-  ['pairs in a row on a stand', 'row', {}, (r) => r.kind === 'chain' && r.layout.rows.length === 1 && r.stand && r.turn],
-  ['pairs on a diagonal (no turn)', 'row', { turn: false, stand: false }, (r) => r.kind === 'chain' && !r.turn && !r.stand],
-  ['two rows of pairs', 'rows', { rows: 2 }, (r) => r.kind === 'chain' && r.layout.rows.length === 2],
-  ['three rows of pairs', 'rows', { rows: 3 }, (r) => r.kind === 'chain' && r.layout.rows.length === 3],
-  ['grid', 'grid', {}, (r) => r.spacing === 'grid'],
-  ['grid, monospaced', 'grid', { mono: true }, (r) => r.spacing === 'grid-mono'],
+  ['pairs in a row on a stand', 'row', { stand: true }, (r) => r.kind === 'chain' && r.layout.rows.length === 1 && r.stand && r.turn],
+  ['pairs on a diagonal (no turn)', 'row', { turn: false, stand: false, supports: 'allowed' }, (r) => r.kind === 'chain' && !r.turn && !r.stand],
+  ['two rows of pairs', 'rows', { rows: 2, supports: 'allowed' }, (r) => r.kind === 'chain' && r.layout.rows.length === 2],
+  ['three rows of pairs', 'rows', { rows: 3, supports: 'allowed' }, (r) => r.kind === 'chain' && r.layout.rows.length === 3],
+  ['grid', 'grid', { supports: 'allowed' }, (r) => r.spacing === 'grid'],
+  ['grid, monospaced', 'grid', { mono: true, supports: 'allowed' }, (r) => r.spacing === 'grid-mono'],
   ['tower: one pair per level', 'tower', { style: 'pairs' }, (r) => r.kind === 'chain' && r.spacing.startsWith('column')],
   ['tower: one tall letter', 'tower', { style: 'tall' }, (r) => r.kind === 'span'],
   ['tower: stacked', 'tower', { style: 'stacked' }, (r) => r.kind === 'stacked'],
   ['heart-shaped tower', 'tower', { style: 'stacked', shape: '❤' }, (r) => r.kind === 'stacked' && r.top?.char === '❤'],
-  ['gapped stacked tower', 'tower', { style: 'stacked', spacing: 'gapped' }, (r) => r.kind === 'stacked' && r.spacing === 'spaced'],
+  ['gapped stacked tower', 'tower', { style: 'stacked', spacing: 'gapped', supports: 'allowed' }, (r) => r.kind === 'stacked' && r.spacing === 'spaced'],
   ['heart-shaped tower, one pair per level', 'tower', { style: 'pairs', shape: '❤' }, (r) => r.kind === 'chain' && r.top?.char === '❤'],
   ['whole-word block', 'block', {}, (r) => r.kind === 'block' && !r.top && (r.angle ?? 90) === 90],
   ['heart slab', 'block', { shape: '❤' }, (r) => r.kind === 'block' && r.top?.char === '❤'],
@@ -61,7 +61,7 @@ for (const [name, lookId, knobs, check] of REACHABLE) {
 test('reachable with two fonts (Bungee front, Kanit Black side): row, grid, towers, block', async () => {
   const bungee = loadFont(await readFile(new URL('../fonts/Bungee-Regular.ttf', import.meta.url)));
   const two = { ...ctx, font: bungee, fontB: ctx.font, shapes: undefined };
-  for (const [lookId, knobs] of [['row', {}], ['grid', {}], ['tower', { style: 'tall' }], ['tower', { style: 'stacked' }], ['block', {}]]) {
+  for (const [lookId, knobs] of [['row', { supports: 'allowed' }], ['grid', { supports: 'allowed' }], ['tower', { style: 'tall' }], ['tower', { style: 'stacked' }], ['block', {}]]) {
     const [first] = generateLook(two, 'Finola', 'Bryan', lookId, knobs);
     if (first.recipe.kind === 'chain') assert.ok(first.recipe.layout.rows.every((r) => r.frameB), 'chain rows carry the side font\'s frame');
     const d = buildRecipe(two, 'Finola', 'Bryan', first.recipe);
@@ -113,7 +113,7 @@ test('supports: none means no rods; a stand or touching letters still make one p
   const withStand = build({ supports: 'none', stand: true });
   assert.equal(withStand.rods, 0);
   assert.equal(withStand.finalPieces, 1, 'the stand joins them');
-  const withRods = build({ stand: false });
+  const withRods = build({ stand: false, supports: 'allowed' });
   assert.ok(withRods.rods > 0 && withRods.finalPieces === 1, 'supports allowed: rods join them');
 });
 

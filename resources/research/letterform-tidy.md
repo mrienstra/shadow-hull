@@ -98,6 +98,26 @@ The app's knob ("Tidy slivers", on by default for row, rows, grid; recipe
 scores. Weights (λ = 3, cut 0.3, minGain 0.2, strain 30%) are first guesses
 for the owner's review to tune.
 
+## Fix: thinness, strokes, per-edge moves (2026-09-28)
+
+Owner spotted a very thin stray triangle in L × A (FINOLA × BRYAN, Bungee,
+pairs in a row, no stand, no rods). Cause: tidyPair shifted the L's band
+5.44–10.72 down 0.35 mm (bottom onto the A's crossbar bottom); its top went
+to 10.37, just above where the A's triangular counter starts to slope
+(10.25), leaving a 0.12 mm plate (it was 0.47 mm before). The measure summed
+thin *volume*, so squashing a sliver thinner looked like progress. Fixes:
+
+- `columnSlivers` adds knifeScore/cutScore (mm²): each thin run's footprint
+  × (1 − length/t); tidyPair minimises these, so thinner counts worse.
+- Candidates can also move each band edge on its own to a feature within
+  1 mm (band height may change ≤ 15%): L × A now takes the band to
+  5.09–9.95, both edges on the A's crossbar; knife score 10.8 → 0.
+- Distortion knows strokes: a band wider in ink than both neighbours is a
+  horizontal stroke, weight 3 (else 1), so the F's arm is shifted (as the
+  owner liked) rather than thinned.
+- Grid 0.1 mm (0.2 mm misjudged small gains, e.g. A × N got slightly worse).
+  Cost: 10–30 ms per pair.
+
 ## Starting case (owner)
 
 FINOLA × BRYAN, pairs in a row, Bungee (the default font). In the F/B pair, the

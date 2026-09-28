@@ -7,6 +7,7 @@
  * Letters are [{ ch, pts: contours in (u, z) }] as in layoutCells' cells.
  */
 import { columnSlivers } from './slivers.js';
+import { scanIntervals } from './scan.js';
 
 
 /**
@@ -204,28 +205,39 @@ export function featureNearMisses(lettersA, lettersB, { t = 0.8, eps = 1e-3 } = 
 }
 
 /**
- * The trade-off search: the one move of a pair that best reduces slivers
- * without distorting the letters much. Candidates shift one band (a stroke,
- * or a gap between strokes, between two level heights and not touching the
- * top or bottom) of either chunk, keeping its height, so that one of its
- * edges meets a feature of the other chunk as drawn: a level edge or a
- * pointed corner, up to `tol` mm away. Pairs of the same letters are left
- * alone.
- *   slivers    = knife + cutWeight × cut (columnSlivers, mm³)
- *   distortion = |log| of how much each neighbouring band stretches/squashes
+ * The trade-off search: the one change to a pair that best reduces slivers
+ * without distorting the letters much. A change moves one band (a stroke, or
+ * a gap between strokes, between two level heights, not touching the top or
+ * bottom) of either chunk:
+ *   - shift: the whole band moves up to `tol` mm, keeping its height, so one
+ *     of its edges meets a feature of the other chunk (a level edge or a
+ *     pointed corner, as drawn);
+ *   - edges: each edge may instead move on its own to a feature within
+ *     `near` mm (a near-miss), so the band gets a little taller or shorter
+ *     (this can fix two near-misses at once, e.g. L × A in Bungee).
+ * Pairs of the same letters are left alone.
+ *   slivers    = knifeScore + cutWeight × cutScore (columnSlivers, mm²: the
+ *                thinner a sliver, the more it counts)
+ *   distortion = Σ over the band and its two neighbours of weight × |log| of
+ *                its change in height, weight = strokeWeight for horizontal
+ *                strokes (a band wider in ink than both bands beside it, like
+ *                an F's arm), 1 for the rest: strokes keep their thickness
  *   cost       = slivers + lambda × distortion
- * A move is kept only if it lowers the cost and removes at least `minGain`
- * mm³ of slivers, and no neighbouring band changes by more than `maxStrain`.
- * @returns { a, b, moved: [{ side, band, by, target, kind, strain, distortion, before, after }] }
- *   before/after = { knife, cut } of the pair.
+ * A change is kept only if it lowers the cost and removes at least `minGain`
+ * mm² of slivers; no neighbour may change by more than `maxStrain` and the
+ * band itself by more than `maxBand`.
+ * @returns { a, b, moved: [{ side, band, to, by, target, kind, strain, distortion, before, after }] }
+ *   band → to: the band's old and new edges; by: the larger edge move;
+ *   before/after: columnSlivers of the pair.
  */
 export function tidyPair(lettersA, lettersB, {
-  tol = 3, maxStrain = 0.3, lambda = 3, cutWeight = 0.3, minGain = 0.2, t = 0.8, step = 0.2,
+  tol = 3, near = 1, maxStrain = 0.3, maxBand = 0.15, strokeWeight = 3, lambda = 3, cutWeight = 0.3,
+  minGain = 0.2, t = 0.8, step = 0.1,
 } = {}) {
   const out = { a: lettersA, b: lettersB, moved: [] };
   if (lettersA.map((l) => l.ch).join('') === lettersB.map((l) => l.ch).join('')) return out;
   const measure = (a, b) => columnSlivers(a, b, { t, step });
-  const slivers = (m) => m.knife + cutWeight * m.cut;
+  const slivers = (m) => m.knifeScore + cutWeight * m.cutScore;
   const before = measure(lettersA, lettersB);
   let best = null;
   for (const [side, other] of [['a', 'b'], ['b', 'a']]) {
@@ -235,27 +247,40 @@ export function tidyPair(lettersA, lettersB, {
       ...levelHeights(out[other]).map((z) => [z, 'edge']),
       ...cornerHeights(out[other]).map((z) => [z, 'corner']),
     ];
+    // Ink width at each band's mid-height; a band wider than both neighbours is a horizontal stroke.
+    const polys = out[side].flatMap((l) => l.pts);
+    const width = L.slice(1).map((z, i) => scanIntervals(polys, (L[i] + z) / 2).reduce((s, [x0, x1]) => s + x1 - x0, 0));
+    const weight = (i) => (i > 0 && i < width.length - 1 && width[i] > width[i - 1] && width[i] > width[i + 1] ? strokeWeight : 1);
     const tried = new Set();
     for (let k = 2; k <= L.length - 2; k++) {
       const [lo, hi] = [L[k - 1], L[k]];
-      const below = lo - L[k - 2], above = L[k + 1] - hi;
+      const below = lo - L[k - 2], above = L[k + 1] - hi, h = hi - lo;
+      // Candidate new edges [lo', hi'] with what each meets.
+      const cands = [];
       for (const [z, kind] of targets) {
-        for (const by of [z - hi, z - lo]) {
-          if (Math.abs(by) < 0.01 || Math.abs(by) > tol) continue;
-          const nb = below + by, na = above - by;
-          if (nb <= 0 || na <= 0) continue;
-          const strain = Math.max(Math.abs(by) / below, Math.abs(by) / above);
-          if (strain > maxStrain) continue;
-          const key = `${k}:${by.toFixed(3)}`;
-          if (tried.has(key)) continue;
-          tried.add(key);
-          const moved = warpHeights(out[side], L.map((x) => [x, x === lo || x === hi ? x + by : x]));
-          const after = side === 'a' ? measure(moved, lettersB) : measure(lettersA, moved);
-          const gain = slivers(before) - slivers(after);
-          const distortion = Math.abs(Math.log(nb / below)) + Math.abs(Math.log(na / above));
-          const cost = -gain + lambda * distortion;
-          if (gain < minGain || cost >= 0) continue;
-          if (!best || cost < best.cost) best = { side, band: [lo, hi], by, target: z, kind, strain, distortion, cost, letters: moved, after };
+        for (const by of [z - hi, z - lo]) if (Math.abs(by) >= 0.01 && Math.abs(by) <= tol) cands.push([lo + by, hi + by, z, kind]);
+      }
+      const nearLo = [[lo, null, null], ...targets.filter(([z]) => Math.abs(z - lo) >= 0.01 && Math.abs(z - lo) <= near).map(([z, kind]) => [z, z, kind])];
+      const nearHi = [[hi, null, null], ...targets.filter(([z]) => Math.abs(z - hi) >= 0.01 && Math.abs(z - hi) <= near).map(([z, kind]) => [z, z, kind])];
+      for (const [l2, zl, kl] of nearLo) for (const [h2, zh, kh] of nearHi) if (zl !== null || zh !== null) cands.push([l2, h2, zl ?? zh, kl ?? kh]);
+      for (const [l2, h2, z, kind] of cands) {
+        const nb = l2 - L[k - 2], na = L[k + 1] - h2, nh = h2 - l2;
+        if (nb <= 0 || na <= 0 || nh <= 0) continue;
+        const strain = Math.max(Math.abs(nb - below) / below, Math.abs(na - above) / above);
+        if (strain > maxStrain || Math.abs(nh - h) / h > maxBand) continue;
+        const key = `${k}:${l2.toFixed(3)}:${h2.toFixed(3)}`;
+        if (tried.has(key)) continue;
+        tried.add(key);
+        const moved = warpHeights(out[side], L.map((x) => [x, x === lo ? l2 : x === hi ? h2 : x]));
+        const after = side === 'a' ? measure(moved, lettersB) : measure(lettersA, moved);
+        const gain = slivers(before) - slivers(after);
+        // Band k-1 (below), k (this one) and k+1 (above), indexed from L[0].
+        const distortion = weight(k - 2) * Math.abs(Math.log(nb / below)) + weight(k - 1) * Math.abs(Math.log(nh / h)) + weight(k) * Math.abs(Math.log(na / above));
+        const cost = -gain + lambda * distortion;
+        if (gain < minGain || cost >= 0) continue;
+        if (!best || cost < best.cost) {
+          const by = Math.abs(l2 - lo) > Math.abs(h2 - hi) ? l2 - lo : h2 - hi;
+          best = { side, band: [lo, hi], to: [l2, h2], by, target: z, kind, strain, distortion, cost, letters: moved, after };
         }
       }
     }
@@ -263,6 +288,6 @@ export function tidyPair(lettersA, lettersB, {
   if (!best) return out;
   out[best.side] = best.letters;
   const { letters, cost, after, ...rest } = best;
-  out.moved.push({ ...rest, before: { knife: before.knife, cut: before.cut }, after: { knife: after.knife, cut: after.cut } });
+  out.moved.push({ ...rest, before, after });
   return out;
 }

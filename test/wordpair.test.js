@@ -229,3 +229,17 @@ test('two fonts: 2D cell scores match the 3D solid, and search keeps coverage hi
     assert.ok(built > 0.98, `built coverage ${built}`);
   } finally { r.dispose(); }
 });
+
+test('tidyPair: L × A in Bungee (FINOLA × BRYAN) leaves no thin plate (a 0.12 mm triangle before thinness was scored)', async () => {
+  const { layoutCells, tidyPair } = await import('../src/core/wordpair.js');
+  const { columnSlivers } = await import('../src/core/slivers.js');
+  const bungee = loadFont(await readFile(new URL('../fonts/Bungee-Regular.ttf', import.meta.url)));
+  // The pair as it sits in the default row design (spaced family: kiss -0.06).
+  const [c] = layoutCells(wasm, bungee, { rows: [{ a: ['L'], b: ['A'], frame: rowFrame(bungee, ['FINOLA', 'BRYAN'], { kiss: -0.06 }) }] }, { height: 20, kiss: -0.06 });
+  c.shapes.front.delete(); c.shapes.right.delete();
+  const r = tidyPair(c.letters.front, c.letters.right);
+  assert.equal(r.moved.length, 1);
+  const s = columnSlivers(r.a, r.b, { t: 0.3 });
+  assert.equal(s.knife, 0, 'no material in runs thinner than 0.3 mm');
+  assert.ok(columnSlivers(r.a, r.b).knifeScore < columnSlivers(c.letters.front, c.letters.right).knifeScore / 5);
+});

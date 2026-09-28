@@ -27,10 +27,11 @@ for (const f of fonts) {
   for (const a of CAPS) for (const b of CAPS) {
     const res = tidyPair(L[a], L[b], { tol: 0.15 * H });
     // Fields: moved, other, by, band, target height, strain, knife before/after,
-    // cut before/after (mm³, column measure), target kind ('edge' | 'corner').
+    // cut before/after (mm³, column measure), target kind ('edge' | 'corner'),
+    // the band's new edges (a band may also get a little taller or shorter).
     for (const m of res.moved) {
       moves.push([m.side === 'a' ? a : b, m.side === 'a' ? b : a, r2(m.by), m.band.map(r2), r2(m.target), r2(m.strain),
-        r2(m.before.knife), r2(m.after.knife), r2(m.before.cut), r2(m.after.cut), m.kind]);
+        r2(m.before.knife), r2(m.after.knife), r2(m.before.cut), r2(m.after.cut), m.kind, m.to.map(r2)]);
     }
     const A = levelHeights(res.a), B = levelHeights(res.b);
     if (A.some((za) => B.some((zb) => { const d = Math.abs(za - zb); return d > 1e-3 && d <= 0.6; }))) near++;
