@@ -82,14 +82,17 @@ export function edt(nx, ny, nz, isTarget) {
 
 /**
  * Thin material in a solid (thinner than minThickness), by voxel opening.
+ * With `gaps`, the same for the air instead: thin slots and shallow cuts
+ * (the solid's outside, padded well beyond the bounding box, is opened).
  * @returns { thinVolume, regions: [{ volume, depth, center }] } in mm / mm³,
  *   regions sorted by volume, largest first. Empty regions = passes.
  */
-export function thinFeatures(solid, { minThickness = 1, voxel, depthFactor = 1 } = {}) {
+export function thinFeatures(solid, { minThickness = 1, voxel, depthFactor = 1, gaps = false } = {}) {
   const r = minThickness / 2;
   const h = voxel ?? Math.min(r / 2.5, 0.25);
-  const { grid, nx, ny, nz, origin } = voxelize(solid, h);
   const rv = r / h, rv2 = rv * rv;
+  const { grid, nx, ny, nz, origin } = voxelize(solid, h, gaps ? Math.ceil(2 * rv) + 3 : 2);
+  if (gaps) for (let i = 0; i < grid.length; i++) grid[i] ^= 1;
   // Erode: keep voxels farther than r from the outside.
   const dOut = edt(nx, ny, nz, (i) => grid[i] === 0);
   // Dilate the eroded set by r: opened = within r of an eroded voxel.

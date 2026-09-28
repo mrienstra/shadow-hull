@@ -44,6 +44,35 @@ the other).
 - Suggested order: measures (and validate the proxy) → scores on the review
   page → tidy as a trade-off search. Font per axis is independent.
 
+## Measures (stage 1, done)
+
+`src/core/slivers.js`, checked by `scripts/validate-slivers.mjs` (200 random
+cells) and `scripts/validate-slivers-moves.mjs` (268 tidy moves, 3 fonts),
+t = 0.8 mm:
+
+- **Column measure** (`columnSlivers`): along each vertical line the cell is
+  A's column ∩ B's column; runs of material shorter than t = knife, short air
+  runs between material = cut (mm³). ~10 ms per cell. Exact for *vertical*
+  slivers (the only kind a vertical warp can fix); it also counts acute
+  horizontal wedges, which are knife-like.
+- **Voxel ground truth** (`thinFeatures`, new `gaps` option for thin air):
+  ~1–2 s per solid. Its depth filter (residue ≥ r deep, tuned for
+  printability) ignores small knives: on tidy moves it reports 0 → 0 where the
+  column measure sees 1–3 mm³, so they agree on the direction of change in
+  only 45% of moves, nearly all of the rest being "voxel sees nothing".
+  Across random cells, rank correlation for thin material is 0.58 (voxel also
+  sees sideways-thin strokes, e.g. X and S diagonals, that columns can't).
+  Thin air (cuts) is rarely found by voxel, so no useful comparison.
+- **Feature-height proxy** (`featureNearMisses`): weak (rank corr. ~0.2):
+  a near-miss only matters where the two features overlap in x/y, which
+  heights alone don't know. Not needed: the column measure is cheap enough
+  even for font search (~5 cells × 300 fonts ≈ 15 s).
+- **Decision:** the column measure is the cost; voxel stays an occasional
+  printability check.
+- **Finding:** by the column measure, 86 of 268 arm-to-corner moves make
+  slivers *worse* (a move meets one corner but creates another near-miss) →
+  the trade-off search should only accept moves that reduce the cost.
+
 ## Starting case (owner)
 
 FINOLA × BRYAN, pairs in a row, Bungee (the default font). In the F/B pair, the

@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-09-27 (sliver measures)
+
+- `src/core/slivers.js`: `columnSlivers` measures knives/slivers (vertical
+  runs of material under 0.8 mm) and shallow cuts (short air runs between
+  material) from the two letters' outlines alone, ~10 ms per cell;
+  `featureNearMisses` from feature heights only. `thinFeatures` gains `gaps`
+  (thin air). Validated against the voxel ground truth
+  (`scripts/validate-slivers*.mjs`); findings in
+  resources/research/letterform-tidy.md: the column measure is the cost to
+  use; the feature-height proxy is too weak; a third of arm-to-corner moves
+  make slivers worse by the column measure.
+- Subagent: one is building interactive 3D for the review page in parallel
+  (verdict in its own entry).
+
 ## 2026-09-27 (letter tidying: arm to corner, first cut)
 
 - Owner request: in FINOLA × BRYAN (Bungee), the B's notch sits 0.37 mm below
