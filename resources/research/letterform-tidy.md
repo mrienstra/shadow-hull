@@ -6,6 +6,44 @@ nudge one letter's strokes up or down (a small piecewise-linear vertical warp)
 so the features meet exactly. This note records what was tried, what the owner
 liked, and what's still open, so the work can resume in any session.
 
+## Goal (owner's framing)
+
+Reduce **knife/sliver shapes** (they catch the eye, literally stick out, break
+easily and are hard to make) and, to a lesser extent and only if cheap,
+**shallow cuts**: both are "it almost lines up but not quite". A crude target
+could blend smoothness and reduced poly count. On the other side, keep
+letterforms reasonably nice: mostly **preserve stroke thickness** (it could go
+much deeper). Sometimes switching fonts is easier, but "all fonts" is a huge
+search space. Eventually: **one font per axis** (e.g. cursive one way, block
+the other).
+
+## Proposed direction (not started)
+
+- The solid is the front letter's shape × the side letter's shape, so its
+  feature edges sit at the two letters' feature heights (level edges and
+  corners). A near-miss between two such heights is a thin layer: a knife if it
+  protrudes, a shallow cut if it's a notch.
+- **Ground-truth measure:** thin material in the built solid (e.g. volume
+  thinner than ~0.8 mm; `voxel.js` has a thin-feature check).
+- **Cheap proxy (1D, no geometry):** near-miss pairs of feature heights,
+  weighted by the width of the layer and by knife vs cut; plus the number of
+  distinct feature heights as a "fewer polygons, smoother" term. Validate the
+  proxy against the ground truth on the review set.
+- **Letterform cost:** per band, |log(new/old)| weighted heavily for strokes
+  and lightly for gaps and counters (generalises strain).
+- **Search:** per pair, candidate nudges (arm to corner, stroke to level, both
+  letters meeting halfway) minimising knife/cut cost + λ × letterform cost.
+  Arm to corner becomes one move type among several.
+- **Fonts:** the proxy needs only per-letter feature heights and band
+  thicknesses, so they can be precomputed for many fonts (e.g. a few hundred
+  Google Fonts) and a word pair scored against all of them in seconds;
+  build solids only for the best few. Also scores font *pairings* for one font
+  per axis.
+- **One font per axis:** layout already handles the two words separately;
+  mostly plumbing two fonts through (recipes, UI, share links).
+- Suggested order: measures (and validate the proxy) → scores on the review
+  page → tidy as a trade-off search. Font per axis is independent.
+
 ## Starting case (owner)
 
 FINOLA × BRYAN, pairs in a row, Bungee (the default font). In the F/B pair, the
