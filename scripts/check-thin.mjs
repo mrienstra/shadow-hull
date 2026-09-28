@@ -1,4 +1,5 @@
-// Where does a finished design have material thinner than a threshold?
+// Where does a finished design have material thinner than a threshold, and
+// knife (sharp) edges?
 // node scripts/check-thin.mjs [font file] [look] [t]  → counts by letter pair and height.
 // Ray-casts vertical lines through the built (joined) mesh, so it also sees
 // what tidying and joining did, and zero-thickness sheets (as runs of 0).
@@ -6,6 +7,7 @@ import { readFileSync } from 'node:fs';
 import { getManifold, loadFont } from '../src/core/index.js';
 import { generateLook } from '../src/core/looks.js';
 import { buildRecipe } from '../src/core/gallery.js';
+import { sharpEdges } from '../src/core/sharp.js';
 const [file = 'Bungee-Regular.ttf', look = 'row', T = '0.3'] = process.argv.slice(2);
 const w = await getManifold();
 const ctx = { wasm: w, font: loadFont(readFileSync(new URL(`../fonts/${file}`, import.meta.url))), height: 20 };
@@ -39,4 +41,11 @@ for (let x = min[0] + 0.05; x < max[0]; x += 0.2) for (let y = min[1] + 0.05; y 
 const list = Object.entries(found).filter(([k]) => !k.endsWith('@')).sort((p, q) => q[1] - p[1]);
 console.log(`${file} ${look}: ${list.reduce((s, [, c]) => s + c, 0)} spots under ${T} mm`);
 for (const [k, c] of list.slice(0, 15)) console.log(`  ${k} ×${c}`);
+// Sharp (knife) edges: convex edges under 60° and 45°, by pair (thin spots above
+// also count smooth rounded corners; these don't).
+for (const a of [60, 45]) {
+  const sh = sharpEdges(d.joined.getMesh(), { maxAngle: a }), by = {};
+  for (const e of sh.edges) { const k = cellOf(e.a[0], e.a[1]); by[k] = (by[k] ?? 0) + e.length; }
+  console.log(`sharp edges under ${a}°: ${sh.length.toFixed(1)} mm`, JSON.stringify(Object.fromEntries(Object.entries(by).map(([k, v]) => [k, +v.toFixed(1)]))));
+}
 d.dispose();

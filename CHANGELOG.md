@@ -31,6 +31,18 @@
   that one-font designs are unchanged (12 designs, 2 fonts, identical), re-ran
   the suites, and looked at its screenshots.
 
+## 2026-09-28 (a knife measure that ignores rounded corners)
+
+- `sharpEdges` (src/core/sharp.js): convex mesh edges where the faces meet
+  at an acute interior angle: the owner's "sharp edge". Smooth rounded
+  corners have none (their facets meet at shallow angles), unlike the
+  column-based thin measures. FINOLA × BRYAN: Bungee untidied has 5.3 mm of
+  edge under 45° (F/B, the owner's first knife), tidied none; under 60°,
+  A/N and NO/Y remain (12.7 mm). Kanit has none under 60° either way (its
+  "thin spots" were rounded corners). check-thin.mjs now reports these too.
+  Test added. Next: steer tidy's final choice and trimming by this.
+- No subagents used.
+
 ## 2026-09-28 (tops and bottoms may line up; the thin-spot check counts rounded corners)
 
 - tidyPair: a letter's top or bottom may now move exactly onto a nearly equal
