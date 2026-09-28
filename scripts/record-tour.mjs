@@ -1,12 +1,14 @@
 #!/usr/bin/env node
-// Record the viewer's tour (tour=1) of one design to an MP4, frame by frame
-// with deterministic time: the page's window.__tour.seek(t) places the camera
-// and renders, the script screenshots the viewport and pipes the PNGs to ffmpeg.
+// Record the viewer's tour (tour=1) of one design to an MP4 or GIF, frame by
+// frame with deterministic time: the page's window.__tour.seek(t) places the
+// camera and renders, the script screenshots the viewport and pipes the PNGs to
+// ffmpeg. An --out ending in .gif (or --gif) writes a looping GIF, scaled down to
+// --gif-width with one palette for the whole clip.
 //
 //   npm run record-tour -- [--a Finola] [--b Bryan] [--look row] [--knobs '{"stand":false,"supports":"none"}']
 //                          [--hash '<full hash>'] [--url http://localhost:5173/] [--fps 30]
 //                          [--width 1920] [--height 1080] [--move 2] [--pause 0.6] [--tilt 0]
-//                          [--plain] [--out out/tour.mp4]
+//                          [--plain] [--out out/tour.mp4 | --gif [--gif-width 720]]
 //
 // Without --url it builds the page (vite build) and serves it with vite preview.
 // Uses the locally installed Chrome (playwright-core, channel 'chrome').
@@ -24,24 +26,27 @@ const { values: o } = parseArgs({
     knobs: { type: 'string', default: '{"stand":false,"supports":"none"}' },
     hash: { type: 'string' },
     url: { type: 'string' },
-    fps: { type: 'string', default: '30' },
+    fps: { type: 'string' }, // default 30, or 20 for a GIF (GIF delays are whole centiseconds)
     width: { type: 'string', default: '1920' },
     height: { type: 'string', default: '1080' },
     move: { type: 'string', default: '2' },
     pause: { type: 'string', default: '0.6' },
     tilt: { type: 'string', default: '0' },
     plain: { type: 'boolean', default: false }, // don't colour by view
-    out: { type: 'string', default: 'out/tour.mp4' },
+    out: { type: 'string' },
+    gif: { type: 'boolean', default: false },
+    'gif-width': { type: 'string', default: '720' },
     ffmpeg: { type: 'string', default: '/opt/homebrew/bin/ffmpeg' },
     help: { type: 'boolean', short: 'h', default: false },
   },
 });
 if (o.help) {
-  console.log('Usage: npm run record-tour -- [--a Finola --b Bryan --look row --knobs JSON | --hash HASH] [--url URL] [--fps 30] [--width 1920 --height 1080] [--move 2 --pause 0.6 --tilt 0] [--plain] [--out out/tour.mp4]');
+  console.log('Usage: npm run record-tour -- [--a Finola --b Bryan --look row --knobs JSON | --hash HASH] [--url URL] [--fps 30] [--width 1920 --height 1080] [--move 2 --pause 0.6 --tilt 0] [--plain] [--out out/tour.mp4 | --gif [--gif-width 720]]');
   process.exit(0);
 }
-const fps = Number(o.fps), width = Number(o.width), height = Number(o.height);
-const out = resolve(o.out);
+const out = resolve(o.out ?? (o.gif ? 'out/tour.gif' : 'out/tour.mp4'));
+const gif = o.gif || /\.gif$/i.test(out);
+const fps = Number(o.fps ?? (gif ? 20 : 30)), width = Number(o.width), height = Number(o.height);
 
 let hash;
 if (o.hash) {
@@ -96,10 +101,15 @@ try {
   console.log(`Duration ${duration.toFixed(2)} s → ${frames} frames at ${fps} fps, ${width}×${height}`);
 
   mkdirSync(dirname(out), { recursive: true });
+  // Screenshots are taken at full size and downscaled for a GIF (smoother edges
+  // than rendering small); palettegen sees every frame before paletteuse runs.
+  const encode = gif
+    ? ['-vf', `scale=${Number(o['gif-width'])}:-1:flags=lanczos,split[a][b];[a]palettegen=stats_mode=full[p];`
+        + '[b][p]paletteuse=dither=sierra2_4a', '-loop', '0']
+    : ['-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', '-preset', 'slow',
+        '-movflags', '+faststart'];
   const ff = spawn(o.ffmpeg, [
-    '-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'png', '-i', '-',
-    '-vf', 'pad=ceil(iw/2)*2:ceil(ih/2)*2', '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-crf', '18', '-preset', 'slow',
-    '-movflags', '+faststart', out,
+    '-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(fps), '-c:v', 'png', '-i', '-', ...encode, out,
   ], { stdio: ['pipe', 'inherit', 'inherit'] });
   const done = new Promise((res, rej) => ff.on('close', (code) => (code === 0 ? res() : rej(new Error(`ffmpeg exited with ${code}`)))));
   const t0 = Date.now();

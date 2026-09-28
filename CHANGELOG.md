@@ -21,6 +21,11 @@
   page, drives `window.__tour.seek(t)` in local Chrome frame by frame, pipes
   PNG screenshots to ffmpeg (H.264, yuv420p, CRF 18) → `out/tour.mp4`
   (gitignored). Default: 33.2 s at 1920×1080, 30 fps.
+- `record-tour --gif` (or an `--out` ending in `.gif`): a looping GIF instead,
+  captured at full size and downscaled to `--gif-width` (default 720) with
+  lanczos, one palette for the whole clip (palettegen → paletteuse, sierra2_4a
+  dither). Default 20 fps, since GIF delays are whole centiseconds (30 fps
+  would play at 3 cs = 33 fps). Default tour: 664 frames, 720×405, ~10 MB.
 - e2e: with `tour=1` the stops follow the pairs, the first stop differs from
   the Front view, the loop's end equals its start, and a view button hands the
   camera back; without it there is no Tour button.
