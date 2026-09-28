@@ -11,7 +11,9 @@ import { glyphSilhouette } from './block.js';
 import { realizeDesign, realizeBlock, realizeSpanColumn, realizeStackedColumn } from './design.js';
 
 /**
- * Context for building: { wasm, font, shapeFont, height }. `shapeFont` is the
+ * Context for building: { wasm, font, fontB?, shapeFont, height }. `font` is
+ * word A's (front), `fontB` word B's (side; default: the same font). Like the
+ * front font, it's page state, not part of a recipe. `shapeFont` is the
  * font top-view shapes come from (Noto Emoji); needed only for recipes with a
  * top shape. Silhouettes are cached on the context; call disposeContext when done.
  */
@@ -35,7 +37,7 @@ const tidyOf = (r, height) => (r.tidy === 'pair' ? { mode: 'pair', tol: 0.15 * h
 
 /** Rebuild a design from its recipe (see looks.js). Caller disposes. */
 export function buildRecipe(ctx, wordA, wordB, r) {
-  const { wasm, font, height = 20 } = ctx;
+  const { wasm, font, fontB, height = 20 } = ctx;
   const top = r.top ? { shape: topShape(ctx, r.top.char), rotate: r.top.rotate ?? 0, scale: r.top.scale ?? 1, fit: 'stretch' } : null;
   // r.stand adds a display stand (after hidden joins, before rods);
   // r.supports === 'none' drops the rods ('bridges').
@@ -45,10 +47,10 @@ export function buildRecipe(ctx, wordA, wordB, r) {
     return j;
   };
   switch (r.kind) {
-    case 'chain': return realizeDesign(wasm, font, r.layout, { spacing: r.spacing, join: withStand(r.join ?? 'hull+bridges'), height, weights: r.weights, top, tidy: tidyOf(r, height) });
-    case 'block': return realizeBlock(wasm, font, wordA, wordB, { caseMode: r.caseMode, spacing: 'touching', top, join: withStand('bridges'), height, angle: r.angle ?? 90 });
-    case 'span': return realizeSpanColumn(wasm, font, wordA, wordB, r.spans, { spacing: r.spacing, fit: r.fit, height, top, join: withStand('hull+bridges') });
-    case 'stacked': return realizeStackedColumn(wasm, font, wordA, wordB, { spacing: r.spacing === 'spaced' ? 'spaced' : 'touching', fit: r.fit, height, top, join: withStand('bridges') });
+    case 'chain': return realizeDesign(wasm, font, r.layout, { spacing: r.spacing, join: withStand(r.join ?? 'hull+bridges'), height, weights: r.weights, top, tidy: tidyOf(r, height), fontB });
+    case 'block': return realizeBlock(wasm, font, wordA, wordB, { caseMode: r.caseMode, spacing: 'touching', top, join: withStand('bridges'), height, angle: r.angle ?? 90, fontB });
+    case 'span': return realizeSpanColumn(wasm, font, wordA, wordB, r.spans, { spacing: r.spacing, fit: r.fit, height, top, join: withStand('hull+bridges'), fontB });
+    case 'stacked': return realizeStackedColumn(wasm, font, wordA, wordB, { spacing: r.spacing === 'spaced' ? 'spaced' : 'touching', fit: r.fit, height, top, join: withStand('bridges'), fontB });
     default: throw new Error(`Unknown recipe kind ${r.kind}`);
   }
 }

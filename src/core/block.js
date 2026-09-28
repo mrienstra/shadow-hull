@@ -10,7 +10,7 @@
  * shows fully; a top shape trims letters where it is narrow (e.g. near the
  * heart's lobes and tip).
  */
-import { glyphRun } from './glyph.js';
+import { glyphRun, alignedFrames } from './glyph.js';
 import { viewAtAzimuth } from './views.js';
 
 /**
@@ -50,20 +50,26 @@ const CASE = {
  * @param opts.caseMode upper | lower | title | as
  * @param opts.kiss letter spacing (em overlap at the closest point; negative = gap)
  * @param opts.top { shape: CrossSection (any units), fit: 'stretch' | 'contain' } or null
+ * @param opts.fontB word B's font (default: `font`). Both words share one
+ *   vertical frame so baselines match; with two fonts, their baselines and cap
+ *   heights meet (see glyph.js alignedFrames).
  * @param opts.angle degrees between the two word views (90 = front and right).
  *   Other angles centre both words on the vertical axis; the footprint becomes
  *   a parallelogram, and a top shape isn't supported (it would need fitting
  *   to that parallelogram).
  * @returns { cells (compose.js format, with per-letter outlines), frames }
  */
-export function blockCells(wasm, font, wordA, wordB, { height = 20, caseMode = 'upper', kiss = -0.06, tolerance, top = null, angle = 90 } = {}) {
+export function blockCells(wasm, font, wordA, wordB, { height = 20, caseMode = 'upper', kiss = -0.06, tolerance, top = null, angle = 90, fontB = font } = {}) {
   const words = [CASE[caseMode](wordA), CASE[caseMode](wordB)];
-  const runs = words.map((w) => glyphRun(font, w, { tolerance, kiss }));
-  // One vertical frame for both words so baselines match.
-  const all = runs.flatMap((r) => r.flatMap((g) => g.contours.flat()));
-  const yMin = Math.min(...all.map((p) => p[1])), yMax = Math.max(...all.map((p) => p[1]));
-  const s = height / (yMax - yMin);
-  const place = (run) => {
+  const runs = [glyphRun(font, words[0], { tolerance, kiss }), glyphRun(fontB, words[1], { tolerance, kiss })];
+  // One vertical frame for both words so baselines match (aligned per font with two fonts).
+  const inkFrame = (rs) => {
+    const ys = rs.flatMap((r) => r.flatMap((g) => g.contours.flat().map((p) => p[1])));
+    return [Math.min(...ys), Math.max(...ys)];
+  };
+  const yFrames = fontB === font ? [inkFrame(runs), inkFrame(runs)] : alignedFrames([font, fontB], [[inkFrame([runs[0]])], [inkFrame([runs[1]])]]);
+  const place = (run, [yMin, yMax]) => {
+    const s = height / (yMax - yMin);
     const xs = run.flatMap((g) => g.contours.flat().map((p) => p[0]));
     const x0 = Math.min(...xs);
     return {
@@ -71,7 +77,7 @@ export function blockCells(wasm, font, wordA, wordB, { height = 20, caseMode = '
       letters: run.map((g) => ({ ch: g.ch, pts: g.contours.map((c) => c.map(([x, y]) => [(x - x0) * s, (y - yMin) * s])) })),
     };
   };
-  const [A, B] = runs.map(place);
+  const [A, B] = runs.map((r, i) => place(r, yFrames[i]));
   const shapes = {
     front: new wasm.CrossSection(A.letters.flatMap((l) => l.pts), 'NonZero'),
     right: new wasm.CrossSection(B.letters.flatMap((l) => l.pts), 'NonZero'),

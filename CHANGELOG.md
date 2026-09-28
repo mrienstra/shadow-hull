@@ -1,5 +1,36 @@
 # Changelog
 
+## 2026-09-28 (one font per axis)
+
+- Owner request: in two-word looks the side word can have its own font, e.g.
+  a script one way and a block face the other. Core: `fontB` (options, and
+  `ctx.fontB` for recipes and looks) threaded through layout, cell scoring,
+  search, grid, block and both towers; default = the front font, and then
+  every result is byte-identical to before (checked on 20 designs × 2 fonts:
+  recipes, metrics and volumes).
+- Rule for the vertical frame with two fonts: both fonts are lined up on
+  baseline and cap height (each scaled so its capitals are the same height),
+  and the frame covers both words' ink (`alignedFrames` in glyph.js; with one
+  font it is the old frame). Letting each word's ink fill the row instead cost
+  ~3% coverage (Bungee × Kanit Black, FINOLA × BRYAN: 0.967 vs 0.994), since
+  one font's round overshoot then kept the other's flat capitals from meeting.
+- Chain recipes carry the side word's frame (`frameB`) only when the fonts
+  differ, so old links and one-font recipes are unchanged. The fonts
+  themselves stay page state, like the front font.
+- Page: "Side word font" under the font controls (two-word looks only):
+  Same as front · bundled fonts · any Google Font · upload. Share links add
+  `font2` or `gf2`/`gw2` only when it differs from the front font. The words
+  workers load and cache both fonts. `scripts/explore-words.js --font2`.
+- Tests: unit (each view drawn in its own font, flat capitals meet, 2D
+  scores match 3D, fontB = font identical), looks (five looks with two
+  fonts), e2e (side font changes the design, round-trips through the link;
+  the default link has no `font2`).
+- Subagent: built by a subagent (opus, ~220k tokens, ~25 min). Earned its
+  cost: broad plumbing across core, workers and UI; it rejected the suggested
+  height rule with evidence (coverage −3%) and chose a better one. I re-checked
+  that one-font designs are unchanged (12 designs, 2 fonts, identical), re-ran
+  the suites, and looked at its screenshots.
+
 ## 2026-09-28 (tidy slivers: trade-off search)
 
 - `tidyPair` (new src/core/tidy.js, which now holds the letter-feature and

@@ -8,17 +8,33 @@ import { buildRecipe, designView } from '../src/core/gallery.js';
 import { generateLook } from '../src/core/looks.js';
 
 const wasmReady = getManifold({ locateFile: () => wasmUrl });
-const ctx = { wasm: null, font: null, shapeFont: null, height: 20 };
-let fontKey = null;
+const ctx = { wasm: null, font: null, fontB: undefined, shapeFont: null, height: 20 };
+let fontKey = null, fontBKey = null;
 
-async function ensureFonts({ fontUrl, fontData, needShapes }) {
+// A cache key for a font given as a URL or as bytes (uploads).
+function keyOf(url, data) {
+  if (url) return url;
+  if (!data) return null;
+  const b = new Uint8Array(data);
+  let h = 2166136261;
+  for (let i = 0; i < b.length; i += 7) h = Math.imul(h ^ b[i], 16777619);
+  return `data:${b.length}:${h >>> 0}`;
+}
+const fetchFont = async (url, data) => loadFont(data ?? (await (await fetch(url)).arrayBuffer()));
+
+// fontUrl/fontData: word A's font (front). fontBUrl/fontBData: word B's (side);
+// absent = the same font (ctx.fontB undefined, so results match one font exactly).
+async function ensureFonts({ fontUrl, fontData, fontBUrl, fontBData, needShapes }) {
   ctx.wasm = await wasmReady;
-  const key = fontUrl ?? (fontData ? `data:${fontData.byteLength}` : null);
+  const key = keyOf(fontUrl, fontData);
   if (key && key !== fontKey) {
-    ctx.font = loadFont(fontData ?? (await (await fetch(fontUrl)).arrayBuffer()));
+    ctx.font = await fetchFont(fontUrl, fontData);
     fontKey = key;
     // Cached top shapes are per shape font, not per letter font, so keep them.
   }
+  const keyB = keyOf(fontBUrl, fontBData);
+  if (!keyB || keyB === fontKey) { ctx.fontB = undefined; fontBKey = null; }
+  else if (keyB !== fontBKey) { ctx.fontB = await fetchFont(fontBUrl, fontBData); fontBKey = keyB; }
   if (needShapes && !ctx.shapeFont) ctx.shapeFont = loadFont(await (await fetch(shapeFontUrl)).arrayBuffer());
 }
 

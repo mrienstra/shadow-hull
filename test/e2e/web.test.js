@@ -160,6 +160,50 @@ test('shared links restore the page state (cube, word looks, and old-format link
   assert.deepEqual(errors, []);
 });
 
+test('side word font: another font for the second word changes the design and round-trips through the link', async () => {
+  const page = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  const hash = () => page.evaluate(() => Object.fromEntries(new URLSearchParams(location.hash.slice(1))));
+  // Outline targets per shadow panel (front, side), once a design is shown.
+  const targets = (p) => p.$$eval('#shadow-panels figure path.target', (ps) => ps.map((x) => x.getAttribute('d')));
+  await page.goto(`${url}#look=row&font=bungee&a=Finola&b=Bryan`);
+  await wordsDone(page);
+  await page.waitForFunction(() => new URLSearchParams(location.hash.slice(1)).has('r'));
+  assert.equal(await page.isVisible('#side-font'), true, 'shown for two-word looks');
+  assert.equal(await page.inputValue('#font2-choice'), '', 'default: same as front');
+  assert.equal('font2' in (await hash()), false, 'the default link has no side font');
+  const [, sideBefore] = await targets(page);
+
+  await page.selectOption('#font2-choice', 'kanit-black');
+  await page.waitForFunction((d) => {
+    const ps = document.querySelectorAll('#shadow-panels figure path.target');
+    return ps.length >= 2 && ps[1].getAttribute('d') !== d && /in [\d.]+ s/.test(document.querySelector('#words-status').textContent);
+  }, sideBefore, { timeout: 180_000 });
+  await page.waitForFunction(() => new URLSearchParams(location.hash.slice(1)).get('r')?.includes('frameB'), null, { timeout: 60_000 });
+  const h = await hash();
+  assert.equal(h.font2, 'kanit-black');
+  assert.equal(h.font, 'bungee');
+  const link = page.url();
+  const [frontAfter, sideAfter] = await targets(page);
+
+  const p2 = await browser.newPage({ viewport: { width: 1400, height: 950 } });
+  p2.on('pageerror', (e) => errors.push(e.message));
+  await p2.goto(link);
+  await p2.waitForFunction((d) => document.querySelectorAll('#shadow-panels figure path.target')[1]?.getAttribute('d') === d, sideAfter, { timeout: 180_000 });
+  assert.equal(await p2.inputValue('#font2-choice'), 'kanit-black');
+  assert.equal((await targets(p2))[0], frontAfter, 'same front outline');
+  await p2.close();
+
+  // Back to "Same as front": the link drops the side font.
+  await page.selectOption('#font2-choice', '');
+  await page.waitForFunction(() => !new URLSearchParams(location.hash.slice(1)).has('font2'));
+  // The cube has no side word, so no side font control.
+  await page.click('#looks button[data-look="cube"]');
+  assert.equal(await page.isVisible('#side-font'), false);
+  assert.deepEqual(errors, []);
+});
+
 test('swing: pauses on exactly the front view, then the side view; controls stop it', async () => {
   const page = await browser.newPage({ viewport: { width: 1300, height: 800 } });
   const errors = [];

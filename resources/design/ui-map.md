@@ -110,6 +110,11 @@ thumbnails, plain-language checks, stretch as a knob, cube as a look.
 Since done too: "Support rods: allowed / none" and "Prefer compact" knobs;
 the cube's options use the plain wording; the report script is grouped by
 look (the section-based `generateGallery` was removed; the looks cover it).
+2026-09-28: **Side word font** (two-word looks only), under the font controls:
+"Same as front" (default) · a bundled font · "Any Google Font…" (name box +
+weight) · "Upload a font…". Share links add `font2` or `gf2`/`gw2` only when it
+differs from the front font; an uploaded side font isn't linked (the Share
+note says so).
 
 ## 6. Other entry points (for reference)
 

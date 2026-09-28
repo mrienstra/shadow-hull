@@ -43,7 +43,7 @@ const titleCase = (c) => SHORT_CASES[c] ?? CASES[c] ?? c;
  */
 export function* generateLook(ctx, wordA, wordB, lookId, given = {}, { more = false, candidates = 3 } = {}) {
   const k = lookKnobs(lookId, given);
-  const { wasm, font, height = 20 } = ctx;
+  const { wasm, font, fontB, height = 20 } = ctx; // fontB: side word's font (see gallery.js)
   const fits = k.stretch ? ['shared', 'fill'] : ['shared'];
   // Looks without a case knob use capitals (more: every case).
   const cases = more ? ['upper', 'mixed', 'lower', 'title'] : [k.case ?? 'upper'];
@@ -56,11 +56,11 @@ export function* generateLook(ctx, wordA, wordB, lookId, given = {}, { more = fa
   const tidy = k.tidy ? { mode: 'pair', tol: 0.15 * height } : null;
   const chainRecipe = (famName, l) => ({
     kind: 'chain', spacing: famName, join: 'hull+bridges', ...(tidy ? { tidy: 'pair' } : {}),  // supports/weights come from `extra`
-    layout: { rows: l.rows.map(({ a, b, fit, frame }) => ({ a, b, fit, frame })), score: l.score, imbalance: l.imbalance, caseMode: l.caseMode },
+    layout: { rows: l.rows.map(({ a, b, fit, frame, frameB }) => ({ a, b, fit, frame, ...(frameB ? { frameB } : {}) })), score: l.score, imbalance: l.imbalance, caseMode: l.caseMode },
   });
   const chains = function* (rows, famName, titlePrefix = '') {
     const designs = designWordPair(wasm, font, wordA, wordB, {
-      spacing: famName, join, height, candidates, cases, rows: [rows], fits, weights: k.compact ? COMPACT_WEIGHTS : undefined, tidy,
+      spacing: famName, join, height, candidates, cases, rows: [rows], fits, weights: k.compact ? COMPACT_WEIGHTS : undefined, tidy, fontB,
     });
     for (const { layout, metrics, runnersUp } of designs) {
       yield out(`${titlePrefix}${titleCase(layout.caseMode)}`, describeLayout(layout), chainRecipe(famName, layout), metrics);
@@ -95,7 +95,7 @@ export function* generateLook(ctx, wordA, wordB, lookId, given = {}, { more = fa
         const fit = k.stretch ? 'stretch' : 'uniform';
         let base, label;
         if (style === 'tall') {
-          const [best] = designSpanColumn(wasm, font, wordA, wordB, { spacing: k.spacing === 'touching' ? 'touching' : 'spaced', fit, height, join });
+          const [best] = designSpanColumn(wasm, font, wordA, wordB, { spacing: k.spacing === 'touching' ? 'touching' : 'spaced', fit, height, join, fontB });
           const shorter = [...wordA].length >= [...wordB].length ? wordB : wordA;
           label = `One tall letter (${[...shorter.toUpperCase()].map((c, i) => (best.spans[i] > 1 ? `${c}×${best.spans[i]}` : c)).join('')})`;
           base = { kind: 'span', spacing: k.spacing === 'touching' ? 'touching' : 'spaced', fit, spans: best.spans };

@@ -639,11 +639,14 @@ function wordsCall(msg, onMessage, transfer = []) {
   (wordsWorker ?? startWordsWorker()).postMessage({ ...msg, id }, transfer);
   return id;
 }
+// Fonts for a words-worker message: the front font (word A), plus the side
+// word's font (word B) when it has its own (see sideSource).
 function fontSource() {
-  if (uploadedFont) return { fontData: uploadedFont.slice(0) };
-  if (googleFont) return { fontUrl: googleFont.url };
+  const side = sideSource();
+  if (uploadedFont) return { fontData: uploadedFont.slice(0), ...side };
+  if (googleFont) return { fontUrl: googleFont.url, ...side };
   const f = FONTS.find((x) => x.id === fontChoice.value);
-  return { fontUrl: new URL(FONT_URLS[`../fonts/${f.file}`], location.href).href };
+  return { fontUrl: new URL(FONT_URLS[`../fonts/${f.file}`], location.href).href, ...side };
 }
 
 function setLook(id, { generate = true } = {}) {
@@ -654,6 +657,7 @@ function setLook(id, { generate = true } = {}) {
   const words = mode === 'words';
   form.hidden = words; $('#candidates').hidden = words;
   wordsForm.hidden = !words; designsHost.hidden = !words;
+  $('#side-font').hidden = !words;
   $('#view-right').textContent = words ? 'Side' : 'Right';
   $('#shadow-panels').replaceChildren();
   $('#print-check').textContent = '';
@@ -906,15 +910,21 @@ function clearGoogleFont() {
   gweight.replaceChildren();
   gweight.disabled = true;
 }
+// A Google Font by id or family name, at `weight` if it has it (else its heaviest).
+async function resolveGoogleFont(idOrFamily, weight) {
+  const cat = await loadGoogleCatalog();
+  const key = String(idOrFamily).trim().toLowerCase();
+  const f = cat.find((x) => x.id === key || x.family.toLowerCase() === key);
+  if (!f) return null;
+  const w = f.weights.includes(weight) ? weight : Math.max(...f.weights);
+  return { id: f.id, family: f.family, weight: w, weights: f.weights, url: `https://cdn.jsdelivr.net/fontsource/fonts/${f.id}@latest/latin-${w}-normal.ttf` };
+}
 async function useGoogleFont(idOrFamily, weight, { quiet = false } = {}) {
   const say = (t) => { status.textContent = t; $('#words-status').textContent = t; };
   try {
-    const cat = await loadGoogleCatalog();
-    const key = String(idOrFamily).trim().toLowerCase();
-    const f = cat.find((x) => x.id === key || x.family.toLowerCase() === key);
+    const f = await resolveGoogleFont(idOrFamily, weight);
     if (!f) { say(`No Google Font called “${idOrFamily}”.`); return false; }
-    const w = f.weights.includes(weight) ? weight : Math.max(...f.weights);
-    const url = `https://cdn.jsdelivr.net/fontsource/fonts/${f.id}@latest/latin-${w}-normal.ttf`;
+    const { weight: w, url } = f;
     say(`Loading ${f.family} ${w}…`);
     await call({ type: 'font', url });
     uploadedFont = null;
@@ -938,9 +948,90 @@ gfont.addEventListener('focus', () => { loadGoogleCatalog().catch(() => {}); }, 
 gfont.addEventListener('change', () => gfont.value.trim() && useGoogleFont(gfont.value));
 gweight.addEventListener('change', () => googleFont && useGoogleFont(googleFont.id, Number(gweight.value)));
 
+// ---- Side word font (two-word looks) ------------------------------------------
+// The word seen from the side (word B) can use its own font, e.g. a script
+// face one way and a block face the other. Like the front font it's page
+// state, not part of a design's recipe. null = same as the front font.
+// { kind: 'bundled', id } | { kind: 'google', id, family, weight, url } | { kind: 'upload', name, data }
+let sideFont = null, pendingSideGoogle = null, font2Settled = '';
+const font2Choice = $('#font2-choice'), gfont2 = $('#gfont2'), gweight2 = $('#gweight2');
+font2Choice.append(new Option('Same as front', ''), ...FONTS.map((f) => new Option(f.name, f.id)),
+  new Option('Any Google Font…', 'google'), new Option('Upload a font…', 'upload'));
+
+function sideSource() {
+  if (!sideFont) return {};
+  if (sideFont.kind === 'upload') return { fontBData: sideFont.data.slice(0) };
+  if (sideFont.kind === 'google') return { fontBUrl: sideFont.url };
+  const f = FONTS.find((x) => x.id === sideFont.id);
+  return { fontBUrl: new URL(FONT_URLS[`../fonts/${f.file}`], location.href).href };
+}
+// True when the side font is the front font anyway (then links don't carry it).
+function sideIsFront() {
+  if (!sideFont) return true;
+  if (sideFont.kind === 'bundled') return !googleFont && !uploadedFont && sideFont.id === fontChoice.value;
+  if (sideFont.kind === 'google') return googleFont?.url === sideFont.url;
+  return false;
+}
+function setSideFont(next, { quiet = false, say = null } = {}) {
+  sideFont = next;
+  font2Settled = font2Choice.value;
+  $('#gfont2-row').hidden = next?.kind !== 'google' && font2Choice.value !== 'google';
+  writeHash();
+  if (!quiet && mode === 'words') generateWords(false);
+  if (say) $('#words-status').textContent = say;
+}
+font2Choice.addEventListener('change', () => {
+  const v = font2Choice.value;
+  $('#gfont2-row').hidden = v !== 'google';
+  if (v === 'upload') { $('#font2-upload').click(); return; } // chosen in the file dialog
+  if (v === 'google') { loadGoogleCatalog().catch(() => {}); gfont2.focus(); return; } // chosen by name
+  gfont2.value = '';
+  setSideFont(v ? { kind: 'bundled', id: v } : null);
+});
+$('#font2-upload').addEventListener('cancel', () => { font2Choice.value = font2Settled; $('#gfont2-row').hidden = font2Settled !== 'google'; });
+$('#font2-upload').addEventListener('change', async () => {
+  const file = $('#font2-upload').files[0];
+  if (!file) { font2Choice.value = font2Settled; return; }
+  const data = await file.arrayBuffer();
+  $('#font2-upload').value = '';
+  gfont2.value = '';
+  font2Choice.querySelector('option[value="upload"]').textContent = `${file.name} (uploaded)`;
+  font2Choice.value = 'upload';
+  setSideFont({ kind: 'upload', name: file.name, data });
+});
+async function useSideGoogleFont(idOrFamily, weight, { quiet = false } = {}) {
+  const say = (t) => { $('#words-status').textContent = t; };
+  try {
+    const f = await resolveGoogleFont(idOrFamily, weight);
+    if (!f) { say(`No Google Font called “${idOrFamily}”.`); return false; }
+    say(`Loading ${f.family} ${f.weight}…`);
+    const res = await fetch(f.url); // check it loads (the workers then get it from the cache)
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    font2Choice.value = 'google';
+    gfont2.value = f.family;
+    gweight2.replaceChildren(...f.weights.map((x) => new Option(String(x), String(x))));
+    gweight2.value = String(f.weight);
+    gweight2.disabled = false;
+    setSideFont({ kind: 'google', id: f.id, family: f.family, weight: f.weight, url: f.url }, { quiet });
+    if (quiet) say(`Side word font: ${f.family} ${f.weight} (Google Fonts, OFL)`);
+    return true;
+  } catch (e) {
+    say(`Couldn’t load that font: ${e.message}`);
+    return false;
+  }
+}
+gfont2.addEventListener('focus', () => { loadGoogleCatalog().catch(() => {}); }, { once: true });
+gfont2.addEventListener('change', () => {
+  const name = gfont2.value.trim();
+  if (!name || (sideFont?.kind === 'google' && sideFont.family.toLowerCase() === name.toLowerCase())) return; // already in use
+  useSideGoogleFont(name);
+});
+gweight2.addEventListener('change', () => sideFont?.kind === 'google' && useSideGoogleFont(sideFont.id, Number(gweight2.value)));
+
 // ---- Shareable state in the URL hash -----------------------------------------
 // #look=cube&font=bungee&t=G|E|B&size=40&fit=stretch&tf=upright&perm=1&conn=1&thick=1&pick=[...]
 // #look=row&font=kanit-black&a=Finola&b=Bryan&k={knobs}&r={recipe}&ti=title
+//   (+ font2=… or gf2=…&gw2=… when the side word has its own font)
 // Older links (#m=letters / #m=words&…) still open.
 let pendingPick = null;
 function writeHash() {
@@ -958,6 +1049,11 @@ function writeHash() {
     const f = new FormData(wordsForm);
     h.set('a', f.get('wordA')); h.set('b', f.get('wordB'));
     h.set('k', JSON.stringify(knobValues));
+    // The side word's font, only when it differs from the front font (uploads aren't linked).
+    if (!sideIsFront()) {
+      if (sideFont.kind === 'bundled') h.set('font2', sideFont.id);
+      else if (sideFont.kind === 'google') { h.set('gf2', sideFont.id); h.set('gw2', sideFont.weight); }
+    }
     if (selectedItem) { h.set('r', JSON.stringify(stripFinish(selectedItem.recipe))); h.set('ti', selectedItem.title); }
   }
   if (new URLSearchParams(location.hash.slice(1)).get('tour') === '1') h.set('tour', '1'); // keep tour mode
@@ -988,6 +1084,11 @@ function readHash() {
     pendingPick = h.get('pick');
     return { look: 'cube' };
   }
+  if (h.get('font2') && FONTS.some((f) => f.id === h.get('font2'))) {
+    sideFont = { kind: 'bundled', id: h.get('font2') };
+    font2Choice.value = font2Settled = h.get('font2');
+  }
+  if (h.get('gf2')) pendingSideGoogle = { id: h.get('gf2'), weight: Number(h.get('gw2')) || null };
   wordsForm.wordA.value = h.get('a') ?? wordsForm.wordA.value;
   wordsForm.wordB.value = h.get('b') ?? wordsForm.wordB.value;
   const recipe = h.get('r') ? JSON.parse(h.get('r')) : null;
@@ -1002,7 +1103,8 @@ function readHash() {
 
 $('#share').addEventListener('click', async () => {
   writeHash();
-  const note = uploadedFont ? ' (the uploaded font isn’t included; the link uses the default font)' : '';
+  const note = uploadedFont ? ' (the uploaded font isn’t included; the link uses the default font)'
+    : sideFont?.kind === 'upload' ? ' (the uploaded side word font isn’t included; the link uses the front font for both words)' : '';
   try {
     await navigator.clipboard.writeText(location.href);
     $('#share-status').textContent = `Link copied${note}.`;
@@ -1018,6 +1120,7 @@ renderLookMenu();
 const shared = readHash();
 if (shared && pendingGoogleFont) await useGoogleFont(pendingGoogleFont.id, pendingGoogleFont.weight, { quiet: true });
 else if (shared) await call({ type: 'font', url: FONT_URLS[`../fonts/${FONTS.find((f) => f.id === fontChoice.value).file}`] });
+if (shared && pendingSideGoogle) await useSideGoogleFont(pendingSideGoogle.id, pendingSideGoogle.weight, { quiet: true });
 if (shared && shared.look !== 'cube') {
   setLook(shared.look, { generate: false });
   knobValues = lookKnobs(shared.look, shared.knobs);

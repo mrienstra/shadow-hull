@@ -159,3 +159,73 @@ test('tidyPair: picks the F-arm-to-B-notch move in Bungee, only when it reduces 
   assert.equal(tidyPair(same.front, same.right).moved.length, 0);
   assert.equal(tidyPair(F, B, { minGain: 100 }).moved.length, 0);
 });
+
+// ---- One font per word (fontB) ----------------------------------------------
+
+const loadBundled = async (file) => loadFont(await readFile(new URL(`../fonts/${file}`, import.meta.url)));
+// Shape signature of outlines, invariant to uniform scale and translation:
+// width / height of the ink and ink area / box area (NonZero polygons).
+function signature(contourSets) {
+  const pts = contourSets.flat(2);
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const w = Math.max(...xs) - Math.min(...xs), h = Math.max(...ys) - Math.min(...ys);
+  const cs = new wasm.CrossSection(contourSets.flat(), 'NonZero');
+  try { return { aspect: w / h, fill: cs.area() / (w * h), z: [Math.min(...ys), Math.max(...ys)] }; } finally { cs.delete(); }
+}
+
+test('two fonts: each view is drawn in its own font, flat capitals of both fonts meet, fontB = font changes nothing', async () => {
+  const { ink, layoutCells, realizeLayout } = await import('../src/core/wordpair.js');
+  const bungee = await loadBundled('Bungee-Regular.ttf'), kanit = await loadBundled('Kanit-Black.ttf');
+  const layout = { rows: [{ a: ['F', 'IN', 'O'], b: ['B', 'R', 'YAN'], fit: ['shared', 'shared', 'shared'] }] };
+  const cells = layoutCells(wasm, bungee, layout, { height: 20, gap: 'kiss', overlap: 0.3, kiss: 0.01, fontB: kanit });
+  try {
+    for (const [i, c] of cells.entries()) {
+      const front = signature(c.letters.front.map((l) => l.pts)), right = signature(c.letters.right.map((l) => l.pts));
+      const sig = (f, t) => signature([ink(f, t, { kiss: 0.01 }).contours]); // same letter spacing as the layout
+      const own = { a: sig(bungee, layout.rows[0].a[i]), b: sig(kanit, layout.rows[0].b[i]) };
+      const other = { a: sig(kanit, layout.rows[0].a[i]), b: sig(bungee, layout.rows[0].b[i]) };
+      for (const k of ['aspect', 'fill']) {
+        assert.ok(Math.abs(front[k] - own.a[k]) < 1e-3, `${c.label} front ${k}: ${front[k]} vs Bungee ${own.a[k]}`);
+        assert.ok(Math.abs(right[k] - own.b[k]) < 1e-3, `${c.label} side ${k}: ${right[k]} vs Kanit ${own.b[k]}`);
+      }
+      assert.ok(Math.abs(front.aspect - other.a.aspect) > 0.02 || Math.abs(front.fill - other.a.fill) > 0.02, `${c.label}: front differs from Kanit`);
+      assert.ok(Math.abs(right.aspect - other.b.aspect) > 0.02 || Math.abs(right.fill - other.b.fill) > 0.02, `${c.label}: side differs from Bungee`);
+    }
+    // Flat capitals (F, I, N / B, R, Y, A, N) of both fonts span the same heights: baselines and cap heights meet.
+    const f = signature([cells[0].letters.front[0].pts]), b = signature([cells[0].letters.right[0].pts]);
+    assert.ok(Math.abs(f.z[0] - b.z[0]) < 0.01 && Math.abs(f.z[1] - b.z[1]) < 0.01, `F ${f.z} vs B ${b.z}`);
+  } finally {
+    for (const c of cells) { c.shapes.front.delete(); c.shapes.right.delete(); }
+  }
+  // Omitting fontB and passing the same font give identical solids.
+  const opts = { height: 20, gap: 'kiss', overlap: -1.2, kiss: -0.06, align: 'center' };
+  const frame = rowFrame(kanit, ['FIN', 'O', 'B', 'R', 'YAN']);
+  const one = realizeLayout(wasm, kanit, { rows: [{ ...layout.rows[0], frame }] }, opts);
+  const same = realizeLayout(wasm, kanit, { rows: [{ ...layout.rows[0], frame }] }, { ...opts, fontB: kanit });
+  try {
+    assert.equal(same.solid.volume(), one.solid.volume());
+    assert.deepEqual(same.metrics, one.metrics);
+  } finally { one.dispose(); same.dispose(); }
+});
+
+test('two fonts: 2D cell scores match the 3D solid, and search keeps coverage high', async () => {
+  const { exploreWordPair, wordFrames } = await import('../src/core/wordpair.js');
+  const bungee = await loadBundled('Bungee-Regular.ttf'), kanit = await loadBundled('Kanit-Black.ttf');
+  const [frame, frameB] = wordFrames(bungee, kanit, ['F', 'I', 'N', 'O', 'L', 'A'], ['B', 'R', 'Y', 'A', 'N']);
+  for (const [a, b] of [['F', 'B'], ['O', 'R'], ['LA', 'N']]) {
+    const s = scoreCell(wasm, bungee, a, b, frame, 'shared', { fontB: kanit, frameB });
+    const r = realizeLayout(wasm, bungee, { rows: [{ a: [a], b: [b], fit: ['shared'], frame, frameB }] }, { fontB: kanit });
+    try {
+      assert.ok(Math.abs(r.metrics.views.front.coverage - s.covA) < 1e-6, `${a}/${b} front ${r.metrics.views.front.coverage} vs ${s.covA}`);
+      assert.ok(Math.abs(r.metrics.views.right.coverage - s.covB) < 1e-6, `${a}/${b} right ${r.metrics.views.right.coverage} vs ${s.covB}`);
+    } finally { r.dispose(); }
+  }
+  const [best] = exploreWordPair(wasm, bungee, 'Finola', 'Bryan', { cases: ['upper'], rows: [1], fits: ['shared'], fontB: kanit });
+  assert.ok(best.score.coverage > 0.98, `coverage ${best.score.coverage}`);
+  assert.deepEqual(best.rows[0].frameB, frameB, 'rows carry word B\'s frame (in its own font)');
+  const r = realizeLayout(wasm, bungee, best, { fontB: kanit });
+  try {
+    const built = Math.min(r.metrics.views.front.coverage, r.metrics.views.right.coverage);
+    assert.ok(built > 0.98, `built coverage ${built}`);
+  } finally { r.dispose(); }
+});

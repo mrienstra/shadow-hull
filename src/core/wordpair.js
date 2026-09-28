@@ -16,8 +16,17 @@
  * line. Cells in a row form a diagonal chain: A along +X, B along +Y, with
  * `gap` between (negative = overlap, which also helps join the cells).
  * The top view is unconstrained.
+ *
+ * Fonts: word A (front) uses `font`, word B (right) `opts.fontB` (default: the
+ * same font). With one font both words share one vertical frame (all their
+ * ink), so their baselines line up. With two fonts each word has a frame in
+ * its own font's units, aligned on the type's guidelines: both fonts' baselines
+ * and cap heights meet (each font scaled so its capitals are the same height),
+ * and the frame covers both words' ink. That keeps flat capitals meeting flat
+ * capitals across fonts, as in one font; with the same font twice it is the
+ * one-font frame. See wordFrames and glyph.js alignedFrames.
  */
-import { glyphRun, kissOffset } from './glyph.js';
+import { glyphRun, kissOffset, alignedFrames } from './glyph.js';
 import { cellPieces } from './scan.js';
 import { buildComposition, measureComposition, disposeCells } from './compose.js';
 import { alignLevels, alignCorners, tidyPair } from './tidy.js';
@@ -61,6 +70,31 @@ export function rowFrame(font, texts, txt) {
   return [Math.min(...inks.map((g) => g.yMin)), Math.max(...inks.map((g) => g.yMax))];
 }
 
+const widen = (f, g) => (f ? [Math.min(f[0], g.yMin), Math.max(f[1], g.yMax)] : [g.yMin, g.yMax]);
+
+/** True when word B has a font of its own (see the module note on fonts). */
+const splitFonts = (font, fontB) => fontB != null && fontB !== font;
+
+/**
+ * Vertical frames [A, B] for word A's texts in `font` and word B's in `fontB`:
+ * one shared frame from both (one font), or two aligned frames (two fonts; see
+ * the module note), each in its own font's units.
+ */
+export function wordFrames(font, fontB, textsA, textsB, txt) {
+  if (!splitFonts(font, fontB)) { const f = rowFrame(font, [...textsA, ...textsB], txt); return [f, f]; }
+  return alignedFrames([font, fontB], [[rowFrame(font, textsA, txt)], [rowFrame(fontB, textsB, txt)]]);
+}
+
+/**
+ * Frames for one cell: the given frame(s) widened to cover the cell's ink so
+ * nothing is clipped. One font: one frame from `frame0` and both inks. Two
+ * fonts: A's (`frame0`, ga) and B's (`frameB0`, gb), kept aligned.
+ */
+function cellFrames(font, fontB, ga, gb, frame0, frameB0) {
+  if (!splitFonts(font, fontB)) { const f = widen(widen(frame0, ga), gb); return [f, f]; }
+  return alignedFrames([font, fontB], [[frame0, [ga.yMin, ga.yMax]], [frameB0, [gb.yMin, gb.yMax]]]);
+}
+
 /**
  * Vertical placement of a chunk in a row of height `height` (row bottom at 0):
  * 'shared' keeps the row's common frame (baselines line up); 'fill' stretches
@@ -84,16 +118,22 @@ function vertical(g, frame, height, fit) {
  * monospaced look with any font, without turning an I into a block.
  * 'center' keeps natural widths.
  */
-function gridRows(font, layout, { height = 20, fit = 'shared', txt, overlap = 0.3, grid }) {
+function gridRows(font, layout, { height = 20, fit = 'shared', txt, overlap = 0.3, grid, fontB = font }) {
   const glyphBox = (g) => {
     const pts = g.contours.flat();
     return { x0: Math.min(...pts.map((p) => p[0])), x1: Math.max(...pts.map((p) => p[0])) };
   };
-  // One vertical frame for all rows, so every row has the same scale.
-  let frame = rowFrame(font, layout.rows.flatMap((r) => [...r.a, ...r.b]), txt);
-  for (const r of layout.rows) if (r.frame) frame = [Math.min(frame[0], r.frame[0]), Math.max(frame[1], r.frame[1])];
-  const shared = height / (frame[1] - frame[0]);
-  const letterWidths = (k) => layout.rows.flatMap((r) => r[k].flatMap((t) => ink(font, t, txt).glyphs.map((g) => { const b = glyphBox(g); return (b.x1 - b.x0) * shared; })));
+  // One vertical frame for all rows, so every row has the same scale (one
+  // per word with two fonts).
+  const fonts = { a: font, b: fontB };
+  const split = splitFonts(font, fontB);
+  const [fa, fb] = wordFrames(font, fontB, layout.rows.flatMap((r) => r.a), layout.rows.flatMap((r) => r.b), txt);
+  const frames = { a: fa, b: fb };
+  const union = (f, g) => (g ? [Math.min(f[0], g[0]), Math.max(f[1], g[1])] : f);
+  if (!split) for (const r of layout.rows) frames.a = frames.b = union(frames.a, r.frame);
+  else [frames.a, frames.b] = alignedFrames([font, fontB], [[fa, ...layout.rows.map((r) => r.frame)], [fb, ...layout.rows.map((r) => r.frameB)]]);
+  const shared = { a: height / (frames.a[1] - frames.a[0]), b: height / (frames.b[1] - frames.b[0]) };
+  const letterWidths = (k) => layout.rows.flatMap((r) => r[k].flatMap((t) => ink(fonts[k], t, txt).glyphs.map((g) => { const b = glyphBox(g); return (b.x1 - b.x0) * shared[k]; })));
   const W = { a: Math.max(...letterWidths('a')), b: Math.max(...letterWidths('b')) };
   const pitch = { a: W.a - overlap, b: W.b - overlap };
   return layout.rows.map((row) => {
@@ -101,16 +141,16 @@ function gridRows(font, layout, { height = 20, fit = 'shared', txt, overlap = 0.
     return row.a.map((ta, i) => {
       const f = row.fit?.[i] ?? fit;
       const side = (k, t) => {
-        const g = ink(font, t, txt);
-        const v = vertical(g, frame, height, f);
+        const g = ink(fonts[k], t, txt);
+        const v = vertical(g, frames[k], height, f);
         const start = col[k];
         const letters = g.glyphs.map((gl) => {
-          const b = glyphBox(gl), w = (b.x1 - b.x0) * shared;
+          const b = glyphBox(gl), w = (b.x1 - b.x0) * shared[k];
           // Stretch towards the slot width, capped: an I stretched to a full slot is just a block.
-          const sx = grid.fit === 'stretch' ? shared * Math.min(W[k] / w, grid.maxStretch ?? 1.5) : shared;
+          const sx = grid.fit === 'stretch' ? shared[k] * Math.min(W[k] / w, grid.maxStretch ?? 1.5) : shared[k];
           const centre = col[k] * pitch[k] + W[k] / 2;
           col[k]++;
-          return { ch: gl.ch, pts: placePoints(gl.contours, [(b.x0 + b.x1) / 2, v.from], [centre, 0], [sx, v.s]), stretch: sx / shared };
+          return { ch: gl.ch, pts: placePoints(gl.contours, [(b.x0 + b.x1) / 2, v.from], [centre, 0], [sx, v.s]), stretch: sx / shared[k] };
         });
         return { letters, pos: start * pitch[k], span: (col[k] - start - 1) * pitch[k] + W[k] };
       };
@@ -122,8 +162,11 @@ function gridRows(font, layout, { height = 20, fit = 'shared', txt, overlap = 0.
 
 /**
  * Cells for a fixed layout (for building the 3D solid).
- * @param layout.rows [{ a: [chunk...], b: [chunk...], fit?: ['shared'|'fill', ...], frame?: [y0, y1] }]
+ * @param layout.rows [{ a: [chunk...], b: [chunk...], fit?: ['shared'|'fill', ...], frame?: [y0, y1], frameB?: [y0, y1] }]
  *   top to bottom; a[i] pairs with b[i]. `frame` defaults to the row's own ink.
+ *   With two fonts (opts.fontB), `frame` is word A's frame and `frameB` word
+ *   B's, each in its own font's units; missing ones default to that word's ink
+ *   over all rows (so rows keep one scale).
  * @param opts.height row height (mm); opts.gap between chunks (mm, may be < 0),
  *   or 'kiss': each chunk just touches the previous one in each view,
  *   overlapping by opts.overlap (mm) at the closest point; opts.lineGap
@@ -136,9 +179,12 @@ function gridRows(font, layout, { height = 20, fit = 'shared', txt, overlap = 0.
  *   features meet (see tidy.js): mode 'pair' = tidyPair (the trade-off
  *   search), 'corners' = alignCorners (share links from before tidyPair),
  *   'levels' = alignLevels; tol in mm.
+ *   opts.fontB: word B's font (default: `font`; see the module note on fonts).
  */
 export function layoutCells(wasm, font, layout, opts = {}) {
   const { height = 20, gap = 0, lineGap = 0, fit = 'shared', tolerance, tracking, kiss, overlap = 0.3, align = 'left', grid = null, tidy: tidyOpt = null } = opts;
+  const fontB = opts.fontB ?? font;
+  const split = splitFonts(font, fontB);
   // Line up each pair's nearly level edges (before spacing, so letters still just touch).
   // Nudge strokes so each pair's features meet (before spacing, so letters still just touch).
   const tidy = (a, b) => {
@@ -151,22 +197,29 @@ export function layoutCells(wasm, font, layout, opts = {}) {
   const txt = { tolerance, tracking, kiss };
   const shiftPts = (pts, du, dv) => pts.map((c) => c.map(([u, v]) => [u + du, v + dv]));
   // Pass 1: each row laid out with its bottom at z = 0 (plain JS geometry).
-  const rows = grid ? gridRows(font, layout, { ...opts, txt }).map((row) => row.map((c) => ({ ...c, ...tidy(c.a, c.b) }))) : layout.rows.map((row) => {
+  // Two fonts: each word's frame over all rows, for rows that don't give one.
+  const wide = split && wordFrames(font, fontB, layout.rows.flatMap((r) => r.a), layout.rows.flatMap((r) => r.b), txt);
+  const rows = grid ? gridRows(font, layout, { ...opts, fontB, txt }).map((row) => row.map((c) => ({ ...c, ...tidy(c.a, c.b) }))) : layout.rows.map((row) => {
     if (row.a.length !== row.b.length) throw new Error('Each row needs the same number of chunks in both words');
     // Never clip: widen a given frame to cover this row's own ink.
-    const own = rowFrame(font, [...row.a, ...row.b], txt);
-    const frame = row.frame ? [Math.min(row.frame[0], own[0]), Math.max(row.frame[1], own[1])] : own;
-    const shared = height / (frame[1] - frame[0]);
+    let frameA, frameB;
+    if (!split) {
+      const own = rowFrame(font, [...row.a, ...row.b], txt);
+      frameA = frameB = row.frame ? [Math.min(row.frame[0], own[0]), Math.max(row.frame[1], own[1])] : own;
+    } else {
+      [frameA, frameB] = alignedFrames([font, fontB], [[row.frame ?? wide[0], rowFrame(font, row.a, txt)], [row.frameB ?? wide[1], rowFrame(fontB, row.b, txt)]]);
+    }
+    const sharedA = height / (frameA[1] - frameA[0]), sharedB = height / (frameB[1] - frameB[0]);
     const out = [];
     let x = 0, y = 0, prev = null;
     row.a.forEach((ta, i) => {
-      const ga = ink(font, ta, txt), gb = ink(font, row.b[i], txt);
+      const ga = ink(font, ta, txt), gb = ink(fontB, row.b[i], txt);
       const f = row.fit?.[i] ?? fit;
-      const va = vertical(ga, frame, height, f), vb = vertical(gb, frame, height, f);
-      const wa = (ga.xMax - ga.xMin) * shared, wb = (gb.xMax - gb.xMin) * shared;
+      const va = vertical(ga, frameA, height, f), vb = vertical(gb, frameB, height, f);
+      const wa = (ga.xMax - ga.xMin) * sharedA, wb = (gb.xMax - gb.xMin) * sharedB;
       const { a: lettersA, b: lettersB } = tidy(
-        ga.glyphs.map((g) => ({ ch: g.ch, pts: placePoints(g.contours, [ga.xMin, va.from], [0, 0], [shared, va.s]) })),
-        gb.glyphs.map((g) => ({ ch: g.ch, pts: placePoints(g.contours, [gb.xMin, vb.from], [0, 0], [shared, vb.s]) })));
+        ga.glyphs.map((g) => ({ ch: g.ch, pts: placePoints(g.contours, [ga.xMin, va.from], [0, 0], [sharedA, va.s]) })),
+        gb.glyphs.map((g) => ({ ch: g.ch, pts: placePoints(g.contours, [gb.xMin, vb.from], [0, 0], [sharedB, vb.s]) })));
       if (prev && gap === 'kiss') {
         // Just touch the previous cell in each view (per-height edge profiles).
         const dx = kissOffset(prev.a.flatMap((l) => l.pts), lettersA.flatMap((l) => l.pts), overlap);
@@ -262,16 +315,17 @@ function coverageUnder(wasm, cs, profile) {
 
 /**
  * Score one cell in 2D: both chunks placed in a row of the given frame/fit.
+ * With two fonts (opts.fontB), `frame0` is A's frame and opts.frameB B's.
  * Returns { coverage: min of the two sides, covA, covB, distortion }.
  */
-export function scoreCell(wasm, font, ta, tb, frame0, fit, { height = 20, tolerance, tracking, kiss } = {}) {
+export function scoreCell(wasm, font, ta, tb, frame0, fit, { height = 20, tolerance, tracking, kiss, fontB = font, frameB } = {}) {
   const txt = { tolerance, tracking, kiss };
-  const ga = ink(font, ta, txt), gb = ink(font, tb, txt);
-  const frame = [Math.min(frame0[0], ga.yMin, gb.yMin), Math.max(frame0[1], ga.yMax, gb.yMax)];
-  const shared = height / (frame[1] - frame[0]);
-  const va = vertical(ga, frame, height, fit), vb = vertical(gb, frame, height, fit);
-  const a = placed(wasm, ga.contours, [ga.xMin, va.from], [0, 0], [shared, va.s]);
-  const b = placed(wasm, gb.contours, [gb.xMin, vb.from], [0, 0], [shared, vb.s]);
+  const ga = ink(font, ta, txt), gb = ink(fontB, tb, txt);
+  const [fa, fb] = cellFrames(font, fontB, ga, gb, frame0, frameB);
+  const sa = height / (fa[1] - fa[0]), sb = height / (fb[1] - fb[0]);
+  const va = vertical(ga, fa, height, fit), vb = vertical(gb, fb, height, fit);
+  const a = placed(wasm, ga.contours, [ga.xMin, va.from], [0, 0], [sa, va.s]);
+  const b = placed(wasm, gb.contours, [gb.xMin, vb.from], [0, 0], [sb, vb.s]);
   try {
     const covA = coverageUnder(wasm, a, verticalProfile(b));
     const covB = coverageUnder(wasm, b, verticalProfile(a));
@@ -286,8 +340,9 @@ export function scoreCell(wasm, font, ta, tb, frame0, fit, { height = 20, tolera
  * "i" with a letter that has ink at dot height strands the dot as a floating
  * lump. Needs a small 3D build; callers cache it.
  */
-export function cellFragments(wasm, font, ta, tb, frame, fit, { height = 20, tolerance, tracking, kiss } = {}) {
-  const cells = layoutCells(wasm, font, { rows: [{ a: [ta], b: [tb], fit: [fit], frame }] }, { height, tolerance, tracking, kiss });
+export function cellFragments(wasm, font, ta, tb, frame, fit, { height = 20, tolerance, tracking, kiss, fontB, frameB } = {}) {
+  const row = { a: [ta], b: [tb], fit: [fit], frame, ...(frameB ? { frameB } : {}) };
+  const cells = layoutCells(wasm, font, { rows: [row] }, { height, tolerance, tracking, kiss, fontB });
   const solid = buildComposition(wasm, cells);
   try {
     const parts = solid.decompose();
@@ -303,14 +358,14 @@ export function cellFragments(wasm, font, ta, tb, frame, fit, { height = 20, tol
  * Same as cellFragments, but by scanline slicing in plain JS (see scan.js):
  * ~100x faster, may over-count a connection thinner than one slice.
  */
-export function cellFragmentsScan(font, ta, tb, frame0, fit, { height = 20, tolerance, tracking, kiss, levels = 200 } = {}) {
+export function cellFragmentsScan(font, ta, tb, frame0, fit, { height = 20, tolerance, tracking, kiss, levels = 200, fontB = font, frameB } = {}) {
   const txt = { tolerance, tracking, kiss };
-  const ga = ink(font, ta, txt), gb = ink(font, tb, txt);
-  const frame = [Math.min(frame0[0], ga.yMin, gb.yMin), Math.max(frame0[1], ga.yMax, gb.yMax)];
-  const shared = height / (frame[1] - frame[0]);
-  const va = vertical(ga, frame, height, fit), vb = vertical(gb, frame, height, fit);
-  const a = placePoints(ga.contours, [ga.xMin, va.from], [0, 0], [shared, va.s]);
-  const b = placePoints(gb.contours, [gb.xMin, vb.from], [0, 0], [shared, vb.s]);
+  const ga = ink(font, ta, txt), gb = ink(fontB, tb, txt);
+  const [fa, fb] = cellFrames(font, fontB, ga, gb, frame0, frameB);
+  const sa = height / (fa[1] - fa[0]), sb = height / (fb[1] - fb[0]);
+  const va = vertical(ga, fa, height, fit), vb = vertical(gb, fb, height, fit);
+  const a = placePoints(ga.contours, [ga.xMin, va.from], [0, 0], [sa, va.s]);
+  const b = placePoints(gb.contours, [gb.xMin, vb.from], [0, 0], [sb, vb.s]);
   return Math.max(0, cellPieces(a, b, 0, height, levels) - 1);
 }
 
@@ -411,20 +466,26 @@ function pareto(items, limit) {
  */
 export function alignLines(wasm, font, lineA, lineB, opts = {}) {
   const { caseMode = 'upper', fits = ['shared'], maxChunk = 3, frontLimit = 12, height = 20, tolerance, tracking, kiss } = opts;
+  const fontB = opts.fontB ?? font;
+  const split = splitFonts(font, fontB);
   const txt = { tolerance, tracking, kiss };
   const A = [...CASES[caseMode === 'mixed' ? 'as' : caseMode](lineA)], B = [...CASES[caseMode === 'mixed' ? 'as' : caseMode](lineB)];
-  const frameTexts = caseMode === 'mixed' ? [...A, ...B].flatMap((c) => [c.toUpperCase(), c.toLowerCase()]) : [...A, ...B];
-  // A caller searching many line splits passes one frame and cache for all of
-  // them (same row height scale everywhere, and cells are scored once).
-  const frame = opts.frame ?? rowFrame(font, frameTexts, txt);
+  const variants = (cs) => (caseMode === 'mixed' ? cs.flatMap((c) => [c.toUpperCase(), c.toLowerCase()]) : cs);
+  // A caller searching many line splits passes one frame (per word, with two
+  // fonts) and cache for all of them (same row height scale everywhere, and
+  // cells are scored once).
+  const [fa, fb] = wordFrames(font, fontB, variants(A), variants(B), txt);
+  const frame = opts.frame ?? fa;
+  const frameB = split ? (opts.frameB ?? fb) : undefined;
   const cellCache = opts.cache ?? new Map();
   const cellOptions = (ca, cb) => {
-    const key = `${caseMode}|${ca}|${cb}|${frame}|${fits}|${height}|${tracking ?? 0}|${kiss ?? ''}`;
+    const key = `${caseMode}|${ca}|${cb}|${frame}|${frameB ?? ''}|${fits}|${height}|${tracking ?? 0}|${kiss ?? ''}`;
     if (!cellCache.has(key)) {
       const out = [];
       for (const va of caseVariants(ca, caseMode)) for (const vb of caseVariants(cb, caseMode)) for (const fit of fits) {
-        const s = scoreCell(wasm, font, va, vb, frame, fit, { height, tolerance, tracking, kiss });
-        const fragments = cellFragmentsScan(font, va, vb, frame, fit, { height, tolerance, tracking, kiss });
+        const two = split ? { fontB, frameB } : {};
+        const s = scoreCell(wasm, font, va, vb, frame, fit, { height, tolerance, tracking, kiss, ...two });
+        const fragments = cellFragmentsScan(font, va, vb, frame, fit, { height, tolerance, tracking, kiss, ...two });
         out.push({
           a: va, b: vb, fit, cell: s,
           score: { coverage: s.coverage, distortion: s.distortion, fragments, merged: [...va].length + [...vb].length - 2, lower: lowercaseCount(va) + lowercaseCount(vb) },
@@ -451,7 +512,7 @@ export function alignLines(wasm, font, lineA, lineB, opts = {}) {
       }
     }
   }
-  return (best[n][m] ?? []).map((p) => ({ ...p, frame }));
+  return (best[n][m] ?? []).map((p) => ({ ...p, frame, ...(split ? { frameB } : {}) }));
 }
 
 /**
@@ -463,6 +524,7 @@ export function alignLines(wasm, font, lineA, lineB, opts = {}) {
  * @param opts.fits per-cell vertical fit choices: 'shared' and/or 'fill'
  * @param opts.rows row counts to try
  * @param opts.grid only equal-length line splits (see gridLines), for grid layouts
+ * @param opts.fontB word B's font (default: `font`); rows then also carry frameB
  * @param opts.byStyle return every non-dominated layout per (case, line split)
  *   instead of only the global front, so styles that lose on these objectives
  *   (e.g. stacked rows, which win on compactness) stay visible.
@@ -475,11 +537,12 @@ export function exploreWordPair(wasm, font, wordA, wordB, opts = {}) {
     // Title case applies to whole words, so do it before splitting into lines.
     const [wa, wb] = caseMode === 'title' ? [CASES.title(wordA), CASES.title(wordB)] : [wordA, wordB];
     const lineMode = caseMode === 'title' ? 'as' : caseMode;
-    // One vertical frame per case mode: every row has the same scale.
-    const letters = [...wa, ...wb];
-    const frame = rowFrame(font, lineMode === 'mixed'
-      ? letters.flatMap((c) => [c.toUpperCase(), c.toLowerCase()])
-      : letters.map((c) => (CASES[lineMode] ?? CASES.as)(c)), { tolerance: opts.tolerance, tracking: opts.tracking, kiss: opts.kiss });
+    // One vertical frame per case mode (per word, with two fonts): every row has the same scale.
+    const forms = (w) => (lineMode === 'mixed'
+      ? [...w].flatMap((c) => [c.toUpperCase(), c.toLowerCase()])
+      : [...w].map((c) => (CASES[lineMode] ?? CASES.as)(c)));
+    const [frame, fb] = wordFrames(font, opts.fontB ?? font, forms(wa), forms(wb), { tolerance: opts.tolerance, tracking: opts.tracking, kiss: opts.kiss });
+    const frameB = splitFonts(font, opts.fontB) ? fb : undefined;
     for (const r of rowCounts) {
       if (r > Math.min([...wa].length, [...wb].length)) continue;
       const lineSplits = (w) => (opts.grid ? [gridLines(w, r)] : splits(w, r));
@@ -488,10 +551,10 @@ export function exploreWordPair(wasm, font, wordA, wordB, opts = {}) {
           if (la.length !== r || lb.length !== r) continue;
           let partial = [{ score: ZERO, rows: [] }];
           for (let j = 0; j < r; j++) {
-            const aligned = alignLines(wasm, font, la[j], lb[j], { ...opts, caseMode: lineMode, frontLimit, frame, cache });
+            const aligned = alignLines(wasm, font, la[j], lb[j], { ...opts, caseMode: lineMode, frontLimit, frame, frameB, cache });
             partial = pareto(partial.flatMap((p) => aligned.map((q) => ({
               score: combine(p.score, q.score),
-              rows: [...p.rows, { a: q.cells.map((c) => c.a), b: q.cells.map((c) => c.b), fit: q.cells.map((c) => c.fit), frame: q.frame, cells: q.cells }],
+              rows: [...p.rows, { a: q.cells.map((c) => c.a), b: q.cells.map((c) => c.b), fit: q.cells.map((c) => c.fit), frame: q.frame, ...(q.frameB ? { frameB: q.frameB } : {}), cells: q.cells }],
             }))), frontLimit);
           }
           // Line imbalance: how uneven each word's lines are (0 = a true grid, e.g. FIN/OLA).
@@ -504,7 +567,7 @@ export function exploreWordPair(wasm, font, wordA, wordB, opts = {}) {
   return byStyle ? results : pareto(results, 1e9);
 }
 
-/** Build and measure a layout in 3D (pieces, compactness, verified coverage). */
+/** Build and measure a layout in 3D (pieces, compactness, verified coverage); opts as layoutCells (incl. fontB). */
 export function realizeLayout(wasm, font, layout, opts = {}) {
   const cells = layoutCells(wasm, font, { rows: layout.rows }, opts);
   const solid = buildComposition(wasm, cells);

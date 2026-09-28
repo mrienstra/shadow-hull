@@ -57,6 +57,23 @@ for (const [name, lookId, knobs, check] of REACHABLE) {
   });
 }
 
+// One font per word: the side word in its own font, in every kind of design.
+test('reachable with two fonts (Bungee front, Kanit Black side): row, grid, towers, block', async () => {
+  const bungee = loadFont(await readFile(new URL('../fonts/Bungee-Regular.ttf', import.meta.url)));
+  const two = { ...ctx, font: bungee, fontB: ctx.font, shapes: undefined };
+  for (const [lookId, knobs] of [['row', {}], ['grid', {}], ['tower', { style: 'tall' }], ['tower', { style: 'stacked' }], ['block', {}]]) {
+    const [first] = generateLook(two, 'Finola', 'Bryan', lookId, knobs);
+    if (first.recipe.kind === 'chain') assert.ok(first.recipe.layout.rows.every((r) => r.frameB), 'chain rows carry the side font\'s frame');
+    const d = buildRecipe(two, 'Finola', 'Bryan', first.recipe);
+    const plain = buildRecipe({ ...ctx, font: bungee }, 'Finola', 'Bryan', first.recipe);
+    try {
+      assert.equal(d.metrics.finalPieces, 1, `${lookId}: one printable piece`);
+      assert.ok(d.metrics.coverage > 0.95, `${lookId}: coverage ${d.metrics.coverage}`);
+      assert.notEqual(d.joined.volume().toFixed(3), plain.joined.volume().toFixed(3), `${lookId}: the side font changes the object`);
+    } finally { d.dispose(); plain.dispose(); }
+  }
+});
+
 // Every knob a look shows must change the object (turn only rotates it for
 // display, so it's checked by the recipe instead).
 test('tower knobs take effect: spacing and shape on every style; no compact knob', () => {

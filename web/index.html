@@ -24,6 +24,15 @@
         <datalist id="gfont-list"></datalist>
       </div>
       <label class="upload">…or upload a font (TTF/OTF) <input type="file" id="font-upload" accept=".ttf,.otf"></label>
+      <!-- Two-word looks: the second word (seen from the side) can use another font -->
+      <div class="side-font" id="side-font" hidden>
+        <label class="font-row">Side word font <select id="font2-choice" title="Font for the word seen from the side"></select></label>
+        <div class="gfont" id="gfont2-row" hidden>
+          <input id="gfont2" list="gfont-list" placeholder="Google Font for the side word, e.g. Pacifico" autocomplete="off" aria-label="Google Font family for the side word">
+          <select id="gweight2" aria-label="Weight (side word)" title="Weight (heaviest is usually best)" disabled></select>
+        </div>
+        <input type="file" id="font2-upload" accept=".ttf,.otf" hidden aria-label="Upload a font for the side word">
+      </div>
 
       <!-- Letter cube (three letters) -->
       <form id="form">

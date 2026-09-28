@@ -116,10 +116,13 @@ export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods =
   };
 }
 
-/** Build one chain layout with a spacing family, join it, and measure everything. */
-export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = 'hull+bridges', height = 20, weights, top = null, tidy = null } = {}) {
+/**
+ * Build one chain layout with a spacing family, join it, and measure everything.
+ * `fontB` (here and below): word B's font, for the side view (default: `font`).
+ */
+export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = 'hull+bridges', height = 20, weights, top = null, tidy = null, fontB } = {}) {
   const fam = SPACING[spacing];
-  const cells = layoutCells(wasm, font, { rows: layout.rows }, { height, ...fam.layout, tidy });
+  const cells = layoutCells(wasm, font, { rows: layout.rows }, { height, ...fam.layout, tidy, fontB });
   if (top?.shape) {
     // A shape seen from above over the whole layout (used for towers of
     // letter pairs): fitted to the cells' combined footprint, shared by all.
@@ -142,9 +145,9 @@ export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = '
  * shape. spacing 'touching' (letters just touch) or 'spaced' (visible gaps,
  * joined by low level rods).
  */
-export function realizeBlock(wasm, font, wordA, wordB, { caseMode = 'upper', spacing = 'spaced', top = null, join = 'bridges', height = 20, angle = 90 } = {}) {
+export function realizeBlock(wasm, font, wordA, wordB, { caseMode = 'upper', spacing = 'spaced', top = null, join = 'bridges', height = 20, angle = 90, fontB } = {}) {
   const fam = SPACING[spacing];
-  const { cells, frames } = blockCells(wasm, font, wordA, wordB, { height, caseMode, kiss: fam.layout.kiss, top, angle });
+  const { cells, frames } = blockCells(wasm, font, wordA, wordB, { height, caseMode, kiss: fam.layout.kiss, top, angle, fontB });
   const solid = buildComposition(wasm, cells, { frames });
   return finishDesign(wasm, cells, solid, { join, rods: fam.rods, height, frames });
 }
@@ -160,7 +163,7 @@ export const styleOf = (p) => `${p.caseMode}, ${p.rows.length} row${p.rows.lengt
 export function designWordPair(wasm, font, wordA, wordB, opts = {}) {
   const {
     spacing = 'spaced', join = 'hull+bridges', height = 20, candidates = 3,
-    cases = ['upper', 'lower', 'title', 'mixed'], rows, fits = ['shared', 'fill'], maxChunk = 3, weights, tidy = null,
+    cases = ['upper', 'lower', 'title', 'mixed'], rows, fits = ['shared', 'fill'], maxChunk = 3, weights, tidy = null, fontB,
   } = opts;
   const fam = SPACING[spacing];
   const search = { ...fam.search };
@@ -169,7 +172,7 @@ export function designWordPair(wasm, font, wordA, wordB, opts = {}) {
   if (search.rows === 'column') search.rows = [Math.min([...wordA].length, [...wordB].length)];
   search.rows = rows ?? search.rows ?? [1, 2, 3];
   const all = exploreWordPair(wasm, font, wordA, wordB, {
-    cases, fits, maxChunk, byStyle: true, height, kiss: fam.layout.kiss, ...search,
+    cases, fits, maxChunk, byStyle: true, height, kiss: fam.layout.kiss, fontB, ...search,
   });
   const groups = new Map();
   for (const p of all) {
@@ -181,7 +184,7 @@ export function designWordPair(wasm, font, wordA, wordB, opts = {}) {
   for (const [style, ps] of groups) {
     ps.sort(rankLayouts);
     const tried = ps.slice(0, candidates).map((layout) => {
-      const d = realizeDesign(wasm, font, layout, { spacing, join, height, weights, tidy });
+      const d = realizeDesign(wasm, font, layout, { spacing, join, height, weights, tidy, fontB });
       const m = d.metrics;
       d.dispose();
       return { style, layout, metrics: m };
@@ -200,12 +203,12 @@ export function designWordPair(wasm, font, wordA, wordB, opts = {}) {
  * (1.2 mm gaps, which cut a line through spanning letters).
  * @returns [{ spans, metrics }] best first
  */
-export function designSpanColumn(wasm, font, wordA, wordB, { spacing = 'touching', fit = 'stretch', caseMode = 'upper', maxSpan = 3, height = 20, join = 'hull+bridges' } = {}) {
+export function designSpanColumn(wasm, font, wordA, wordB, { spacing = 'touching', fit = 'stretch', caseMode = 'upper', maxSpan = 3, height = 20, join = 'hull+bridges', fontB } = {}) {
   const [n, m] = [[...wordA].length, [...wordB].length];
   const spansList = compositions(Math.max(n, m), Math.min(n, m), maxSpan);
   const gap = spacing === 'touching' ? -0.3 : 1.2;
   const results = spansList.map((spans) => {
-    const d = realizeSpanColumn(wasm, font, wordA, wordB, spans, { spacing, fit, caseMode, height, join, gap });
+    const d = realizeSpanColumn(wasm, font, wordA, wordB, spans, { spacing, fit, caseMode, height, join, gap, fontB });
     const { metrics } = d;
     d.dispose();
     return { spans, metrics };
@@ -214,9 +217,9 @@ export function designSpanColumn(wasm, font, wordA, wordB, { spacing = 'touching
 }
 
 /** Build one spanning column (see designSpanColumn); caller disposes. */
-export function realizeSpanColumn(wasm, font, wordA, wordB, spans, { spacing = 'touching', fit = 'stretch', caseMode = 'upper', height = 20, join = 'hull+bridges', gap, top = null } = {}) {
+export function realizeSpanColumn(wasm, font, wordA, wordB, spans, { spacing = 'touching', fit = 'stretch', caseMode = 'upper', height = 20, join = 'hull+bridges', gap, top = null, fontB } = {}) {
   const fam = SPACING[spacing];
-  const cells = spanColumnCells(wasm, font, wordA, wordB, spans, { height, gap: gap ?? (spacing === 'touching' ? -0.3 : 1.2), fit, caseMode, top });
+  const cells = spanColumnCells(wasm, font, wordA, wordB, spans, { height, gap: gap ?? (spacing === 'touching' ? -0.3 : 1.2), fit, caseMode, top, fontB });
   const solid = buildComposition(wasm, cells);
   // Stretch: how much taller than a normal row the tallest spanning letter is.
   const stretch = Math.max(...spans) - 1;
@@ -224,9 +227,9 @@ export function realizeSpanColumn(wasm, font, wordA, wordB, spans, { spacing = '
 }
 
 /** Build a stacked block (see column.js stackedColumnCells); caller disposes. */
-export function realizeStackedColumn(wasm, font, wordA, wordB, { spacing = 'touching', fit = 'stretch', caseMode = 'upper', height = 20, join = 'bridges', top = null } = {}) {
+export function realizeStackedColumn(wasm, font, wordA, wordB, { spacing = 'touching', fit = 'stretch', caseMode = 'upper', height = 20, join = 'bridges', top = null, fontB } = {}) {
   const fam = SPACING[spacing];
-  const cells = stackedColumnCells(wasm, font, wordA, wordB, { height, gap: spacing === 'touching' ? -0.3 : 1.2, fit, caseMode, top });
+  const cells = stackedColumnCells(wasm, font, wordA, wordB, { height, gap: spacing === 'touching' ? -0.3 : 1.2, fit, caseMode, top, fontB });
   const solid = buildComposition(wasm, cells);
   return finishDesign(wasm, cells, solid, { join, rods: fam.rods, height, stretch: fit === 'stretch' ? cells[0].stretch : 0 });
 }

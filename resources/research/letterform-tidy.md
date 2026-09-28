@@ -40,7 +40,12 @@ the other).
   build solids only for the best few. Also scores font *pairings* for one font
   per axis.
 - **One font per axis:** layout already handles the two words separately;
-  mostly plumbing two fonts through (recipes, UI, share links).
+  mostly plumbing two fonts through (recipes, UI, share links). Done
+  2026-09-28: the two fonts are lined up on baseline and cap height
+  (`alignedFrames` in glyph.js). Letting each word's ink fill the row instead
+  cost ~3% coverage (Bungee × Kanit Black FINOLA × BRYAN: 0.967 vs 0.994),
+  because one font's round overshoot then stops the other's flat capitals
+  meeting it.
 - Order taken: measures → scores + interactive 3D on the review page → tidy
   as a trade-off search (all done 2026-09-27/28) → font per axis.
 

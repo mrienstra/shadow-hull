@@ -70,7 +70,9 @@ for words, look, knobs (or `--hash`), size, fps and timing.
 Nine heavy display fonts from Google Fonts, plus Noto Emoji for shapes, all
 under the SIL Open Font License (see `fonts/README.md` for how they were
 chosen). The web page can also load **any Google Font** by name (TTF files via
-[Fontsource](https://fontsource.org/)), and any TTF/OTF can be uploaded.
+[Fontsource](https://fontsource.org/)), and any TTF/OTF can be uploaded. In
+two-word looks the side word can have **its own font** (e.g. a script one way
+and a block face the other); both fonts are lined up on baseline and cap height.
 
 ## Papers and prior work
 

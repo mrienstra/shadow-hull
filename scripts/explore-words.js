@@ -3,7 +3,7 @@
 // per design) to reports/<a>-<b>.html, grouped by look. Exploration tool, not product.
 // Example words: Finola and Bryan, the lead agents (Finola Jones, Bryan Beneventi)
 // in NBC's sci-fi series Debris (2021) — a 6- and a 5-letter name with an i-dot.
-// Usage: node scripts/explore-words.js Finola Bryan [--font kanit-black]
+// Usage: node scripts/explore-words.js Finola Bryan [--font kanit-black] [--font2 bungee]
 //        [--looks row,rows,grid,tower,block] [--fast] [--shape ❤]
 // Uses the same looks as the web page (src/core/looks.js), with "More variants".
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -17,6 +17,7 @@ const { values: o, positionals: [wordA, wordB] } = parseArgs({
   allowPositionals: true,
   options: {
     font: { type: 'string', default: 'kanit-black' },
+    font2: { type: 'string', default: '' }, // the side word's font (default: the same)
     looks: { type: 'string', default: 'row,rows,grid,tower,block' }, // two-word looks to include
     fast: { type: 'boolean', default: false }, // only each look's first result (no "More variants")
     shape: { type: 'string', default: '❤' }, // also make the tower and block with this shape from above ('' = skip)
@@ -28,9 +29,11 @@ const FONTS_DIR = new URL('../fonts/', import.meta.url);
 const fonts = JSON.parse(await readFile(new URL('fonts.json', FONTS_DIR), 'utf8'));
 const entry = fonts.find((f) => f.id === o.font);
 const font = loadFont(await readFile(entry ? fileURLToPath(new URL(entry.file, FONTS_DIR)) : o.font));
+const entry2 = fonts.find((f) => f.id === o.font2);
+const fontB = o.font2 ? loadFont(await readFile(entry2 ? fileURLToPath(new URL(entry2.file, FONTS_DIR)) : o.font2)) : undefined;
 const shapeFont = loadFont(await readFile(fileURLToPath(new URL('shapes/NotoEmoji.ttf', FONTS_DIR))));
 const wasm = await getManifold();
-const ctx = { wasm, font, shapeFont, height: 20 };
+const ctx = { wasm, font, fontB, shapeFont, height: 20 };
 const list = (x) => (x ? x.split(',') : []);
 
 // Face colours by what carved them. Order matters: index into PALETTE in the page.
@@ -101,7 +104,7 @@ path.s { fill:var(--ink); } path.m { fill:var(--miss); }
 .legend .sw { display:inline-block; width:12px; height:12px; border-radius:2px; margin-left:8px; }
 </style></head><body>
 <h1>${wordA} × ${wordB}</h1>
-<p class="sub">Designs per look (${entry?.name ?? o.font}), as the web page's “More variants” makes them, ranked by “quality”: worst-letter coverage minus penalties for hidden letters, merged stems, stretch, extra shadow and uneven rows (src/core/design.js). “·” separates cells, “/” rows, “↕” = letter stretched to row height. Front reads ${wordA}, right reads ${wordB}; red = missing from the letter. “Least visible” = share of a letter not covered by neighbouring letters; “most contact” = outline touching other letters, in row heights (≳30% reads as merged). Drag to rotate.</p>
+<p class="sub">Designs per look (${entry?.name ?? o.font}${o.font2 ? ` × ${entry2?.name ?? o.font2}` : ''}), as the web page's “More variants” makes them, ranked by “quality”: worst-letter coverage minus penalties for hidden letters, merged stems, stretch, extra shadow and uneven rows (src/core/design.js). “·” separates cells, “/” rows, “↕” = letter stretched to row height. Front reads ${wordA}, right reads ${wordB}; red = missing from the letter. “Least visible” = share of a letter not covered by neighbouring letters; “most contact” = outline touching other letters, in row heights (≳30% reads as merged). Drag to rotate.</p>
 <p class="legend"><label><input type="checkbox" id="colour" checked> Colour faces by the view that carved them:</label>
   <span class="sw" style="background:#e07b53"></span>front <span class="sw" style="background:#4c9be8"></span>side <span class="sw" style="background:#9b6fd6"></span>top
   <span class="sw" style="background:#b7b1a6"></span>bounding box <span class="sw" style="background:#6f6f6f"></span>connectors.

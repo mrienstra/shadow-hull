@@ -116,3 +116,37 @@ export function glyphRun(font, text, { tolerance = 0.01, tracking = 0, kiss = nu
 export function textContours(font, text, opts = {}) {
   return glyphRun(font, text, opts).flatMap((g) => g.contours);
 }
+
+// ---- Two fonts side by side -------------------------------------------------
+
+const capCache = new WeakMap();
+
+/**
+ * Cap height in font units: the top of 'H' (a flat capital) when the font has
+ * one, else OS/2 sCapHeight, else 0.7 em.
+ */
+export function capHeight(font) {
+  if (!capCache.has(font)) {
+    const g = font.charToGlyph('H');
+    const top = g && g.index !== 0 ? g.getBoundingBox().y2 : 0;
+    capCache.set(font, top > 0 ? top : font.tables.os2?.sCapHeight || 0.7 * font.unitsPerEm);
+  }
+  return capCache.get(font);
+}
+
+/**
+ * Vertical frames for text in different fonts that share one row: each font
+ * is measured in its own cap heights (baseline y = 0, cap height = 1), so the
+ * fonts' baselines and cap heights meet (flat capitals of both fill the same
+ * band), and the frame covers every range. `ranges[i]` lists [y0, y1] ranges
+ * in fonts[i]'s units (nullish entries ignored). Returns one [y0, y1] per font
+ * in that font's units. With a single font this is just the union of its ranges.
+ */
+export function alignedFrames(fonts, ranges) {
+  let lo = Infinity, hi = -Infinity;
+  fonts.forEach((f, i) => {
+    const c = capHeight(f);
+    for (const r of ranges[i]) if (r) { lo = Math.min(lo, r[0] / c); hi = Math.max(hi, r[1] / c); }
+  });
+  return fonts.map((f) => [lo * capHeight(f), hi * capHeight(f)]);
+}

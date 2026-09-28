@@ -5,14 +5,11 @@ when done. Owner requests are marked (owner).
 
 ## Letterform tidying (owner; see resources/research/letterform-tidy.md)
 - Settle the strain limit and the counter/S-terminal cases from the review page.
-- Interactive 3D (orbit) on the review page (owner request).
-- Near-miss level edges (~2/3 of pairs): shift whole strokes, not the gaps.
 - Tidy the other looks (tower stacked/tall, block).
 - Later: tweak both letters towards a compromise shape.
-- Knife/cut measures (ground truth + 1D proxy), then tidy as a trade-off
-  search (see the note's "Proposed direction").
-- Font search by the 1D proxy over many fonts (precomputed per-letter profiles).
-- One font per axis (e.g. cursive × block) (owner).
+- Tune tidyPair's weights from the owner's marks on the review page.
+- Font search: score a word pair against many fonts (or font pairings, now
+  that each word can have its own font) with the column sliver measure.
 
 ## Ideas from TextTango (Lucandia/dual_letter_illusion; GPL, so reimplement)
 - Quick-insert buttons for symbols (♥ ⭐ ♪ …) next to the top-shape field.
