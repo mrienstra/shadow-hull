@@ -8,7 +8,7 @@
  * each style keeps its top few search results, builds them, and picks the best
  * by designQuality.
  */
-import { letterVisibility, buildComposition, measureComposition, disposeCells } from './compose.js';
+import { letterVisibility, buildComposition, measureComposition, disposeCells, trimThin } from './compose.js';
 import { exploreWordPair, layoutCells, rankLayouts } from './wordpair.js';
 import { blockCells } from './block.js';
 import { compositions, spanColumnCells, stackedColumnCells, placeTop } from './column.js';
@@ -85,7 +85,9 @@ export function designQuality(m, w = QUALITY_WEIGHTS) {
  * and blocks). Takes ownership of `solid` and `cells` via dispose().
  * @returns { cells, solid (letters only), joined, metrics, dispose() }
  */
-export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods = {}, height = 20, stretch = 0, imbalance = 0, frames, weights } = {}) {
+export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods = {}, height = 20, stretch = 0, imbalance = 0, frames, weights, trim = 0 } = {}) {
+  // Trim knife edges first (letters only), so everything is measured on the trimmed solid.
+  if (trim > 0) { const trimmed = trimThin(wasm, cells, solid, { t: trim, frames }); solid.delete(); solid = trimmed; }
   const base = measureComposition(wasm, solid, cells, { frames });
   const vis = letterVisibility(wasm, cells, { height });
   let joined = solid, bridges = [], blocks = [];
@@ -120,7 +122,7 @@ export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods =
  * Build one chain layout with a spacing family, join it, and measure everything.
  * `fontB` (here and below): word B's font, for the side view (default: `font`).
  */
-export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = 'hull+bridges', height = 20, weights, top = null, tidy = null, fontB } = {}) {
+export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = 'hull+bridges', height = 20, weights, top = null, tidy = null, fontB, trim = 0 } = {}) {
   const fam = SPACING[spacing];
   const cells = layoutCells(wasm, font, { rows: layout.rows }, { height, ...fam.layout, tidy, fontB });
   if (top?.shape) {
@@ -136,7 +138,7 @@ export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = '
   }
   const solid = buildComposition(wasm, cells);
   return finishDesign(wasm, cells, solid, {
-    join, rods: fam.rods, height, stretch: layout.score?.distortion ?? 0, imbalance: layout.imbalance ?? 0, weights,
+    join, rods: fam.rods, height, stretch: layout.score?.distortion ?? 0, imbalance: layout.imbalance ?? 0, weights, trim,
   });
 }
 
@@ -145,11 +147,11 @@ export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = '
  * shape. spacing 'touching' (letters just touch) or 'spaced' (visible gaps,
  * joined by low level rods).
  */
-export function realizeBlock(wasm, font, wordA, wordB, { caseMode = 'upper', spacing = 'spaced', top = null, join = 'bridges', height = 20, angle = 90, fontB } = {}) {
+export function realizeBlock(wasm, font, wordA, wordB, { caseMode = 'upper', spacing = 'spaced', top = null, join = 'bridges', height = 20, angle = 90, fontB, trim = 0 } = {}) {
   const fam = SPACING[spacing];
   const { cells, frames } = blockCells(wasm, font, wordA, wordB, { height, caseMode, kiss: fam.layout.kiss, top, angle, fontB });
   const solid = buildComposition(wasm, cells, { frames });
-  return finishDesign(wasm, cells, solid, { join, rods: fam.rods, height, frames });
+  return finishDesign(wasm, cells, solid, { join, rods: fam.rods, height, frames, trim });
 }
 
 /** Style key of a layout: case mode × number of rows. */
@@ -217,21 +219,21 @@ export function designSpanColumn(wasm, font, wordA, wordB, { spacing = 'touching
 }
 
 /** Build one spanning column (see designSpanColumn); caller disposes. */
-export function realizeSpanColumn(wasm, font, wordA, wordB, spans, { spacing = 'touching', fit = 'stretch', caseMode = 'upper', height = 20, join = 'hull+bridges', gap, top = null, fontB } = {}) {
+export function realizeSpanColumn(wasm, font, wordA, wordB, spans, { spacing = 'touching', fit = 'stretch', caseMode = 'upper', height = 20, join = 'hull+bridges', gap, top = null, fontB, trim = 0 } = {}) {
   const fam = SPACING[spacing];
   const cells = spanColumnCells(wasm, font, wordA, wordB, spans, { height, gap: gap ?? (spacing === 'touching' ? -0.3 : 1.2), fit, caseMode, top, fontB });
   const solid = buildComposition(wasm, cells);
   // Stretch: how much taller than a normal row the tallest spanning letter is.
   const stretch = Math.max(...spans) - 1;
-  return finishDesign(wasm, cells, solid, { join, rods: fam.rods, height, stretch: fit === 'stretch' ? stretch : 0 });
+  return finishDesign(wasm, cells, solid, { join, rods: fam.rods, height, stretch: fit === 'stretch' ? stretch : 0, trim });
 }
 
 /** Build a stacked block (see column.js stackedColumnCells); caller disposes. */
-export function realizeStackedColumn(wasm, font, wordA, wordB, { spacing = 'touching', fit = 'stretch', caseMode = 'upper', height = 20, join = 'bridges', top = null, fontB } = {}) {
+export function realizeStackedColumn(wasm, font, wordA, wordB, { spacing = 'touching', fit = 'stretch', caseMode = 'upper', height = 20, join = 'bridges', top = null, fontB, trim = 0 } = {}) {
   const fam = SPACING[spacing];
   const cells = stackedColumnCells(wasm, font, wordA, wordB, { height, gap: spacing === 'touching' ? -0.3 : 1.2, fit, caseMode, top, fontB });
   const solid = buildComposition(wasm, cells);
-  return finishDesign(wasm, cells, solid, { join, rods: fam.rods, height, stretch: fit === 'stretch' ? cells[0].stretch : 0 });
+  return finishDesign(wasm, cells, solid, { join, rods: fam.rods, height, stretch: fit === 'stretch' ? cells[0].stretch : 0, trim });
 }
 
 /**

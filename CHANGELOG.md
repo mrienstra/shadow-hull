@@ -31,6 +31,28 @@
   that one-font designs are unchanged (12 designs, 2 fonts, identical), re-ran
   the suites, and looked at its screenshots.
 
+## 2026-09-28 (trim knife edges: first version, off by default)
+
+- Owner: after tidying lines edges up, trim or round sharp edges only where
+  needed; a sharp edge exists only where thin material meets an opening.
+  New knob "Trim knife edges (under 0.3 mm)" on the two-word looks (off by
+  default for now; recipe `trim: true`). `trimThin` (compose.js) removes
+  material thinner than 0.3 mm vertically with air above and below:
+  where = columns with such a run (`thinRuns`, from the outlines);
+  what = a vertical morphological opening, done cheaply because the solid is
+  front outline × side outline (erode each outline vertically as shifted
+  copies, build, grow back as shifted copies). ~10 ms per design.
+  FINOLA × BRYAN: Bungee loses 0.6 mm³ (the A/N plate, NO/Y slivers) with
+  shadows and pieces unchanged; Kanit loses 3.7 mm³, side shadow 100% →
+  99.993%, pieces unchanged. Not yet for angled blocks. Test added.
+- Tried and dropped: a plain grid of boxes (left most thin material, split
+  Kanit into 11 pieces); an unmasked opening (saw-toothed slopes); exact
+  Minkowski erosion/dilation (over 15 minutes).
+- Tidy: tried placing "beside" offsets by which way edges face (fixes the L
+  foot block top being sliced in A × L) but it flipped A × C / A × D back to
+  clearing; reverted. Plan: exact meets plus this trimming step.
+- No subagents used.
+
 ## 2026-09-28 (tidy: smaller offset; sharper review outlines)
 
 - "Beside a feature" offset 0.05 → 0.01 mm (owner noticed A × L's crossbar
