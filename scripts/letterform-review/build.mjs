@@ -13,7 +13,7 @@ const out = process.argv[2]?.replace(/\/$/, '');
 if (!out || out.startsWith('--')) { console.error('usage: node scripts/letterform-review/build.mjs <outDir> [--skip-render]'); process.exit(1); }
 mkdirSync(out + '/sheets', { recursive: true });
 mkdirSync(out + '/lib', { recursive: true });
-execFileSync('node', [here + 'pack.mjs', out + '/pack.json'], { stdio: 'inherit' });
+execFileSync('node', [here + 'pack.mjs', out], { stdio: 'inherit' });
 if (!process.argv.includes('--skip-render')) execFileSync('node', [here + 'render.mjs', out], { stdio: 'inherit' });
 
 // The viewer: three.js bundled in (tree-shaken, minified); manifold-3d stays a separate

@@ -226,7 +226,7 @@ function counts(f) {
 }
 function stat() {
   const f = DATA.find((x) => x.id === font), c = counts(f);
-  $('stat').textContent = `${c.n} changes · ${c.marked} marked (${c.good} good, ${c.bad} bad) · ${f.near}/676 pairs still have level edges within 0.6 mm`;
+  $("stat").textContent = `${c.n} pairs changed · ${c.marked} marked (${c.good} good, ${c.bad} bad)`;
   renderFonts();
 }
 function renderFonts() {
