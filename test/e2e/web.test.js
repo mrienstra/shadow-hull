@@ -199,5 +199,32 @@ test('swing: pauses on exactly the front view, then the side view; controls stop
   await page.click('.toolbar [data-view="iso"]');
   assert.equal(await page.getAttribute('#swing', 'aria-pressed'), 'false');
   assert.equal(await page.isVisible('#swing-timing'), false); // visibility: hidden
+  assert.equal(await page.$('#tour'), null, 'no Tour button without tour=1');
+  assert.deepEqual(errors, []);
+});
+
+test('tour (tour=1): stops follow the letter pairs, zoomed in; loops seamlessly', async () => {
+  const page = await browser.newPage({ viewport: { width: 1000, height: 700 } });
+  const errors = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  await page.goto(url + '#look=row&a=Finola&b=Bryan&k={"stand":false,"supports":"none"}&tour=1');
+  await wordsDone(page);
+  await page.waitForFunction(() => window.__tour?.ready);
+  assert.equal(await page.isVisible('#tour'), true);
+  assert.equal(await page.evaluate(() => new URLSearchParams(location.hash.slice(1)).get('tour')), '1', 'hash keeps tour=1');
+  const stops = await page.evaluate(() => window.__tour.stops().map((s) => `${s.text}/${s.view}`));
+  assert.deepEqual(stops, ['F/front', 'B/right', 'I/front', 'R/right', 'NO/front', 'Y/right', 'L/front', 'A/right', 'A/front', 'N/right', 'FINOLA/front', 'BRYAN/right']);
+  const frame = () => page.evaluate(() => document.querySelector('#viewport canvas').toDataURL());
+  await page.click('.toolbar [data-view="front"]');
+  await page.waitForTimeout(300);
+  const front = await frame();
+  const start = await page.evaluate(() => (window.__tour.seek(0), document.querySelector('#viewport canvas').toDataURL()));
+  assert.notEqual(start, front, 'stop 1 is zoomed in on the F, not the whole front view');
+  const end = await page.evaluate(() => (window.__tour.seek(window.__tour.duration), document.querySelector('#viewport canvas').toDataURL()));
+  assert.equal(end, start, 'the end of the loop is its start');
+  // A view button hands the camera back.
+  await page.click('.toolbar [data-view="front"]');
+  await page.waitForTimeout(300);
+  assert.equal(await frame(), front);
   assert.deepEqual(errors, []);
 });

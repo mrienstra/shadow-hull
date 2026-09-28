@@ -39,6 +39,7 @@ const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
 camera.up.set(0, 0, 1);
 let controls = new OrbitControls(camera, renderer.domElement);
 let meshObj = null, box = null, size = 40;
+const meshCentre = new THREE.Vector3(); // world point shown at the scene origin
 
 const material = new THREE.MeshStandardMaterial({ color: 0xc8a27a, roughness: 0.65, metalness: 0, flatShading: true });
 // Colour by the view that carved each face (labels from core faceRuns).
@@ -117,6 +118,7 @@ function showMesh({ numProp, vertProperties, triVerts, runs = [] }) {
   size = Math.max(dims.x, dims.y, dims.z);
   meshObj = new THREE.Mesh(geo, material);
   meshObj.position.copy(centre).negate();
+  meshCentre.copy(centre);
   applyColour();
   scene.add(meshObj);
   box = new THREE.LineSegments(
@@ -185,8 +187,133 @@ function swingCamera(now) {
 }
 renderer.domElement.addEventListener('pointerdown', () => swing && setSwing(false));
 
+// ---- Tour (only with tour=1 in the URL hash, for recording videos) -------------
+// Two-word looks: for each cell of the design in order, zoom in on its chunk of
+// word A from the front, then its chunk of word B from the side; then all of
+// word A (front), all of word B (side), and back to the first stop, so it
+// loops. Moves use the Swing timing and easing: pause, then azimuth, target
+// and zoom (geometrically) move together, with the tilt arch.
+// scripts/record-tour.mjs drives window.__tour to render a video frame by frame.
+const TOUR = new URLSearchParams(location.hash.slice(1)).get('tour') === '1';
+let wordCells = null; // per-cell chunk bounds from the words worker (view.cells)
+let tour = null; // { t0 } while playing
+let tourHeld = false; // __tour.seek owns the camera
+let tourTarget = new THREE.Vector3();
+const LETTER_FILL = 0.7; // a letter chunk fills this much of the view (height or width)
+const WORD_FILL = 1 / 1.5; // as the Front/Side buttons: fitFrustum shows 1.5 × the design's size
+function tourStops() {
+  if (mode !== 'words' || !wordFrames || !wordCells?.length) return null;
+  const ends = swingEnds();
+  if (!ends) return null;
+  const W = camera.right - camera.left, H = camera.top - camera.bottom;
+  const stop = (view, chunks, wide) => {
+    chunks = chunks.filter(Boolean);
+    if (!chunks.length) return null;
+    const { U, V, D } = wordFrames[view];
+    const u0 = Math.min(...chunks.map((c) => c.min[0])), u1 = Math.max(...chunks.map((c) => c.max[0]));
+    const v0 = Math.min(...chunks.map((c) => c.min[1])), v1 = Math.max(...chunks.map((c) => c.max[1]));
+    // The chunk's centre as seen in this view; in depth, the cell's centre (so
+    // the camera turns about the cell between its two letters). Wide shots
+    // keep the design's centre in depth, like the view buttons.
+    const target = new THREE.Vector3()
+      .addScaledVector(new THREE.Vector3(...U), (u0 + u1) / 2)
+      .addScaledVector(new THREE.Vector3(...V), (v0 + v1) / 2)
+      .addScaledVector(new THREE.Vector3(...D), wide ? meshCentre.dot(new THREE.Vector3(...D)) : chunks[0].depth)
+      .sub(meshCentre);
+    const fill = wide ? WORD_FILL : LETTER_FILL;
+    const zoom = fill * Math.min(H / Math.max(v1 - v0, 1e-6), W / Math.max(u1 - u0, 1e-6));
+    const text = chunks.map((c) => c.text).join('');
+    return { view, a: view === 'front' ? ends.a0 : ends.a1, target, zoom, wide, text };
+  };
+  const stops = [];
+  for (const c of wordCells) stops.push(stop('front', [c.front]), stop('right', [c.right]));
+  stops.push(stop('front', wordCells.map((c) => c.front), true), stop('right', wordCells.map((c) => c.right), true));
+  return stops.filter(Boolean);
+}
+function tourPlan() {
+  const stops = tourStops();
+  if (!stops?.length) return null;
+  const move = Math.max(0.3, Number($('#swing-secs').value) || 2);
+  const hold = Math.max(0, Number($('#swing-hold').value) || 0);
+  const segs = [];
+  let t = 0;
+  stops.forEach((from, i) => {
+    const to = stops[(i + 1) % stops.length];
+    // Zooming between a whole word and a letter takes a bit longer.
+    const m = from.wide !== to.wide ? move * 1.5 : move;
+    segs.push({ from, to, t0: t, hold, move: m });
+    t += hold + m;
+  });
+  return { stops, segs, duration: t };
+}
+function tourCamera(plan, t) {
+  t = ((t % plan.duration) + plan.duration) % plan.duration;
+  const seg = plan.segs.findLast((s) => s.t0 <= t);
+  const local = t - seg.t0;
+  const x = local < seg.hold ? 0 : easeInOutSine(Math.min(1, (local - seg.hold) / seg.move));
+  const { from, to } = seg;
+  let a1 = to.a;
+  while (a1 - from.a > Math.PI) a1 -= 2 * Math.PI;
+  while (a1 - from.a < -Math.PI) a1 += 2 * Math.PI;
+  const a = from.a + (a1 - from.a) * x;
+  const maxTilt = (Math.min(60, Math.max(-60, Number($('#swing-tilt').value) || 0)) * Math.PI) / 180;
+  const tilt = maxTilt * Math.sin(Math.PI * x);
+  const target = from.target.clone().lerp(to.target, x);
+  const r = size * 4;
+  camera.position.set(Math.cos(a) * Math.cos(tilt), Math.sin(a) * Math.cos(tilt), Math.sin(tilt)).multiplyScalar(r).add(target);
+  camera.up.set(0, 0, 1);
+  camera.lookAt(target);
+  camera.zoom = Math.exp(Math.log(from.zoom) + (Math.log(to.zoom) - Math.log(from.zoom)) * x);
+  camera.updateProjectionMatrix();
+  tourTarget = target;
+}
+function setTour(on, { keep = false } = {}) {
+  const was = !!tour || tourHeld;
+  tourHeld = false;
+  if (on) setSwing(false);
+  tour = on && tourPlan() ? { t0: performance.now() } : null;
+  $('#tour')?.setAttribute('aria-pressed', String(!!tour));
+  $('#swing-timing').classList.toggle('off', !swing && !tour);
+  if (was && !tour) {
+    // Hand the camera to the orbit controls: where the tour left it (a drag),
+    // or reset for a view button.
+    controls.dispose();
+    controls = new OrbitControls(camera, renderer.domElement);
+    if (keep) controls.target.copy(tourTarget);
+    else { camera.zoom = 1; camera.updateProjectionMatrix(); }
+  }
+}
+if (TOUR) {
+  const b = Object.assign(document.createElement('button'), { type: 'button', id: 'tour', textContent: 'Tour ▶', title: 'Tour: zoom in on each letter pair, front then side, then each whole word; loops. Uses the swing timing.' });
+  b.setAttribute('aria-pressed', 'false');
+  $('#swing').after(b);
+  b.addEventListener('click', () => setTour(!tour));
+  renderer.domElement.addEventListener('pointerdown', () => tour && setTour(false, { keep: true }));
+  // For scripts/record-tour.mjs: deterministic time. seek(t) (seconds) sets the
+  // camera and renders; the page's own animation stays out of the way until release().
+  window.__tour = {
+    get ready() { return !!tourPlan(); },
+    get duration() { return tourPlan()?.duration ?? 0; },
+    stops: () => tourPlan()?.stops.map((s) => ({ view: s.view, text: s.text, wide: s.wide, zoom: s.zoom })) ?? [],
+    seek(t) {
+      const plan = tourPlan();
+      if (!plan) return false;
+      if (tour) setTour(false);
+      if (swing) setSwing(false);
+      tourHeld = true;
+      tourCamera(plan, t);
+      renderer.render(scene, camera);
+      return true;
+    },
+    release() { tourHeld = false; camera.zoom = 1; camera.updateProjectionMatrix(); snap('iso'); },
+  };
+}
+
 renderer.setAnimationLoop((now) => {
-  if (swing) swingCamera(now);
+  if (tourHeld) { /* __tour.seek placed the camera */ } else if (tour) {
+    const plan = tourPlan();
+    if (plan) tourCamera(plan, (now - tour.t0) / 1000);
+  } else if (swing) swingCamera(now);
   else controls.update();
   renderer.render(scene, camera);
 });
@@ -359,8 +486,8 @@ form.addEventListener('submit', async (e) => {
   }
 });
 
-for (const b of document.querySelectorAll('.toolbar [data-view]')) b.addEventListener('click', () => { setSwing(false); snap(b.dataset.view); });
-$('#swing').addEventListener('click', () => setSwing(!swing));
+for (const b of document.querySelectorAll('.toolbar [data-view]')) b.addEventListener('click', () => { setTour(false); setSwing(false); snap(b.dataset.view); });
+$('#swing').addEventListener('click', () => { setTour(false); setSwing(!swing); });
 $('#colour-faces').addEventListener('change', applyColour);
 // Bounding box toggle (off by default); remembered per browser when storage is available.
 const showBox = $('#show-box');
@@ -606,6 +733,7 @@ function selectWordDesign(item, button) {
     if (m.type === 'error') { wordsStatus.textContent = `Error: ${m.error}`; return; }
     const { view } = m;
     wordFrames = view.frames;
+    wordCells = view.cells ?? null;
     stl = m.stl;
     wordDownloadName = `${currentWords.join('-')}-${currentLook}-${item.title.replace(/[^\w]+/g, '-')}.stl`.toLowerCase().replace(/-+/g, '-');
     $('#download').disabled = false;
@@ -824,6 +952,7 @@ function writeHash() {
     h.set('k', JSON.stringify(knobValues));
     if (selectedItem) { h.set('r', JSON.stringify(stripFinish(selectedItem.recipe))); h.set('ti', selectedItem.title); }
   }
+  if (new URLSearchParams(location.hash.slice(1)).get('tour') === '1') h.set('tour', '1'); // keep tour mode
   history.replaceState(null, '', `#${h}`);
 }
 

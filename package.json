@@ -15,7 +15,8 @@
     "test:e2e": "vite build && node --test test/e2e/*.test.js",
     "test:py": "cd py && uv run --extra dev pytest -q",
     "fixtures": "node scripts/make-fixtures.js",
-    "check": "npm test && npm run test:e2e && npm run test:py"
+    "check": "npm test && npm run test:e2e && npm run test:py",
+    "record-tour": "node scripts/record-tour.mjs"
   },
   "engines": {
     "node": ">=20"

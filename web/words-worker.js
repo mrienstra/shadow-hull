@@ -3,7 +3,7 @@
 // terminating it without touching the three-letters worker.
 import wasmUrl from 'manifold-3d/manifold.wasm?url';
 import shapeFontUrl from '../fonts/shapes/NotoEmoji.ttf?url';
-import { getManifold, loadFont, toBinarySTL } from '../src/core/index.js';
+import { getManifold, loadFont, toBinarySTL, frameOf } from '../src/core/index.js';
 import { buildRecipe, designView } from '../src/core/gallery.js';
 import { generateLook } from '../src/core/looks.js';
 
@@ -20,6 +20,24 @@ async function ensureFonts({ fontUrl, fontData, needShapes }) {
     // Cached top shapes are per shape font, not per letter font, so keep them.
   }
   if (needShapes && !ctx.shapeFont) ctx.shapeFont = loadFont(await (await fetch(shapeFontUrl)).arrayBuffer());
+}
+
+// Per cell and view: the letter chunk's 2D bounds in that view's frame (which
+// the 45° turn leaves unchanged) and the depth of the cell's centre along the
+// view direction. Small data, for the viewer's tour (tour=1) to frame each chunk.
+function cellChunks(d) {
+  return d.cells.map((c) => {
+    const out = { label: c.label };
+    const mid = c.box.min.map((m, i) => (m + c.box.max[i]) / 2);
+    for (const v of ['front', 'right']) {
+      if (!c.shapes[v]) continue;
+      const { min, max } = c.shapes[v].bounds();
+      const { D } = frameOf(v, d.frames);
+      const text = (c.letters?.[v] ?? []).map((l) => l.ch ?? '').join('');
+      out[v] = { min, max, depth: mid[0] * D[0] + mid[1] * D[1] + mid[2] * D[2], text };
+    }
+    return out;
+  });
 }
 
 self.onmessage = async ({ data: msg }) => {
@@ -47,6 +65,7 @@ self.onmessage = async ({ data: msg }) => {
           return;
         }
         const { solid, ...view } = designView(ctx.wasm, d, { turn: msg.recipe.turn ? -45 : 0 });
+        view.cells = cellChunks(d);
         const stl = toBinarySTL(solid);
         if (solid !== d.joined) solid.delete();
         self.postMessage({ id: msg.id, type: 'built', view, stl }, [view.mesh.vertProperties.buffer, view.mesh.triVerts.buffer, stl.buffer]);

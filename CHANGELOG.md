@@ -1,5 +1,33 @@
 # Changelog
 
+## 2026-09-27 (tour for recording a video)
+
+- Owner request: a video of one design (FINOLA × BRYAN, pairs in a row, no
+  stand, no rods, coloured by view). Niche, so it hides behind `tour=1` in the
+  URL hash; without it nothing changes (writeHash keeps `tour=1` when present).
+- **Tour ▶** (next to Swing): zooms in on each cell's chunk of word A from the
+  front, then its chunk of word B from the side, in chain order (F, B, I, R,
+  NO, Y, L, A, A, N), then all of FINOLA, all of BRYAN, and back to F, so it
+  loops. Stops come from the built design: the words worker now also sends
+  each cell's per-view chunk bounds and depth (`view.cells`). A letter stop
+  centres the chunk and fills 70% of the view; the camera pivots on the cell's
+  centre, so it turns about each pair. Word stops use the Front/Side buttons'
+  margin (the word fills 2/3). Directions are the same per-design frames as
+  those buttons (45° turn included).
+- Motion reuses Swing's timing and easing (move, pause, max tilt): azimuth,
+  target and zoom move together (zoom geometrically); moves between a word
+  and a letter take 1.5×. Dragging or a view button stops it.
+- `npm run record-tour` (`scripts/record-tour.mjs`): builds and previews the
+  page, drives `window.__tour.seek(t)` in local Chrome frame by frame, pipes
+  PNG screenshots to ffmpeg (H.264, yuv420p, CRF 18) → `out/tour.mp4`
+  (gitignored). Default: 33.2 s at 1920×1080, 30 fps.
+- e2e: with `tour=1` the stops follow the pairs, the first stop differs from
+  the Front view, the loop's end equals its start, and a view button hands the
+  camera back; without it there is no Tour button.
+- Subagent: built by a subagent (opus, ~150k tokens, ~11 min). Earned its cost:
+  self-contained, owner asked to delegate; it checked its own stills and caught
+  the Shadows panel over the video. I re-checked the stills and re-ran the suites.
+
 ## 2026-09-27 (thinner, straighter support rods)
 
 - Owner request (NO × YA tower: a chunky diagonal rod from a rounded corner):

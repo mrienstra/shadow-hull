@@ -182,7 +182,7 @@ details#word-stats p { margin: 4px 0 0; }
 #designs .text { grid-column: 2 / -1; }
 .upload { font-size: 12px; color: var(--muted); margin: -4px 0 10px; display: grid; gap: 3px; }
 .upload input { font-size: 12px; }
-#swing[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+#swing[aria-pressed="true"], #tour[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 .swing-timing { display: inline-flex; gap: 8px; font-size: 12px; color: var(--muted); }
 /* Hidden but still taking its space, so toggling Swing never reflows the
    toolbar (a reflow resizes the viewport and rescales the view). */

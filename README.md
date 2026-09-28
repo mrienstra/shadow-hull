@@ -51,6 +51,20 @@ node scripts/explore-words.js Finola Bryan     # HTML report of every look's var
 The web page keeps its state in the URL, so "Share link" gives a link that
 reopens the same design.
 
+## Extras: recording a tour
+
+Add `&tour=1` to a two-word page's URL (e.g.
+`http://localhost:5173/#look=row&a=Finola&b=Bryan&k={"stand":false,"supports":"none"}&tour=1`)
+and a **Tour ▶** button appears next to Swing: the camera zooms in on each
+letter pair in turn (word A's letters from the front, word B's from the
+side), then shows each whole word, and loops. It uses the swing timing
+(move, pause, tilt); dragging or a view button stops it.
+
+`npm run record-tour` renders the same tour to `out/tour.mp4` frame by frame
+(local Chrome, ffmpeg): Finola × Bryan, pairs in a row, no stand or rods,
+coloured by view, 1920×1080 at 30 fps. See `npm run record-tour -- --help`
+for words, look, knobs (or `--hash`), size, fps and timing.
+
 ## Fonts
 
 Nine heavy display fonts from Google Fonts, plus Noto Emoji for shapes, all
