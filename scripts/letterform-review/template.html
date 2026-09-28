@@ -39,10 +39,11 @@ h1 { font: 400 clamp(26px, 5vw, 40px)/1.05 var(--display); margin: 0; letter-spa
 .opts label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
 .stat { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
-.solids { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
-.solids figure { margin: 0; display: grid; gap: 2px; }
+.solids { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%; padding: 0; border: 0; background: none; color: inherit; font: inherit; cursor: zoom-in; border-radius: 6px; }
+.solids .fig { display: grid; gap: 2px; }
+.solids:hover .img { box-shadow: inset 0 0 0 1px var(--faint); }
 .solids .img { aspect-ratio: 1; max-width: 100%; background-repeat: no-repeat; background-size: 800% auto; border-radius: 4px; background-color: var(--ground); }
-.solids figcaption { font: 500 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; text-align: center; }
+.solids .cap { font: 500 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; text-align: center; }
 .card { background: var(--card); border: 1px solid var(--faint); border-radius: 8px; padding: 10px 10px 8px; display: grid; gap: 6px; }
 .card[data-v="good"] { box-shadow: inset 0 0 0 2px var(--good); }
 .card[data-v="bad"] { box-shadow: inset 0 0 0 2px var(--bad); }
@@ -53,6 +54,9 @@ h1 { font: 400 clamp(26px, 5vw, 40px)/1.05 var(--display); margin: 0; letter-spa
 .by { font: 500 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 svg { width: 100%; height: auto; display: block; }
 .what { font-size: 12px; color: var(--muted); margin: 0; }
+.scores { font: 400 12px var(--mono); color: var(--muted); margin: 0; font-variant-numeric: tabular-nums; }
+.scores .better { color: var(--good); font-weight: 500; }
+.scores .worse { color: var(--bad); font-weight: 500; }
 .votes { display: flex; gap: 6px; }
 .votes button { flex: 1; font: 500 12px var(--sans); padding: 4px 0; border-radius: 5px; border: 1px solid var(--faint); background: transparent; color: var(--ink); cursor: pointer; }
 .votes button[data-k="good"][aria-pressed="true"] { background: var(--good); border-color: var(--good); color: var(--card); }
@@ -60,13 +64,38 @@ svg { width: 100%; height: auto; display: block; }
 .votes button[data-k="unsure"][aria-pressed="true"] { background: var(--unsure); border-color: var(--unsure); color: var(--card); }
 button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 .note { font-size: 13px; color: var(--muted); }
+/* 3D viewer (lib/viewer.js, loaded on first use) */
+#viewer { width: min(1120px, calc(100vw - 32px)); max-width: none; height: min(780px, calc(100dvh - 32px)); max-height: none; padding: 0; border: 1px solid var(--faint); border-radius: 10px; background: var(--card); color: var(--ink); }
+#viewer[open] { display: grid; grid-template-rows: auto auto 1fr auto; }
+#viewer::backdrop { background: rgba(10, 12, 16, 0.55); }
+.v-head { display: flex; align-items: baseline; gap: 12px; padding: 12px 12px 0 16px; }
+.v-head h2 { font: 600 17px var(--sans); margin: 0; }
+.v-head h2 em { font-style: normal; color: var(--moved); }
+.v-head .by { flex: 1; }
+.v-close { font: 500 20px/1 var(--sans); width: 36px; height: 36px; border-radius: 6px; border: 1px solid var(--faint); background: transparent; color: var(--ink); cursor: pointer; align-self: center; }
+.v-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 16px; font-size: 13px; color: var(--muted); }
+.v-bar .fonts button { padding: 4px 12px; }
+.v-stage { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 0 16px; min-height: 0; }
+.v-pane { position: relative; display: grid; grid-template-rows: auto 1fr; gap: 4px; min-height: 0; }
+.v-pane .cap { font: 500 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; text-align: center; }
+.v-gl { position: relative; min-height: 0; background: var(--ground); border-radius: 6px; overflow: hidden; }
+.v-gl canvas { cursor: grab; }
+.v-gl canvas:active { cursor: grabbing; }
+.v-gl canvas:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+.v-status { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; text-align: center; font-size: 13px; color: var(--muted); pointer-events: none; }
+.v-foot { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 10px 16px 14px; font-size: 12px; color: var(--muted); }
+@media (max-width: 640px) {
+  #viewer { width: calc(100vw - 16px); height: calc(100dvh - 16px); }
+  .v-stage { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; }
+  .v-bar { padding: 8px 12px; } .v-stage { padding: 0 12px; } .v-foot { padding: 8px 12px 12px; }
+}
 .empty { color: var(--muted); padding: 24px 0; }
 </style>
 
 <div class="wrap">
   <header style="display:grid;gap:10px">
     <h1>Arm to corner</h1>
-    <p class="lede">Where one letter of a pair has a <b>pointed corner</b> (like the notch between a B's bowls) inside a <b>stroke</b> of the other letter (like the F's middle arm), the stroke slides up or down, keeping its thickness, until its nearer edge meets the corner. Only one letter of a pair moves, and pairs of the same letter are left alone. The % on each card is the <b>change</b>: the move as a share of the smaller gap beside the stroke (the F's arm moving 0.37 mm is 13%). Tops and bottoms never move; changes over 70% or 3 mm are never made. Every capital pair in each bundled font, 20 mm tall; the 3D views show the pair's solid from the front-right, as the app's 3/4 view does (orange walls follow the left letter, blue the right). Mark each change so I can tune the rule.</p>
+    <p class="lede">Where one letter of a pair has a <b>pointed corner</b> (like the notch between a B's bowls) inside a <b>stroke</b> of the other letter (like the F's middle arm), the stroke slides up or down, keeping its thickness, until its nearer edge meets the corner. Only one letter of a pair moves, and pairs of the same letter are left alone. The % on each card is the <b>change</b>: the move as a share of the smaller gap beside the stroke (Bungee's F ← B, the change you liked, is 13%). Tops and bottoms never move; changes over 70% or 3 mm are never made. Every capital pair in each bundled font, 20 mm tall; the 3D views show the pair's solid from the front-right, as the app's 3/4 view does (orange walls follow the left letter, blue the right). Under each card, <b>knives</b> (material in vertical runs under 0.8 mm: slivers and sharp wedges) and <b>cuts</b> (air slots under 0.8 mm) before → after, in mm³: green when the change helps, red when it makes things worse. Mark each change so I can tune the rule.</p>
     <div class="legend">
       <span><i class="sw" style="background:var(--moved)"></i>moved letter, after</span>
       <span><i class="sw" style="border:2px dashed var(--before)"></i>moved letter, before</span>
@@ -79,6 +108,7 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
     <div class="opts">
       <label><input type="checkbox" id="unmarked"> Only unmarked</label>
       <label><input type="checkbox" id="bysize"> Largest changes first</label>
+      <label><input type="checkbox" id="helps"> Only changes that reduce knives</label>
       <label for="maxstrain">Show changes up to <input type="range" id="maxstrain" min="5" max="70" step="5" value="70" style="width:120px;vertical-align:middle"> <b id="maxval" class="stat">70%</b></label>
       <span class="stat" id="stat"></span>
       <span class="note" id="save"></span>
@@ -86,6 +116,24 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
   </div>
   <div class="grid" id="grid"></div>
 </div>
+
+<dialog id="viewer" aria-labelledby="v-title">
+  <div class="v-head"><h2 id="v-title"></h2><span class="by" id="v-by"></span><button type="button" class="v-close" id="v-close" aria-label="Close">×</button></div>
+  <div class="v-bar">
+    <div class="fonts" id="v-views" role="group" aria-label="View from">
+      <button type="button" data-view="front" aria-pressed="false">Front</button>
+      <button type="button" data-view="side" aria-pressed="false">Side</button>
+      <button type="button" data-view="top" aria-pressed="false">Top</button>
+      <button type="button" data-view="iso" aria-pressed="true">3/4</button>
+    </div>
+    <span>Drag to orbit (both turn together) · scroll to zoom · right-drag to pan</span>
+  </div>
+  <div class="v-stage">
+    <div class="v-pane"><span class="cap">Before</span><div class="v-gl" id="v-before"></div><div class="v-status"></div></div>
+    <div class="v-pane"><span class="cap">After</span><div class="v-gl" id="v-after"></div><div class="v-status"></div></div>
+  </div>
+  <div class="v-foot" id="v-foot"></div>
+</dialog>
 
 <script>
 const DATA = /*DATA*/null;
@@ -116,6 +164,11 @@ function tile(f, i, slot) {
   const rows = Math.ceil(f.moves.length / 4), col = (i % 4) * 2 + slot, row = Math.floor(i / 4);
   return `background-image:url('sheets/${f.id}.webp');background-position:${(col / 7) * 100}% ${rows > 1 ? (row / (rows - 1)) * 100 : 0}%`;
 }
+// "Knives 0.67 → 0 mm³": green if it went down, red if up (±0.05 mm³ counts as no change).
+function score(label, a, b) {
+  const cls = b < a - 0.05 ? 'better' : b > a + 0.05 ? 'worse' : 'same';
+  return `${label} <span class="${cls}">${a.toFixed(2)} → ${b.toFixed(2)}</span> mm³`;
+}
 function card(f, m) {
   const idx = f.moves.indexOf(m);
   const [mv, ot, by, band, corner, strain] = m;
@@ -135,9 +188,11 @@ function card(f, m) {
       <path d="${path(B.r, A.w + gap)}" fill="var(--other)" fill-rule="nonzero"/>
       <line x1="-1" x2="${W + 1}" y1="${20 - corner}" y2="${20 - corner}" stroke="var(--corner)" stroke-width="0.22"/>
     </svg>
-    <div class="solids">${['Before', 'After'].map((t, slot) => `<figure><div class="img" role="img" aria-label="${t}: the ${mv} and ${ot} solid" style="${tile(f, idx, slot)}"></div><figcaption>${t}</figcaption></figure>`).join('')}</div>
+    <button type="button" class="solids" aria-label="Open the ${mv} and ${ot} solid in 3D, before and after" title="Open in 3D">${['Before', 'After'].map((t, slot) => `<span class="fig"><span class="img" style="${tile(f, idx, slot)}"></span><span class="cap">${t}</span></span>`).join('')}</button>
     <p class="what">${mv}'s stroke ${band[0].toFixed(1)}–${band[1].toFixed(1)} mm moves ${by < 0 ? 'down' : 'up'}: its ${edge === band[1] ? 'top' : 'bottom'} meets ${ot}'s corner at ${corner.toFixed(1)} mm.</p>
+    <p class="scores">${score('Knives', m[6], m[7])} · ${score('cuts', m[8], m[9])}</p>
     <div class="votes">${['good', 'bad', 'unsure'].map((x) => `<button type="button" data-k="${x}" aria-pressed="${v === x}">${x[0].toUpperCase() + x.slice(1)}</button>`).join('')}</div>`;
+  el.querySelector('.solids').addEventListener('click', (e) => open3d(f, m, e.currentTarget));
   el.querySelector('.votes').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     const nv = marks[k]?.v === b.dataset.k ? '' : b.dataset.k;
@@ -179,15 +234,60 @@ function render() {
   const cap = +$('maxstrain').value / 100;
   $('maxval').textContent = `${Math.round(cap * 100)}%`;
   ms = ms.filter((m) => m[5] <= cap + 1e-9);
+  if ($('helps').checked) ms = ms.filter((m) => m[7] < m[6] - 0.05);
   if ($('bysize').checked) ms.sort((a, b) => b[5] - a[5]);
   const g = $('grid');
   g.replaceChildren(...ms.map((m) => card(f, m)));
   if (!ms.length) { const p = document.createElement('p'); p.className = 'empty'; p.textContent = 'Nothing left to mark in this font.'; g.append(p); }
   stat();
 }
+// ---- 3D viewer: builds both solids in the page (manifold-3d) and shows them with linked cameras.
+const rings = (rs) => rs.map((r) => r.split(' ').map((p) => p.split(',').map(Number)));
+let viewer = null, viewToken = 0, viewNow = 'iso', opener = null;
+function v3status(t) { document.querySelectorAll('#viewer .v-status').forEach((el) => { el.textContent = t; }); }
+function setView(v) {
+  viewNow = v;
+  document.querySelectorAll('#v-views button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.view === v)));
+  viewer?.look(v);
+}
+async function open3d(f, m, btn) {
+  const [mv, ot, by, band, , strain] = m;
+  const A = f.letters[mv], B = f.letters[ot], token = ++viewToken;
+  opener = btn;
+  $('v-title').innerHTML = `<em>${mv}</em> ← ${ot} <span class="by">${f.name}</span>`;
+  $('v-by').textContent = `${by < 0 ? '↓' : '↑'} ${Math.abs(by).toFixed(2)} mm · ${Math.round(strain * 100)}%`;
+  $('v-foot').innerHTML = `<span><i class="sw" style="background:#e07b53"></i> walls cut by ${mv}'s outline (read from the front)</span><span><i class="sw" style="background:#4c9be8"></i> walls cut by ${ot}'s outline (read from the right side)</span>`;
+  const d = $('viewer');
+  if (!d.open) d.showModal();
+  v3status('Building the solids…');
+  viewer?.clear();
+  try {
+    viewer ??= await import('./lib/viewer.js');
+    if (token !== viewToken || !d.open) return;
+    await viewer.show({
+      hosts: [$('v-before'), $('v-after')],
+      before: rings(A.r), after: rings(A.r.map((r) => warp(r, A.lv, band, by))), side: rings(B.r),
+      w: [A.w, B.w], h: 20, view: viewNow,
+    });
+    if (token !== viewToken || !d.open) { viewer.clear(); return; }
+    v3status('');
+    setView(viewNow);
+  } catch (e) {
+    if (token === viewToken) { console.error(e); const msg = String(e?.message || e); v3status(/Content Security|unsafe-eval/.test(msg) ? 'The 3D view cannot run here: this page is not allowed to run WebAssembly.' : 'The 3D view could not load (' + msg.slice(0, 160) + ').'); }
+  }
+}
+$('v-views').addEventListener('click', (e) => { const b = e.target.closest('button'); if (b) setView(b.dataset.view); });
+$('v-close').addEventListener('click', () => $('viewer').close());
+// A click on the backdrop closes the viewer, but not the end of a drag that started on a canvas.
+let downOnBackdrop = false;
+$('viewer').addEventListener('pointerdown', (e) => { downOnBackdrop = e.target === e.currentTarget; });
+$('viewer').addEventListener('click', (e) => { if (downOnBackdrop && e.target === e.currentTarget) e.currentTarget.close(); });
+$('viewer').addEventListener('close', () => { viewToken++; viewer?.clear(); opener?.focus(); });
+
 for (const f of DATA) for (const c in f.letters) f.letters[c].r = f.letters[c].d.split('|');
 $('unmarked').addEventListener('change', render);
 $('bysize').addEventListener('change', render);
+$('helps').addEventListener('change', render);
 $('maxstrain').addEventListener('input', render);
 render();
 (async () => {

@@ -42,21 +42,23 @@ for (const fp of pack) {
     const xs = cs.flat().map((p) => p[0]), x0 = Math.min(...xs);
     return [c, [{ ch: c, pts: cs.map((r) => r.map(([x, y]) => [(x - x0) * s, (y - y0) * s])) }]];
   }));
-  // Same moves, order and de-duplication as pack.mjs, keeping which letter was in front.
+  // Same moves, order and de-duplication as pack.mjs.
   const seen = new Set(), jobs = [];
   for (const a of CAPS) for (const b of CAPS) {
     const res = alignCorners(L[a], L[b], { tol: 0.15 * H });
     for (const m of res.moved) {
       const mv = m.side === 'a' ? a : b, ot = m.side === 'a' ? b : a, k = mv + ot + r2(m.by);
       if (seen.has(k)) continue; seen.add(k);
-      jobs.push({ a, b, res });
+      // Render with the moved letter in front (orange), as the page's outlines put it on the left;
+      // the move is the same in a×b and b×a, and the solids are mirror images.
+      jobs.push(m.side === 'a' ? { a, b, ra: res.a, rb: res.b } : { a: b, b: a, ra: res.b, rb: res.a });
     }
   }
   if (jobs.length !== fp.moves.length) throw new Error(`${fp.name}: ${jobs.length} vs ${fp.moves.length}`);
   await page.evaluate(([n, c]) => window.startSheet(n, c), [jobs.length, COLS]);
   for (let i = 0; i < jobs.length; i++) {
-    const { a, b, res } = jobs[i];
-    const before = solidOf(L[a], L[b]), after = solidOf(res.a, res.b);
+    const { a, b, ra, rb } = jobs[i];
+    const before = solidOf(L[a], L[b]), after = solidOf(ra, rb);
     // Frame both the same way: the cell's bounding sphere.
     const wa = Math.max(...L[a][0].pts.flat().map((p) => p[0])), wb = Math.max(...L[b][0].pts.flat().map((p) => p[0]));
     const fit = { centre: [wa / 2, wb / 2, H / 2], radius: Math.hypot(wa, wb, H) / 2 };

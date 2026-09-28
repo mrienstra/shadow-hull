@@ -4,6 +4,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 const R = '/Users/m/Documents/GitHub/shadow-hull/';
 const { loadFont, glyphRun } = await import(R + 'src/core/glyph.js');
 const { alignCorners, levelHeights } = await import(R + 'src/core/wordpair.js');
+const { columnSlivers } = await import(R + 'src/core/slivers.js');
 const fonts = JSON.parse(readFileSync(R + 'fonts/fonts.json', 'utf8'));
 const H = 20, CAPS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 const r1 = (v) => Math.round(v * 10) / 10, r2 = (v) => Math.round(v * 100) / 100;
@@ -26,7 +27,12 @@ for (const f of fonts) {
   let near = 0;
   for (const a of CAPS) for (const b of CAPS) {
     const res = alignCorners(L[a], L[b], { tol: 0.15 * H });
-    for (const m of res.moved) moves.push([m.side === 'a' ? a : b, m.side === 'a' ? b : a, r2(m.by), m.band.map(r2), r2(m.corner), r2(m.strain)]);
+    // Scores (fields 6–9): knife and cut volumes (mm³, column measure) before and after.
+    const score = (x, y) => columnSlivers(x, y);
+    for (const m of res.moved) {
+      const s0 = score(L[a], L[b]), s1 = score(res.a, res.b);
+      moves.push([m.side === 'a' ? a : b, m.side === 'a' ? b : a, r2(m.by), m.band.map(r2), r2(m.corner), r2(m.strain), r2(s0.knife), r2(s1.knife), r2(s0.cut), r2(s1.cut)]);
+    }
     const A = levelHeights(res.a), B = levelHeights(res.b);
     if (A.some((za) => B.some((zb) => { const d = Math.abs(za - zb); return d > 1e-3 && d <= 0.6; }))) near++;
   }

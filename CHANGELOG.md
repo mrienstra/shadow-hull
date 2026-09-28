@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-09-27 (review page: interactive 3D and sliver scores)
+
+- Owner request: orbit the 3D before/after. Clicking a card's 3D thumbnail
+  opens a viewer: before and after side by side, cameras linked, Front / Side
+  / Top / 3/4 buttons, Esc closes. The solids are built in the page by
+  manifold-3d (published alongside as lib/manifold.js + .wasm) from the
+  page's own outlines, so any future move type works; three.js is bundled by
+  vite into lib/viewer.js. Moved letter now always in front (orange), in the
+  thumbnails too (it was at the side in 161 of 363 cards).
+- Each card shows knives and cuts (column measure, mm³) before → after, green
+  or red; "Only changes that reduce knives" filter.
+- Subagent: the viewer was built by a subagent (opus, ~100k tokens, ~9 min).
+  Earned its cost: self-contained, parallel with the measures work, and it
+  caught the moved-letter orientation mismatch. Untested in the real Artifact
+  sandbox (WebAssembly may be refused by its CSP; the page then says so).
+
 ## 2026-09-27 (sliver measures)
 
 - `src/core/slivers.js`: `columnSlivers` measures knives/slivers (vertical
@@ -11,8 +27,6 @@
   resources/research/letterform-tidy.md: the column measure is the cost to
   use; the feature-height proxy is too weak; a third of arm-to-corner moves
   make slivers worse by the column measure.
-- Subagent: one is building interactive 3D for the review page in parallel
-  (verdict in its own entry).
 
 ## 2026-09-27 (letter tidying: arm to corner, first cut)
 
