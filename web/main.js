@@ -31,7 +31,8 @@ const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserv
 renderer.setPixelRatio(devicePixelRatio);
 viewport.append(renderer.domElement);
 const scene = new THREE.Scene();
-scene.add(new THREE.HemisphereLight(0xffffff, 0x8888aa, 1.6));
+const hemi = new THREE.HemisphereLight(0xffffff, 0x8888aa, 1.6);
+scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xffffff, 1.6);
 sun.position.set(2, -3, 4);
 scene.add(sun);
@@ -304,6 +305,13 @@ if (TOUR) {
       tourCamera(plan, t);
       renderer.render(scene, camera);
       return true;
+    },
+    // Recolour faces by view label ({ front: '#000', right: '#fff', ... }; any CSS colour).
+    faceColours(map) { for (const [k, c] of Object.entries(map)) faceMaterials[k]?.color.set(c); },
+    // Scale both lights; neutral drops the fill light's blue ground tint (for white/grey faces).
+    lighting({ scale = 1, neutral = false }) {
+      hemi.intensity = 1.6 * scale; sun.intensity = 1.6 * scale;
+      hemi.groundColor.set(neutral ? 0x999999 : 0x8888aa);
     },
     release() { tourHeld = false; camera.zoom = 1; camera.updateProjectionMatrix(); snap('iso'); },
   };

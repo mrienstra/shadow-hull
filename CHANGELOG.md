@@ -26,6 +26,14 @@
   lanczos, one palette for the whole clip (palettegen → paletteuse, sierra2_4a
   dither). Default 20 fps, since GIF delays are whole centiseconds (30 fps
   would play at 3 cs = 33 fps). Default tour: 664 frames, 720×405, ~10 MB.
+- `record-tour` colours: `--bg`, `--front`, `--right`, `--top` (any CSS
+  colour) recolour the background and the faces carved by each view, through
+  new `window.__tour.faceColours` / `lighting` hooks (the page itself is
+  unchanged). With custom face colours the fill light's ground tint goes
+  neutral (the default blue-grey tinted white faces). `--light` scales both
+  lights: head-on faces get little direct light, so white only reads as white
+  at about `--light 3` (checked at 1, 1.5, 2, 2.5, 3); black is unaffected.
+  Owner's pick: `--bg '#808080' --right white --front black --light 3`.
 - e2e: with `tour=1` the stops follow the pairs, the first stop differs from
   the Front view, the loop's end equals its start, and a view button hands the
   camera back; without it there is no Tour button.
