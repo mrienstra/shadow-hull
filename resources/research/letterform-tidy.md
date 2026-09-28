@@ -118,6 +118,22 @@ thin *volume*, so squashing a sliver thinner looked like progress. Fixes:
 - Grid 0.1 mm (0.2 mm misjudged small gains, e.g. A × N got slightly worse).
   Cost: 10–30 ms per pair.
 
+## Fix: touching faces, and clearing features (2026-09-28)
+
+Owner still saw a triangle in L × A (top view, deployed site). It was a
+~1 mm² horizontal face at 5.093 mm with no volume under it: the L's foot top
+exactly on the A's crossbar bottom. Coincident *opposite* faces make the
+boolean leave a zero-thickness sheet (Manifold's `simplify` doesn't remove
+it). `columnSlivers` had dropped touching columns, so it looked clean. Now a
+touching column counts as a length-0 run (score 1), and tidyPair also tries
+targets at feature ± 0.05 mm (land beside it) and ± t (clear it): meeting a
+feature exactly still leaves a wedge wherever the other letter's edge
+slopes into it (the A/N plate under the N's slot tip). FINOLA × BRYAN
+(Bungee): L × A → 5.04–10.00 (clean window), A × N → the N's middle band
+1 mm lower (visible; owner to judge). How it was found: render the whole
+design from the six axis directions, match the owner's screenshot, then read
+the mesh's faces in that spot.
+
 ## Starting case (owner)
 
 FINOLA × BRYAN, pairs in a row, Bungee (the default font). In the F/B pair, the
