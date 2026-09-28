@@ -31,6 +31,25 @@
   that one-font designs are unchanged (12 designs, 2 fonts, identical), re-ran
   the suites, and looked at its screenshots.
 
+## 2026-09-28 (trim knife edges by chamfering; on by default)
+
+- "Trim knife edges" now chamfers every convex edge sharper than 60° where
+  the wedge is 0.3 mm thick (`trimSharp`, src/core/sharp.js; at most 1.5 mm
+  deep; cutters overlap along curved edges and sit just outside the faces,
+  which otherwise left hair-thin slivers). Rounded corners are untouched.
+  Works on any mesh, so angled blocks too. On by default.
+  FINOLA × BRYAN, knife edges under 60°: Alfa Slab One 21.2 → 0 mm, Archivo
+  Black 55.1 → 0.1, Bungee 12.7 → 2.1, Sigmar One 18.8 → 5.9 (tiny slivers
+  where cuts meet), Kanit none to begin with. Shadows unchanged (a few
+  1e-5 in Archivo and Sigmar), pieces unchanged, a few hundred triangles more.
+- Replaces the column-based trimThin/thinRuns (removed): it cut rounded
+  corners, ballooned meshes and left zero-thickness faces.
+- Exact meets + trimming: fewer knife edges in Bungee (8.5 vs 12.7 mm before
+  trimming) but 15 zero-thickness sheets (the stray-triangle defect), which
+  chamfering can't remove. So tidy keeps its 0.01 mm offsets for now; A × L's
+  sliced L foot top (a crease, not a knife) stays open.
+- No subagents used.
+
 ## 2026-09-28 (a knife measure that ignores rounded corners)
 
 - `sharpEdges` (src/core/sharp.js): convex mesh edges where the faces meet

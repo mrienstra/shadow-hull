@@ -41,3 +41,65 @@ export function sharpEdges(mesh, { maxAngle = 60 } = {}) {
   out.sort((x, y) => x.angle - y.angle);
   return { length, edges: out };
 }
+
+/**
+ * Trim knife edges (the design option `trim`, t in mm):
+ * truncate knife edges: for every convex edge sharper than `maxAngle`, cut off
+ * the wedge's tip with a flat chamfer where the wedge is `t` thick (at
+ * r = t / (2 tan(angle / 2)) from the edge, along both faces). The chamfer
+ * meets the faces at blunt angles, so no new sharp edge appears; rounded
+ * corners and everything else are left alone. Returns a new Manifold.
+ */
+export function trimSharp(wasm, solid, { maxAngle = 60, t = 0.3, maxDepth = 1.5, extend = 0.5 } = {}) {
+  const { Manifold } = wasm;
+  const mesh = solid.getMesh();
+  const { vertProperties: P, numProp: n, triVerts: T } = mesh;
+  const v = (i) => [P[i * n], P[i * n + 1], P[i * n + 2]];
+  const sub = (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const add = (a, b, k = 1) => [a[0] + k * b[0], a[1] + k * b[1], a[2] + k * b[2]];
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const norm = (a) => { const l = Math.hypot(...a); return l > 0 ? a.map((x) => x / l) : a; };
+  const tris = [], edges = new Map();
+  for (let k = 0; k < T.length; k += 3) {
+    const [a, b, c] = [T[k], T[k + 1], T[k + 2]];
+    tris.push(norm(cross(sub(v(b), v(a)), sub(v(c), v(a)))));
+    for (const [p, q, r] of [[a, b, c], [b, c, a], [c, a, b]]) {
+      const key = p < q ? `${p},${q}` : `${q},${p}`;
+      const e = edges.get(key);
+      if (e) e.push([k / 3, r]); else edges.set(key, [[k / 3, r]]);
+    }
+  }
+  const cuts = [];
+  for (const [key, fs] of edges) {
+    if (fs.length !== 2) continue;
+    const [[f1, r1], [f2, r2]] = fs;
+    const [i, j] = key.split(',').map(Number);
+    const A = v(i), B = v(j), n1 = tris[f1], n2 = tris[f2];
+    if (dot(n1, sub(v(r2), A)) > -1e-9) continue; // concave
+    const interior = Math.PI - Math.acos(Math.max(-1, Math.min(1, dot(n1, n2))));
+    if (interior >= (maxAngle * Math.PI) / 180) continue;
+    const e = norm(sub(B, A));
+    // In-face directions perpendicular to the edge, pointing into each face.
+    let d1 = norm(cross(n1, e)); if (dot(d1, sub(v(r1), A)) < 0) d1 = d1.map((x) => -x);
+    let d2 = norm(cross(n2, e)); if (dot(d2, sub(v(r2), A)) < 0) d2 = d2.map((x) => -x);
+    const r = Math.min(maxDepth, t / (2 * Math.tan(interior / 2)));
+    // The tip: the edge, pushed a hair outside (so the cut isn't coplanar with
+    // the faces), and the two points r along each face; slightly longer than
+    // the edge so neighbouring segments overlap.
+    const out = norm(add(n1, n2)).map((x) => x * 0.01);
+    const ext = Math.max(0.01, extend * r);
+    const A2 = add(A, e, -ext), B2 = add(B, e, ext);
+    // Far corners pushed outside their own face (along its normal), so the
+    // cutter's sides clear the faces and only the chamfer cuts (a cutter lying
+    // in a face's plane leaves hair-thin slivers).
+    const o1 = n1.map((x) => x * 0.02), o2 = n2.map((x) => x * 0.02);
+    cuts.push(Manifold.hull([add(A2, out), add(B2, out), add(add(A2, d1, r), o1), add(add(B2, d1, r), o1), add(add(A2, d2, r), o2), add(add(B2, d2, r), o2)]));
+  }
+  if (!cuts.length) return solid.translate([0, 0, 0]);
+  const cut = Manifold.union(cuts);
+  for (const c of cuts) c.delete();
+  const res = solid.subtract(cut);
+  cut.delete();
+  return res;
+}

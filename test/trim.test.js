@@ -1,33 +1,21 @@
 import { test, before } from 'node:test';
 import assert from 'node:assert/strict';
 import { getManifold } from '../src/core/index.js';
-import { buildComposition, trimThin, disposeCells } from '../src/core/compose.js';
+import { sharpEdges, trimSharp } from '../src/core/sharp.js';
 
 let wasm;
 before(async () => { wasm = await getManifold(); });
 
-// A cell from two letters given as rectangles [u0, u1] × [z0, z1] (front: u = x, side: u = y).
-const rect = (u0, u1, z0, z1) => [[u0, z0], [u1, z0], [u1, z1], [u0, z1]];
-function cellOf(front, side) {
-  const letters = { front: [{ ch: 'a', pts: front }], right: [{ ch: 'b', pts: side }] };
-  return {
-    box: { min: [0, 0, 0], max: [10, 10, 10] },
-    shapes: { front: new wasm.CrossSection(front, 'NonZero'), right: new wasm.CrossSection(side, 'NonZero') },
-    letters,
-  };
-}
-
-test('trimThin removes a thin plate (air above and below) and leaves thick material and shadows alone', () => {
-  // Front: a full square. Side: a block 0–5 and a 0.2 mm plate at 7–7.2 over half its width.
-  const cells = [cellOf([rect(0, 10, 0, 10)], [rect(0, 10, 0, 5), rect(0, 5, 7, 7.2)])];
-  const solid = buildComposition(wasm, cells);
-  const trimmed = trimThin(wasm, cells, solid, { t: 0.3 });
-  try {
-    assert.ok(Math.abs(solid.volume() - (500 + 10 * 5 * 0.2)) < 0.5, `before: ${solid.volume()}`);
-    assert.ok(Math.abs(trimmed.volume() - 500) < 0.5, `the plate is gone: ${trimmed.volume()}`);
-    const cube = [cellOf([rect(0, 10, 0, 10)], [rect(0, 10, 0, 10)])];
-    const c = buildComposition(wasm, cube), ct = trimThin(wasm, cube, c, { t: 0.3 });
-    assert.ok(Math.abs(c.volume() - ct.volume()) < 1e-6, 'nothing thin, nothing trimmed');
-    c.delete(); ct.delete(); disposeCells(cube);
-  } finally { solid.delete(); trimmed.delete(); disposeCells(cells); }
+test('trimSharp chamfers a knife edge and leaves blunt shapes alone', () => {
+  // A 10 mm wedge with a ~10° knife edge along x (at y = 10, z = 0).
+  const wedge = wasm.Manifold.hull([[0, 0, 0], [0, 10, 0], [10, 0, 0], [10, 10, 0], [0, 0, 1.76], [10, 0, 1.76]]);
+  const cut = trimSharp(wasm, wedge, { t: 0.3 });
+  assert.ok(sharpEdges(wedge.getMesh()).length > 9.9);
+  assert.ok(sharpEdges(cut.getMesh()).length < 1e-6, 'no knife edge left');
+  const removed = wedge.volume() - cut.volume();
+  // The tip up to where the wedge is 0.3 mm thick, capped at 1.5 mm deep: about 1.5 × 0.26 / 2 × 10 mm.
+  assert.ok(removed > 1.5 && removed < 2.5, `only the tip goes: ${removed} mm³`);
+  const cube = wasm.Manifold.cube([10, 10, 10]), same = trimSharp(wasm, cube);
+  assert.ok(Math.abs(same.volume() - 1000) < 1e-6, 'a cube is untouched');
+  for (const m of [wedge, cut, cube, same]) m.delete();
 });

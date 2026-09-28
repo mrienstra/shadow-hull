@@ -72,26 +72,3 @@ export function columnSlivers(lettersA, lettersB, { t = 0.8, step = 0.1, touch =
   const a = step * step;
   return { knife: knife * a, cut: cut * a, volume: volume * a, knifeScore: knifeScore * a, cutScore: cutScore * a };
 }
-
-/**
- * The thin runs themselves: [x, y, z0, z1] for every vertical run of material
- * shorter than `t` (knife-thin, with air directly above and below), including
- * zero-length ones where faces only touch. x, y are column centres on a grid
- * of `step` over the letters' own extents (cell coordinates).
- */
-export function thinRuns(lettersA, lettersB, { t = 0.3, step = 0.05 } = {}) {
-  const [la, ha] = range(lettersA), [lb, hb] = range(lettersB);
-  const pa = swap(lettersA), pb = swap(lettersB);
-  const colsB = [];
-  for (let y = lb + step / 2; y < hb; y += step) colsB.push([y, scanIntervals(pb, y)]);
-  const out = [];
-  for (let x = la + step / 2; x < ha; x += step) {
-    const ca = scanIntervals(pa, x);
-    if (!ca.length) continue;
-    for (const [y, cb] of colsB) {
-      if (!cb.length) continue;
-      for (const [z0, z1] of intersect(ca, cb)) if (z1 - z0 < t) out.push([x, y, z0, z1]);
-    }
-  }
-  return out;
-}

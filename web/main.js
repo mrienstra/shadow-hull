@@ -545,7 +545,7 @@ function renderLookMenu() {
 }
 
 // Knob widgets, generated from the look's definition.
-const BOOL_LABELS = { stretch: 'Allow stretching letters', compact: 'Prefer compact', stand: 'Display stand', tidy: 'Tidy slivers (nudge strokes so letters meet cleanly)', trim: 'Trim knife edges (under 0.3 mm)', turn: 'Turn 45° for display', mono: 'Monospaced (letters widened to their column)' };
+const BOOL_LABELS = { stretch: 'Allow stretching letters', compact: 'Prefer compact', stand: 'Display stand', tidy: 'Tidy slivers (nudge strokes so letters meet cleanly)', trim: 'Trim knife edges (blunt edges sharper than 60°)', turn: 'Turn 45° for display', mono: 'Monospaced (letters widened to their column)' };
 const KNOB_LABELS = { spacing: 'Spacing', case: 'Letters', rows: 'Rows', style: 'Style', shape: 'Shape seen from above', angle: 'Angle between the two words', supports: 'Support rods (thin joins between pieces)' };
 const SHAPES = ['❤', '♥', '⭐', '☀', '♣', '♠', '♦', '♪', '😀', '🐱'];
 let knobValues = {};

@@ -8,7 +8,6 @@
  * (see views.js): front = (X, Z), right = (Y, Z), top = (X, Y). A missing shape
  * leaves that view unconstrained inside the box. Shapes are not consumed.
  */
-import { thinRuns } from './slivers.js';
 import { Scope, extrudeCentered, tagged } from './manifold.js';
 import { VIEW_NAMES, localToWorld, worldToLocal } from './views.js';
 
@@ -137,49 +136,6 @@ export function letterVisibility(wasm, cells, { contactDistance = 0.3, height = 
       });
     }
     return { views, worst, worstContact };
-  } finally {
-    scope.dispose();
-  }
-}
-
-/**
- * Trim knife edges: material thinner than `t` vertically, with air directly
- * above and below it (e.g. a plate where two letters' features nearly line
- * up, or the tip of a wedge ending at an opening). The solid is
- * {(x, y, z) : (x, z) in A, (y, z) in B}, so:
- *   - where it's thin: columns whose run of material is shorter than `t`
- *     (thinRuns, from the outlines alone), as small boxes (a mask);
- *   - what's thin there, with smooth boundaries: a vertical morphological
- *     opening (erode each letter's outline vertically by ±t/2, as `k`+1
- *     shifted copies intersected; build; grow back as shifted copies; clip to
- *     the solid). Outside the mask the opening's staircase on slopes is
- *     ignored, so only genuinely thin material goes.
- * Top-view shapes are prisms along z and aren't eroded. Returns a new solid
- * (caller owns it); doesn't consume its inputs.
- */
-export function trimThin(wasm, cells, solid, { t = 0.3, k = 12, step = 0.05, frames } = {}) {
-  const { Manifold, CrossSection } = wasm;
-  const scope = new Scope();
-  try {
-    // Angled views (frames) don't map outline u to world x / y; not handled yet.
-    if (frames) return solid.translate([0, 0, 0]);
-    const h = t / 2, pad = 0.01;
-    const boxes = [];
-    for (const c of cells) {
-      if (!c.letters) continue;
-      for (const [x, y, z0, z1] of thinRuns(c.letters.front, c.letters.right, { t, step })) {
-        boxes.push(scope.add(scope.add(Manifold.cube([3 * step, 3 * step, z1 - z0 + 2 * pad], false)).translate([x - 1.5 * step, y - 1.5 * step, z0 - pad])));
-      }
-    }
-    if (!boxes.length) return solid.translate([0, 0, 0]);
-    const mask = scope.add(Manifold.union(boxes));
-    const shifts = Array.from({ length: k + 1 }, (_, i) => -h + (2 * h * i) / k);
-    const erode = (cs) => scope.add(CrossSection.intersection(shifts.map((s) => scope.add(cs.translate([0, s])))));
-    const eroded = cells.map((c) => ({ box: c.box, shapes: Object.fromEntries(Object.entries(c.shapes).map(([v, cs]) => [v, cs && v !== 'top' ? erode(cs) : cs])) }));
-    const core = scope.add(buildComposition(wasm, eroded, { frames }));
-    const grown = scope.add(Manifold.union(shifts.map((s) => scope.add(core.translate([0, 0, s])))));
-    const thin = scope.add(scope.add(solid.subtract(grown)).intersect(mask));
-    return solid.subtract(thin);
   } finally {
     scope.dispose();
   }

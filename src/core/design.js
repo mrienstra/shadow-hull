@@ -8,7 +8,8 @@
  * each style keeps its top few search results, builds them, and picks the best
  * by designQuality.
  */
-import { letterVisibility, buildComposition, measureComposition, disposeCells, trimThin } from './compose.js';
+import { letterVisibility, buildComposition, measureComposition, disposeCells } from './compose.js';
+import { trimSharp } from './sharp.js';
 import { exploreWordPair, layoutCells, rankLayouts } from './wordpair.js';
 import { blockCells } from './block.js';
 import { compositions, spanColumnCells, stackedColumnCells, placeTop } from './column.js';
@@ -87,7 +88,7 @@ export function designQuality(m, w = QUALITY_WEIGHTS) {
  */
 export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods = {}, height = 20, stretch = 0, imbalance = 0, frames, weights, trim = 0 } = {}) {
   // Trim knife edges first (letters only), so everything is measured on the trimmed solid.
-  if (trim > 0) { const trimmed = trimThin(wasm, cells, solid, { t: trim, frames }); solid.delete(); solid = trimmed; }
+  if (trim > 0) { const trimmed = trimSharp(wasm, solid, { t: trim }); solid.delete(); solid = trimmed; }
   const base = measureComposition(wasm, solid, cells, { frames });
   const vis = letterVisibility(wasm, cells, { height });
   let joined = solid, bridges = [], blocks = [];
