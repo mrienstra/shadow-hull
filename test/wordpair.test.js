@@ -241,5 +241,7 @@ test('tidyPair: L × A in Bungee (FINOLA × BRYAN) leaves no thin plate (a 0.12 
   assert.equal(r.moved.length, 1);
   const s = columnSlivers(r.a, r.b, { t: 0.3 });
   assert.equal(s.knife, 0, 'no material in runs thinner than 0.3 mm');
+  // …and no faces that exactly touch (zero-thickness sheets render as stray triangles).
+  assert.equal(s.knifeScore, 0, 'no zero-thickness sheets either');
   assert.ok(columnSlivers(r.a, r.b).knifeScore < columnSlivers(c.letters.front, c.letters.right).knifeScore / 5);
 });

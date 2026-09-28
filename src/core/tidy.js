@@ -214,7 +214,11 @@ export function featureNearMisses(lettersA, lettersB, { t = 0.8, eps = 1e-3 } = 
  *     pointed corner, as drawn);
  *   - edges: each edge may instead move on its own to a feature within
  *     `near` mm (a near-miss), so the band gets a little taller or shorter
- *     (this can fix two near-misses at once, e.g. L × A in Bungee).
+ *     (this can fix two near-misses at once, e.g. L × A in Bungee);
+ *   - clear: as either of the above, but to `t` above or below a feature
+ *     instead of onto it. Meeting a feature exactly still leaves a thin
+ *     wedge wherever the other letter's edge slopes into it (an A's leg, an
+ *     N's slot); clearing it by `t` leaves nothing thinner than `t`.
  * Pairs of the same letters are left alone.
  *   slivers    = knifeScore + cutWeight × cutScore (columnSlivers, mm²: the
  *                thinner a sliver, the more it counts)
@@ -232,7 +236,7 @@ export function featureNearMisses(lettersA, lettersB, { t = 0.8, eps = 1e-3 } = 
  */
 export function tidyPair(lettersA, lettersB, {
   tol = 3, near = 1, maxStrain = 0.3, maxBand = 0.15, strokeWeight = 3, lambda = 3, cutWeight = 0.3,
-  minGain = 0.2, t = 0.8, step = 0.1,
+  minGain = 0.2, t = 0.8, step = 0.1, eps = 0.05,
 } = {}) {
   const out = { a: lettersA, b: lettersB, moved: [] };
   if (lettersA.map((l) => l.ch).join('') === lettersB.map((l) => l.ch).join('')) return out;
@@ -243,10 +247,13 @@ export function tidyPair(lettersA, lettersB, {
   for (const [side, other] of [['a', 'b'], ['b', 'a']]) {
     const L = levelHeights(out[side]);
     if (L.length < 4) continue;
-    const targets = [
+    const features = [
       ...levelHeights(out[other]).map((z) => [z, 'edge']),
       ...cornerHeights(out[other]).map((z) => [z, 'corner']),
     ];
+    // Onto a feature, a hair either side of it (where exactly onto it would make
+    // faces touch), or clear of it by t.
+    const targets = features.flatMap(([z, kind]) => [[z, kind], [z + eps, kind], [z - eps, kind], [z + t, `clear of ${kind}`], [z - t, `clear of ${kind}`]]);
     // Ink width at each band's mid-height; a band wider than both neighbours is a horizontal stroke.
     const polys = out[side].flatMap((l) => l.pts);
     const width = L.slice(1).map((z, i) => scanIntervals(polys, (L[i] + z) / 2).reduce((s, [x0, x1]) => s + x1 - x0, 0));

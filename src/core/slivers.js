@@ -30,12 +30,17 @@ function columns(letters, step) {
   for (let u = lo + step / 2; u < hi; u += step) out.push(scanIntervals(polys, u));
   return out.filter((c) => c.length);
 }
+// Where one column's ink ends exactly where the other's begins, the solid has
+// a zero-thickness sheet there (coincident opposite faces; the boolean leaves
+// a stray face, e.g. L × A in Bungee after tidying): kept as a length-0 run.
+const TOUCH = 1e-6;
 function intersect(a, b) {
   const out = [];
   let i = 0, j = 0;
   while (i < a.length && j < b.length) {
     const lo = Math.max(a[i][0], b[j][0]), hi = Math.min(a[i][1], b[j][1]);
-    if (hi > lo) out.push([lo, hi]);
+    if (hi > lo + TOUCH) out.push([lo, hi]);
+    else if (Math.abs(hi - lo) <= TOUCH) out.push([lo, lo]);
     if (a[i][1] < b[j][1]) i++; else j++;
   }
   return out;
@@ -47,6 +52,7 @@ function intersect(a, b) {
  * scale); and scores (mm²) `knifeScore`, `cutScore`: each thin run's
  * footprint × (1 − length / t), so the thinner a sliver, the more it counts
  * (a volume would reward squashing a sliver thinner, e.g. L × A in Bungee).
+ * Faces that exactly touch (zero thickness) count as the thinnest sliver.
  */
 export function columnSlivers(lettersA, lettersB, { t = 0.8, step = 0.1 } = {}) {
   const A = columns(lettersA, step), B = columns(lettersB, step);

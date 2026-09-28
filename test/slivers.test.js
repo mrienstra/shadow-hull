@@ -28,3 +28,14 @@ test('featureNearMisses: close but unequal feature heights', () => {
   const r = featureNearMisses(a, b);
   assert.equal(r.count, 1, 'only 4 vs 4.3 is a near-miss (6 = 6 lines up)');
 });
+
+test('columnSlivers: faces that exactly touch count as the thinnest sliver', () => {
+  // Front letter ink below 5, side letter ink above 5: the solid only touches at z = 5.
+  const r = columnSlivers(letter(rect(0, 10, 0, 5)), letter(rect(0, 10, 5, 10)));
+  assert.equal(r.knife, 0, 'no volume');
+  assert.ok(Math.abs(r.knifeScore - 100) < 2, `score = footprint × 1: ${r.knifeScore}`);
+  // Scores weigh thinner slivers more: a 0.1 mm layer outscores a 0.5 mm one.
+  const thin = columnSlivers(square, letter(rect(0, 10, 0, 0.1), rect(0, 10, 2, 10)));
+  const thicker = columnSlivers(square, letter(rect(0, 10, 0, 0.5), rect(0, 10, 2, 10)));
+  assert.ok(thin.knifeScore > thicker.knifeScore && thin.knife < thicker.knife);
+});

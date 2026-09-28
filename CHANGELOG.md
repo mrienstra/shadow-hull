@@ -31,6 +31,21 @@
   that one-font designs are unchanged (12 designs, 2 fonts, identical), re-ran
   the suites, and looked at its screenshots.
 
+## 2026-09-28 (stray triangle: touching faces; clear-of-feature moves)
+
+- Owner still saw a thin triangle in L × A (top view) on the new site. It
+  was a zero-thickness sheet: tidying put the L's foot top exactly on the A's
+  crossbar bottom, and the boolean leaves a stray face where opposite faces
+  coincide. The column measure dropped touching columns, so it scored that
+  as clean. Now touching faces count as the thinnest sliver, and tidyPair
+  also tries landing 0.05 mm either side of a feature (L × A: 5.04–10.00, a
+  clean window) and clearing a feature by 0.8 mm (A × N: the N's middle
+  band 1 mm lower, clear of the A's crossbar). Tests: touching faces score;
+  L × A leaves no zero-thickness sheet.
+- Lesson: after a fix, check the whole finished design (every pair, and the
+  built mesh), not just the pair that was reported.
+- No subagents used.
+
 ## 2026-09-28 (no stand, no rods by default; thinner slivers count worse)
 
 - Owner: no stand and no support rods by default. All two-word looks now
