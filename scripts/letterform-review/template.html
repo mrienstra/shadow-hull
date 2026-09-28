@@ -95,12 +95,12 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 <div class="wrap">
   <header style="display:grid;gap:10px">
     <h1>Arm to corner</h1>
-    <p class="lede">Where one letter of a pair has a <b>pointed corner</b> (like the notch between a B's bowls) inside a <b>stroke</b> of the other letter (like the F's middle arm), the stroke slides up or down, keeping its thickness, until its nearer edge meets the corner. Only one letter of a pair moves, and pairs of the same letter are left alone. The % on each card is the <b>change</b>: the move as a share of the smaller gap beside the stroke (Bungee's F ← B, the change you liked, is 13%). Tops and bottoms never move; changes over 70% or 3 mm are never made. Every capital pair in each bundled font, 20 mm tall; the 3D views show the pair's solid from the front-right, as the app's 3/4 view does (orange walls follow the left letter, blue the right). Under each card, <b>knives</b> (material in vertical runs under 0.8 mm: slivers and sharp wedges) and <b>cuts</b> (air slots under 0.8 mm) before → after, in mm³: green when the change helps, red when it makes things worse. Mark each change so I can tune the rule.</p>
+    <p class="lede">For each pair, the app now tries sliding each <b>stroke</b> of either letter up or down, keeping its thickness, so that one of its edges meets a <b>feature</b> of the other letter: a flat edge, or a pointed corner (like the notch between a B's bowls). It keeps the one change that best reduces knives and cuts without stretching the gaps around the stroke too much, and only if it clearly helps. Only one letter of a pair moves, and pairs of the same letter are left alone. The % on each card is the <b>change</b>: the move as a share of the smaller gap beside the stroke (Bungee's F ← B, the change you liked, is 13%). Tops and bottoms never move; changes over 30% or 3 mm are never made. Every capital pair in each bundled font, 20 mm tall; the 3D views show the pair's solid from the front-right, as the app's 3/4 view does (orange walls follow the left letter, blue the right). Under each card, <b>knives</b> (material in vertical runs under 0.8 mm: slivers and sharp wedges) and <b>cuts</b> (air slots under 0.8 mm) before → after, in mm³: green when the change helps, red when it makes things worse. Mark each change so I can tune the rule.</p>
     <div class="legend">
       <span><i class="sw" style="background:var(--moved)"></i>moved letter, after</span>
       <span><i class="sw" style="border:2px dashed var(--before)"></i>moved letter, before</span>
-      <span><i class="sw" style="background:var(--other)"></i>letter with the corner</span>
-      <span><i class="sw" style="background:var(--corner);height:3px"></i>corner height</span>
+      <span><i class="sw" style="background:var(--other)"></i>the other letter</span>
+      <span><i class="sw" style="background:var(--corner);height:3px"></i>height of the feature it meets</span>
     </div>
   </header>
   <div class="bar">
@@ -109,7 +109,7 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
       <label><input type="checkbox" id="unmarked"> Only unmarked</label>
       <label><input type="checkbox" id="bysize"> Largest changes first</label>
       <label><input type="checkbox" id="helps"> Only changes that reduce knives</label>
-      <label for="maxstrain">Show changes up to <input type="range" id="maxstrain" min="5" max="70" step="5" value="70" style="width:120px;vertical-align:middle"> <b id="maxval" class="stat">70%</b></label>
+      <label for="maxstrain">Show changes up to <input type="range" id="maxstrain" min="5" max="30" step="5" value="30" style="width:120px;vertical-align:middle"> <b id="maxval" class="stat">30%</b></label>
       <span class="stat" id="stat"></span>
       <span class="note" id="save"></span>
     </div>
@@ -181,7 +181,7 @@ function card(f, m) {
   el.className = 'card'; el.dataset.v = v; el.dataset.k = k;
   el.innerHTML = `
     <div class="head"><span class="pair"><em>${mv}</em> ← ${ot}</span><span class="by">${by < 0 ? '↓' : '↑'} ${Math.abs(by).toFixed(2)} mm · ${Math.round(strain * 100)}%</span></div>
-    <svg viewBox="-1 -1 ${W + 2} 22" role="img" aria-label="${mv} moved ${by < 0 ? 'down' : 'up'} ${Math.abs(by).toFixed(2)} millimetres to meet ${ot}'s corner">
+    <svg viewBox="-1 -1 ${W + 2} 22" role="img" aria-label="${mv} moved ${by < 0 ? 'down' : 'up'} ${Math.abs(by).toFixed(2)} millimetres to meet ${ot}'s ${m[10] ?? 'corner'}">
       <rect x="0" y="${20 - (band[1] + by)}" width="${A.w}" height="${band[1] - band[0]}" fill="var(--moved-soft)"/>
       <path d="${path(after, 0)}" fill="var(--moved)" fill-rule="nonzero"/>
       <path d="${path(A.r, 0)}" fill="none" stroke="var(--before)" stroke-width="0.34" stroke-dasharray="0.7 0.45" stroke-linejoin="round"/>
@@ -189,7 +189,7 @@ function card(f, m) {
       <line x1="-1" x2="${W + 1}" y1="${20 - corner}" y2="${20 - corner}" stroke="var(--corner)" stroke-width="0.22"/>
     </svg>
     <button type="button" class="solids" aria-label="Open the ${mv} and ${ot} solid in 3D, before and after" title="Open in 3D">${['Before', 'After'].map((t, slot) => `<span class="fig"><span class="img" style="${tile(f, idx, slot)}"></span><span class="cap">${t}</span></span>`).join('')}</button>
-    <p class="what">${mv}'s stroke ${band[0].toFixed(1)}–${band[1].toFixed(1)} mm moves ${by < 0 ? 'down' : 'up'}: its ${edge === band[1] ? 'top' : 'bottom'} meets ${ot}'s corner at ${corner.toFixed(1)} mm.</p>
+    <p class="what">${mv}'s stroke ${band[0].toFixed(1)}–${band[1].toFixed(1)} mm moves ${by < 0 ? 'down' : 'up'}: its ${edge === band[1] ? 'top' : 'bottom'} meets ${ot}'s ${m[10] === 'edge' ? 'flat edge' : 'corner'} at ${corner.toFixed(1)} mm.</p>
     <p class="scores">${score('Knives', m[6], m[7])} · ${score('cuts', m[8], m[9])}</p>
     <div class="votes">${['good', 'bad', 'unsure'].map((x) => `<button type="button" data-k="${x}" aria-pressed="${v === x}">${x[0].toUpperCase() + x.slice(1)}</button>`).join('')}</div>`;
   el.querySelector('.solids').addEventListener('click', (e) => open3d(f, m, e.currentTarget));

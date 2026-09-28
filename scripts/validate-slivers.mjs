@@ -6,7 +6,8 @@ import { readFileSync } from 'node:fs';
 import { getManifold, loadFont, thinFeatures } from '../src/core/index.js';
 import { layoutCells } from '../src/core/wordpair.js';
 import { buildComposition, disposeCells } from '../src/core/compose.js';
-import { columnSlivers, featureNearMisses } from '../src/core/slivers.js';
+import { columnSlivers } from '../src/core/slivers.js';
+import { featureNearMisses } from '../src/core/tidy.js';
 
 const N = +(process.argv[2] ?? 200), T = 0.8;
 const wasm = await getManifold();

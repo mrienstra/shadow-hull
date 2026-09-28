@@ -132,3 +132,30 @@ test('alignCorners: the F\'s middle arm moves down to the B\'s notch (Bungee); s
   assert.equal(alignCorners(same.front, same.right).moved.length, 0, 'same letters: no change');
   assert.equal(alignCorners(F, B, { maxStrain: 0.05 }).moved.length, 0, 'over the strain limit: no change');
 });
+
+test('tidyPair: picks the F-arm-to-B-notch move in Bungee, only when it reduces slivers', async () => {
+  const { layoutCells, tidyPair, cornerHeights, levelHeights } = await import('../src/core/wordpair.js');
+  const { columnSlivers } = await import('../src/core/slivers.js');
+  const bungee = loadFont(await readFile(new URL('../fonts/Bungee-Regular.ttf', import.meta.url)));
+  const cellOf = (a, b) => {
+    const [c] = layoutCells(wasm, bungee, { rows: [{ a: [a], b: [b] }] }, { height: 20 });
+    c.shapes.front.delete(); c.shapes.right.delete();
+    return c.letters;
+  };
+  const { front: F, right: B } = cellOf('F', 'B');
+  const r = tidyPair(F, B);
+  assert.equal(r.moved.length, 1);
+  const [m] = r.moved;
+  assert.equal(m.side, 'a');
+  assert.equal(m.kind, 'corner');
+  assert.ok(m.by < 0 && m.by > -0.6, `F's arm down a little: ${m.by}`);
+  assert.ok(Math.abs(m.target - cornerHeights(B)[0]) < 1e-9, 'meets the B\'s notch');
+  assert.ok(levelHeights(r.a).some((z) => Math.abs(z - m.target) < 1e-6));
+  // The measured knife volume falls, as the move reports.
+  const before = columnSlivers(F, B), after = columnSlivers(r.a, B);
+  assert.ok(after.knife < before.knife - 0.2, `knife ${before.knife} → ${after.knife}`);
+  // Same letters: never; and a gain threshold nothing can meet: no move.
+  const same = cellOf('B', 'B');
+  assert.equal(tidyPair(same.front, same.right).moved.length, 0);
+  assert.equal(tidyPair(F, B, { minGain: 100 }).moved.length, 0);
+});

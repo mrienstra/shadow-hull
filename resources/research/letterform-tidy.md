@@ -17,7 +17,7 @@ much deeper). Sometimes switching fonts is easier, but "all fonts" is a huge
 search space. Eventually: **one font per axis** (e.g. cursive one way, block
 the other).
 
-## Proposed direction (not started)
+## Proposed direction
 
 - The solid is the front letter's shape × the side letter's shape, so its
   feature edges sit at the two letters' feature heights (level edges and
@@ -41,8 +41,8 @@ the other).
   per axis.
 - **One font per axis:** layout already handles the two words separately;
   mostly plumbing two fonts through (recipes, UI, share links).
-- Suggested order: measures (and validate the proxy) → scores on the review
-  page → tidy as a trade-off search. Font per axis is independent.
+- Order taken: measures → scores + interactive 3D on the review page → tidy
+  as a trade-off search (all done 2026-09-27/28) → font per axis.
 
 ## Measures (stage 1, done)
 
@@ -72,6 +72,26 @@ t = 0.8 mm:
 - **Finding:** by the column measure, 86 of 268 arm-to-corner moves make
   slivers *worse* (a move meets one corner but creates another near-miss) →
   the trade-off search should only accept moves that reduce the cost.
+
+## Trade-off search (stage 3, done)
+
+`tidyPair` (src/core/tidy.js; letter features and warps moved there from
+wordpair.js, re-exported): candidates shift one band (stroke or gap, not
+touching top/bottom) of either letter so an edge meets the other letter's
+level edge or corner (as drawn), within 3 mm; cost = knife + 0.3·cut
+(column measure, 0.2 mm grid) + 3·Σ|log| stretch of the two neighbouring
+bands; kept only if it lowers the cost and removes ≥ 0.2 mm³; strain ≤ 30%.
+~2 ms per pair. Over all 676 pairs it tidies 122 (Bungee), 170 (Kanit),
+160 (Archivo Black), mostly stroke → level edge (the near-miss case the
+halfway warp handled badly). It reproduces the owner's F×B change on its own.
+FINOLA × BRYAN (Bungee): F/B −0.37 mm (knife 0.69 → 0), L/A −0.35 mm (the
+L's foot to the A's crossbar, knife 6.6 → 0), A/N −0.21 mm (small gain).
+
+The app's knob ("Tidy slivers", on by default for row, rows, grid; recipe
+`tidy: 'pair'`) uses it; share links from the arm-to-corner day keep
+`corners` → alignCorners. The review page now shows tidyPair's changes with
+scores. Weights (λ = 3, cut 0.3, minGain 0.2, strain 30%) are first guesses
+for the owner's review to tune.
 
 ## Starting case (owner)
 

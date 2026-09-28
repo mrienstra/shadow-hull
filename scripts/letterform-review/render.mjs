@@ -5,7 +5,7 @@ import { chromium } from 'playwright-core';
 const R = '/Users/m/Documents/GitHub/shadow-hull/';
 const OUT = process.argv[2];
 const { loadFont, glyphRun } = await import(R + 'src/core/glyph.js');
-const { alignCorners } = await import(R + 'src/core/wordpair.js');
+const { tidyPair } = await import(R + 'src/core/wordpair.js');
 const { getManifold, faceRuns } = await import(R + 'src/core/index.js');
 const { buildComposition, disposeCells } = await import(R + 'src/core/compose.js');
 const wasm = await getManifold();
@@ -45,7 +45,7 @@ for (const fp of pack) {
   // Same moves, order and de-duplication as pack.mjs.
   const seen = new Set(), jobs = [];
   for (const a of CAPS) for (const b of CAPS) {
-    const res = alignCorners(L[a], L[b], { tol: 0.15 * H });
+    const res = tidyPair(L[a], L[b], { tol: 0.15 * H });
     for (const m of res.moved) {
       const mv = m.side === 'a' ? a : b, ot = m.side === 'a' ? b : a, k = mv + ot + r2(m.by);
       if (seen.has(k)) continue; seen.add(k);

@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-09-28 (tidy slivers: trade-off search)
+
+- `tidyPair` (new src/core/tidy.js, which now holds the letter-feature and
+  warp code from wordpair.js): per pair, the one stroke shift (either letter,
+  to the other's flat edge or corner) that best reduces knives + 0.3 × cuts
+  (column measure) against how much it stretches the gaps around the stroke;
+  only if it clearly helps. The app's knob becomes "Tidy slivers" (recipe
+  `tidy: 'pair'`; older `corners` links unchanged). FINOLA × BRYAN: the F's
+  arm (as before) plus the L's foot to the A's crossbar (6.6 mm³ of knife
+  gone). Review page shows tidyPair's changes. Test added.
+- No subagents used.
+
 ## 2026-09-27 (review page: interactive 3D and sliver scores)
 
 - Owner request: orbit the 3D before/after. Clicking a card's 3D thumbnail

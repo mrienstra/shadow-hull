@@ -10,14 +10,12 @@
  *   feature heights leaves a short run of material there (a knife or sliver)
  *   or a short run of air between material (a shallow cut). Summing those
  *   over a grid of lines gives their volumes (mm³) without building anything.
- * - featureNearMisses: only the letters' feature heights (level edges and
- *   pointed corners, see wordpair.js): pairs closer than `t` but not equal.
- *   Needs no outlines at all once heights are known (for font search).
+ * - featureNearMisses (tidy.js): only the letters' feature heights; weak
+ *   (see the research note), kept for reference.
  *
  * Letters are [{ pts: contours in (u, z) }] as in layoutCells' cell.letters.
  */
 import { scanIntervals } from './scan.js';
-import { levelHeights, cornerHeights } from './wordpair.js';
 
 // Ink intervals in z of `letters` along the vertical line u.
 const swap = (letters) => letters.flatMap((l) => l.pts.map((r) => r.map(([u, z]) => [z, u])));
@@ -63,23 +61,4 @@ export function columnSlivers(lettersA, lettersB, { t = 0.8, step = 0.1 } = {}) 
   }
   const a = step * step;
   return { knife: knife * a, cut: cut * a, volume: volume * a };
-}
-
-/**
- * Near-misses between the two letters' feature heights: pairs closer than `t`
- * but not within `eps` (already lined up). `weight` sums (t - d) / t, so the
- * closest misses count most; `distinct` = how many different feature heights
- * the pair has in all (fewer = a simpler, cleaner solid).
- */
-export function featureNearMisses(lettersA, lettersB, { t = 0.8, eps = 1e-3 } = {}) {
-  const feats = (ls) => [...levelHeights(ls), ...cornerHeights(ls)];
-  const A = feats(lettersA), B = feats(lettersB);
-  let count = 0, weight = 0;
-  for (const a of A) for (const b of B) {
-    const d = Math.abs(a - b);
-    if (d > eps && d < t) { count++; weight += (t - d) / t; }
-  }
-  const all = [...A, ...B].sort((x, y) => x - y);
-  const distinct = all.filter((z, i) => i === 0 || z - all[i - 1] > eps).length;
-  return { count, weight, distinct };
 }

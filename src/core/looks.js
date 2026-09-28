@@ -21,9 +21,9 @@ import { QUALITY_WEIGHTS } from './design.js';
 // "Prefer compact": also reward squarer overall shapes when ranking layouts
 // (compactness = shortest side / longest side of the letters' bounding box).
 const COMPACT_WEIGHTS = { ...QUALITY_WEIGHTS, compact: 0.3 };
-// "Tidy": move a stroke (up to 15% of the row height) so its edge meets the
-// other letter's pointed corner, e.g. the F's middle arm down to the B's notch.
-const TIDY = 0.15;
+// "Tidy": per pair, the one stroke shift (up to 15% of the row height) that
+// best removes slivers without distorting the letters (tidyPair), e.g. the F's
+// middle arm down to the B's notch.
 
 export { LOOKS, LOOK, lookKnobs };
 
@@ -53,14 +53,14 @@ export function* generateLook(ctx, wordA, wordB, lookId, given = {}, { more = fa
   const extra = { ...(k.supports === 'none' ? { supports: 'none' } : {}), ...(k.compact ? { weights: COMPACT_WEIGHTS } : {}) };
   const out = (title, text, recipe, metrics, note = '') => ({ look: lookId, title, text, note, recipe: { ...recipe, ...extra, ...finish(k) }, metrics });
 
-  const corners = k.tidy ? +(TIDY * height).toFixed(3) : 0;
+  const tidy = k.tidy ? { mode: 'pair', tol: 0.15 * height } : null;
   const chainRecipe = (famName, l) => ({
-    kind: 'chain', spacing: famName, join: 'hull+bridges', ...(corners ? { corners } : {}),  // supports/weights come from `extra`
+    kind: 'chain', spacing: famName, join: 'hull+bridges', ...(tidy ? { tidy: 'pair' } : {}),  // supports/weights come from `extra`
     layout: { rows: l.rows.map(({ a, b, fit, frame }) => ({ a, b, fit, frame })), score: l.score, imbalance: l.imbalance, caseMode: l.caseMode },
   });
   const chains = function* (rows, famName, titlePrefix = '') {
     const designs = designWordPair(wasm, font, wordA, wordB, {
-      spacing: famName, join, height, candidates, cases, rows: [rows], fits, weights: k.compact ? COMPACT_WEIGHTS : undefined, corners,
+      spacing: famName, join, height, candidates, cases, rows: [rows], fits, weights: k.compact ? COMPACT_WEIGHTS : undefined, tidy,
     });
     for (const { layout, metrics, runnersUp } of designs) {
       yield out(`${titlePrefix}${titleCase(layout.caseMode)}`, describeLayout(layout), chainRecipe(famName, layout), metrics);

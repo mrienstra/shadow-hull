@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { columnSlivers, featureNearMisses } from '../src/core/slivers.js';
+import { columnSlivers } from '../src/core/slivers.js';
+import { featureNearMisses } from '../src/core/tidy.js';
 
 // Letters as { pts: contours in (u, z) }: rectangles [u0, u1] × [z0, z1].
 const rect = (u0, u1, z0, z1) => [[u0, z0], [u1, z0], [u1, z1], [u0, z1]];
