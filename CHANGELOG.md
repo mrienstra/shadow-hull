@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-09-27 (letter tidying: arm to corner, first cut)
+
+- Owner request: in FINOLA × BRYAN (Bungee), the B's notch sits 0.37 mm below
+  the top of the F's middle arm, leaving a thin wedge. New knob on row, rows
+  and grid, "Line up arms with corners" (on by default; older share links
+  unchanged): `alignCorners` shifts one letter's stroke, keeping its
+  thickness, so its edge meets the other letter's pointed corner (F's arm
+  ↓ 0.37 mm). One letter per pair, never same-letter pairs, and at most a 15%
+  change to the gaps beside the stroke (provisional).
+- First tried meeting nearly level edges halfway (`alignLevels`); the owner
+  disliked it (it moved the gap between the F's arms). Kept, unused.
+- Review page for the owner (every capital pair × 9 fonts, 2D and 3D
+  before/after, Good/Bad marks): `scripts/letterform-review/`. Findings and
+  open questions: `resources/research/letterform-tidy.md`.
+- Test: F's arm moves to the B's notch, keeps its thickness; same letters and
+  over-limit changes are left alone.
+- No subagents used.
+
 ## 2026-09-27 (tour for recording a video)
 
 - Owner request: a video of one design (FINOLA × BRYAN, pairs in a row, no

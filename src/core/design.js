@@ -117,9 +117,9 @@ export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods =
 }
 
 /** Build one chain layout with a spacing family, join it, and measure everything. */
-export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = 'hull+bridges', height = 20, weights, top = null } = {}) {
+export function realizeDesign(wasm, font, layout, { spacing = 'spaced', join = 'hull+bridges', height = 20, weights, top = null, levels = 0, corners = 0 } = {}) {
   const fam = SPACING[spacing];
-  const cells = layoutCells(wasm, font, { rows: layout.rows }, { height, ...fam.layout });
+  const cells = layoutCells(wasm, font, { rows: layout.rows }, { height, ...fam.layout, levels, corners });
   if (top?.shape) {
     // A shape seen from above over the whole layout (used for towers of
     // letter pairs): fitted to the cells' combined footprint, shared by all.
@@ -160,7 +160,7 @@ export const styleOf = (p) => `${p.caseMode}, ${p.rows.length} row${p.rows.lengt
 export function designWordPair(wasm, font, wordA, wordB, opts = {}) {
   const {
     spacing = 'spaced', join = 'hull+bridges', height = 20, candidates = 3,
-    cases = ['upper', 'lower', 'title', 'mixed'], rows, fits = ['shared', 'fill'], maxChunk = 3, weights,
+    cases = ['upper', 'lower', 'title', 'mixed'], rows, fits = ['shared', 'fill'], maxChunk = 3, weights, levels = 0, corners = 0,
   } = opts;
   const fam = SPACING[spacing];
   const search = { ...fam.search };
@@ -181,7 +181,7 @@ export function designWordPair(wasm, font, wordA, wordB, opts = {}) {
   for (const [style, ps] of groups) {
     ps.sort(rankLayouts);
     const tried = ps.slice(0, candidates).map((layout) => {
-      const d = realizeDesign(wasm, font, layout, { spacing, join, height, weights });
+      const d = realizeDesign(wasm, font, layout, { spacing, join, height, weights, levels, corners });
       const m = d.metrics;
       d.dispose();
       return { style, layout, metrics: m };

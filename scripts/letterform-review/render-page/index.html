@@ -1,0 +1,33 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0">
+<script type="module">
+import * as THREE from 'three';
+const T = 240;
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(T, T);
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8888aa, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(2, -3, 4); scene.add(sun);
+const COL = { front: 0xe07b53, right: 0x4c9be8, top: 0x9b6fd6, box: 0xb7b1a6, connector: 0x6f6f6f };
+const ORDER = [...Object.keys(COL), null];
+const mats = [...Object.values(COL), 0xc8a27a].map((color) => new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0, flatShading: true }));
+const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000); cam.up.set(0, 0, 1);
+let sheet = null, sctx = null, cols = 0;
+window.startSheet = (n, c) => { cols = c; sheet = document.createElement('canvas'); sheet.width = c * 2 * T; sheet.height = Math.ceil(n / c) * T; sctx = sheet.getContext('2d'); return true; };
+// Draw one mesh into the sheet at move i, slot 0 (before) or 1 (after). `fit` = shared framing for the pair.
+window.draw = ({ pos, idx, runs }, i, slot, fit) => {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  geo.setIndex(new THREE.BufferAttribute(new Uint32Array(idx), 1));
+  for (const r of runs) geo.addGroup(r.start, r.count, ORDER.indexOf(r.label in COL ? r.label : null));
+  const mesh = new THREE.Mesh(geo, mats); scene.add(mesh);
+  const c = new THREE.Vector3(...fit.centre), dir = new THREE.Vector3(1.1, -1.6, 1.2).normalize();
+  cam.position.copy(c).addScaledVector(dir, 200); cam.lookAt(c);
+  const h = fit.radius * 1.05; Object.assign(cam, { left: -h, right: h, top: h, bottom: -h }); cam.updateProjectionMatrix();
+  renderer.render(scene, cam);
+  scene.remove(mesh); geo.dispose();
+  sctx.drawImage(renderer.domElement, ((i % cols) * 2 + slot) * T, Math.floor(i / cols) * T);
+  return true;
+};
+window.sheetData = () => sheet.toDataURL('image/webp', 0.86);
+window.ready = true;
+</script>

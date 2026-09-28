@@ -8,6 +8,8 @@ const bool = (def) => ({ type: 'bool', default: def });
 // Supports: thin rods that join separate pieces (visible as small marks in
 // the shadows). 'none' leaves pieces to connect by themselves, through hidden
 // joins, or through the display stand.
+// Tidy: line up edges of a pair's letters that nearly meet (moving each by a
+// fraction of a millimetre), so the solid has no thin slivers there.
 const supports = () => choice(['allowed', 'none'], 'allowed', { allowed: 'Allowed where needed', none: 'None' });
 
 export const LOOKS = [
@@ -21,7 +23,7 @@ export const LOOKS = [
     blurb: 'One shape per pair of letters, standing in a row: one word from the left, the other from the right.',
     knobs: {
       spacing: choice(['gapped', 'touching'], 'gapped'), case: choice(['upper', 'mixed', 'lower', 'title'], 'upper', CASES),
-      stretch: bool(false), supports: supports(), stand: bool(true), turn: bool(true),
+      stretch: bool(false), tidy: bool(true), supports: supports(), stand: bool(true), turn: bool(true),
     },
   },
   {
@@ -29,7 +31,7 @@ export const LOOKS = [
     blurb: 'The row of pairs broken into two or three lines, stacked.',
     knobs: {
       rows: choice([2, 3], 2), spacing: choice(['gapped', 'touching'], 'gapped'), case: choice(['upper', 'mixed', 'lower', 'title'], 'upper', CASES),
-      stretch: bool(false), compact: bool(false), supports: supports(), stand: bool(true), turn: bool(false),
+      stretch: bool(false), tidy: bool(true), compact: bool(false), supports: supports(), stand: bool(true), turn: bool(false),
     },
   },
   {
@@ -37,7 +39,7 @@ export const LOOKS = [
     blurb: 'Letters in equal rows and aligned columns (FIN / OLA).',
     knobs: {
       rows: choice([2, 3], 2), mono: bool(false), case: choice(['upper', 'mixed', 'lower', 'title'], 'upper', CASES),
-      stretch: bool(false), compact: bool(false), supports: supports(), stand: bool(true), turn: bool(false),
+      stretch: bool(false), tidy: bool(true), compact: bool(false), supports: supports(), stand: bool(true), turn: bool(false),
     },
   },
   {

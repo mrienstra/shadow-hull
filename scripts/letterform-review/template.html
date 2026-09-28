@@ -1,0 +1,206 @@
+<title>Arm-to-Corner Review</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bungee&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root {
+  --ground: #eef0f3; --card: #ffffff; --ink: #1a1f2b; --muted: #5d6576; --faint: #c9ced8;
+  --moved: #2f5da8; --moved-soft: rgba(47, 93, 168, 0.16); --corner: #c2562d; --other: #b9765c;
+  --good: #2e7d4f; --bad: #b3372b; --unsure: #9a7a1c; --focus: #2f5da8; --before: #e0a100;
+  --sans: "IBM Plex Sans", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace; --display: "Bungee", "Arial Black", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ground: #13161c; --card: #1c2029; --ink: #e6e9ef; --muted: #9aa3b5; --faint: #3a4150;
+    --moved: #7ea4e6; --moved-soft: rgba(126, 164, 230, 0.18); --corner: #eb8a62; --other: #b98a76;
+    --good: #5cc28a; --bad: #ef7a6d; --unsure: #d8b44a; --focus: #7ea4e6; --before: #ffd257;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ground: #13161c; --card: #1c2029; --ink: #e6e9ef; --muted: #9aa3b5; --faint: #3a4150;
+  --moved: #7ea4e6; --moved-soft: rgba(126, 164, 230, 0.18); --corner: #eb8a62; --other: #b98a76;
+  --good: #5cc28a; --bad: #ef7a6d; --unsure: #d8b44a; --focus: #7ea4e6; --before: #ffd257;
+}
+body { background: var(--ground); color: var(--ink); font: 15px/1.5 var(--sans); padding: 24px 16px 48px; }
+.wrap { max-width: 1180px; margin: 0 auto; display: grid; gap: 20px; }
+h1 { font: 400 clamp(26px, 5vw, 40px)/1.05 var(--display); margin: 0; letter-spacing: 0.01em; text-wrap: balance; }
+.lede { max-width: 68ch; margin: 0; color: var(--muted); }
+.lede b { color: var(--ink); font-weight: 600; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 18px; height: 10px; border-radius: 2px; display: inline-block; }
+.bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 2; background: var(--ground); padding-block: 10px; display: grid; gap: 10px; border-bottom: 1px solid var(--faint); }
+.fonts { display: flex; flex-wrap: wrap; gap: 6px; }
+.fonts button, .opts button { font: 500 13px var(--sans); color: var(--ink); background: var(--card); border: 1px solid var(--faint); border-radius: 999px; padding: 5px 12px; cursor: pointer; }
+.fonts button[aria-pressed="true"] { background: var(--ink); color: var(--card); border-color: var(--ink); }
+.fonts button small { font: 400 11px var(--mono); opacity: 0.75; margin-left: 4px; }
+.opts { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; font-size: 13px; color: var(--muted); }
+.opts label { display: inline-flex; gap: 6px; align-items: center; cursor: pointer; }
+.stat { font: 500 13px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.solids { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.solids figure { margin: 0; display: grid; gap: 2px; }
+.solids .img { aspect-ratio: 1; max-width: 100%; background-repeat: no-repeat; background-size: 800% auto; border-radius: 4px; background-color: var(--ground); }
+.solids figcaption { font: 500 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; text-align: center; }
+.card { background: var(--card); border: 1px solid var(--faint); border-radius: 8px; padding: 10px 10px 8px; display: grid; gap: 6px; }
+.card[data-v="good"] { box-shadow: inset 0 0 0 2px var(--good); }
+.card[data-v="bad"] { box-shadow: inset 0 0 0 2px var(--bad); }
+.card[data-v="unsure"] { box-shadow: inset 0 0 0 2px var(--unsure); }
+.head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.pair { font: 600 15px var(--sans); }
+.pair em { font-style: normal; color: var(--moved); }
+.by { font: 500 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+svg { width: 100%; height: auto; display: block; }
+.what { font-size: 12px; color: var(--muted); margin: 0; }
+.votes { display: flex; gap: 6px; }
+.votes button { flex: 1; font: 500 12px var(--sans); padding: 4px 0; border-radius: 5px; border: 1px solid var(--faint); background: transparent; color: var(--ink); cursor: pointer; }
+.votes button[data-k="good"][aria-pressed="true"] { background: var(--good); border-color: var(--good); color: var(--card); }
+.votes button[data-k="bad"][aria-pressed="true"] { background: var(--bad); border-color: var(--bad); color: var(--card); }
+.votes button[data-k="unsure"][aria-pressed="true"] { background: var(--unsure); border-color: var(--unsure); color: var(--card); }
+button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.note { font-size: 13px; color: var(--muted); }
+.empty { color: var(--muted); padding: 24px 0; }
+</style>
+
+<div class="wrap">
+  <header style="display:grid;gap:10px">
+    <h1>Arm to corner</h1>
+    <p class="lede">Where one letter of a pair has a <b>pointed corner</b> (like the notch between a B's bowls) inside a <b>stroke</b> of the other letter (like the F's middle arm), the stroke slides up or down, keeping its thickness, until its nearer edge meets the corner. Only one letter of a pair moves, and pairs of the same letter are left alone. The % on each card is the <b>change</b>: the move as a share of the smaller gap beside the stroke (the F's arm moving 0.37 mm is 13%). Tops and bottoms never move; changes over 70% or 3 mm are never made. Every capital pair in each bundled font, 20 mm tall; the 3D views show the pair's solid from the front-right, as the app's 3/4 view does (orange walls follow the left letter, blue the right). Mark each change so I can tune the rule.</p>
+    <div class="legend">
+      <span><i class="sw" style="background:var(--moved)"></i>moved letter, after</span>
+      <span><i class="sw" style="border:2px dashed var(--before)"></i>moved letter, before</span>
+      <span><i class="sw" style="background:var(--other)"></i>letter with the corner</span>
+      <span><i class="sw" style="background:var(--corner);height:3px"></i>corner height</span>
+    </div>
+  </header>
+  <div class="bar">
+    <div class="fonts" id="fonts"></div>
+    <div class="opts">
+      <label><input type="checkbox" id="unmarked"> Only unmarked</label>
+      <label><input type="checkbox" id="bysize"> Largest changes first</label>
+      <label for="maxstrain">Show changes up to <input type="range" id="maxstrain" min="5" max="70" step="5" value="70" style="width:120px;vertical-align:middle"> <b id="maxval" class="stat">70%</b></label>
+      <span class="stat" id="stat"></span>
+      <span class="note" id="save"></span>
+    </div>
+  </div>
+  <div class="grid" id="grid"></div>
+</div>
+
+<script>
+const DATA = /*DATA*/null;
+let font = DATA[0].id, marks = {}, db = null;
+try { font = localStorage.getItem('font') || font; } catch {}
+if (!DATA.some((f) => f.id === font)) font = DATA[0].id;
+const $ = (id) => document.getElementById(id);
+const key = (f, m) => `${f}_${m[0]}${m[1]}_${String(m[2]).replace('-', 'm').replace('.', 'p')}`;
+
+function warp(d, lv, band, by) {
+  const knots = lv.map((z) => [z, z === band[0] || z === band[1] ? z + by : z]);
+  const map = (z) => {
+    if (z <= knots[0][0]) return z;
+    for (let k = 1; k < knots.length; k++) {
+      const [a0, a1] = knots[k - 1], [b0, b1] = knots[k];
+      if (z <= b0) return a1 + ((z - a0) * (b1 - a1)) / (b0 - a0);
+    }
+    return z;
+  };
+  return d.split(' ').map((p) => { const [u, z] = p.split(',').map(Number); return `${u},${map(z).toFixed(2)}`; }).join(' ');
+}
+// Contours are "u,z u,z …" per ring; rings are joined in d by spaces too, so split on ring markers.
+function path(rings, dx) {
+  return rings.map((r) => 'M' + r.split(' ').map((p) => { const [u, z] = p.split(',').map(Number); return `${(u + dx).toFixed(2)} ${(20 - z).toFixed(2)}`; }).join('L') + 'Z').join('');
+}
+// 3D renders: one WebP sheet per font, 4 moves per row, before and after side by side (8 tiles across).
+function tile(f, i, slot) {
+  const rows = Math.ceil(f.moves.length / 4), col = (i % 4) * 2 + slot, row = Math.floor(i / 4);
+  return `background-image:url('sheets/${f.id}.webp');background-position:${(col / 7) * 100}% ${rows > 1 ? (row / (rows - 1)) * 100 : 0}%`;
+}
+function card(f, m) {
+  const idx = f.moves.indexOf(m);
+  const [mv, ot, by, band, corner, strain] = m;
+  const A = f.letters[mv], B = f.letters[ot];
+  const gap = 3, W = A.w + gap + B.w;
+  const after = A.r.map((r) => warp(r, A.lv, band, by));
+  const k = key(f.id, m), v = marks[k]?.v ?? '';
+  const edge = Math.abs(band[1] + by - corner) < Math.abs(band[0] + by - corner) ? band[1] : band[0];
+  const el = document.createElement('article');
+  el.className = 'card'; el.dataset.v = v; el.dataset.k = k;
+  el.innerHTML = `
+    <div class="head"><span class="pair"><em>${mv}</em> ← ${ot}</span><span class="by">${by < 0 ? '↓' : '↑'} ${Math.abs(by).toFixed(2)} mm · ${Math.round(strain * 100)}%</span></div>
+    <svg viewBox="-1 -1 ${W + 2} 22" role="img" aria-label="${mv} moved ${by < 0 ? 'down' : 'up'} ${Math.abs(by).toFixed(2)} millimetres to meet ${ot}'s corner">
+      <rect x="0" y="${20 - (band[1] + by)}" width="${A.w}" height="${band[1] - band[0]}" fill="var(--moved-soft)"/>
+      <path d="${path(after, 0)}" fill="var(--moved)" fill-rule="nonzero"/>
+      <path d="${path(A.r, 0)}" fill="none" stroke="var(--before)" stroke-width="0.34" stroke-dasharray="0.7 0.45" stroke-linejoin="round"/>
+      <path d="${path(B.r, A.w + gap)}" fill="var(--other)" fill-rule="nonzero"/>
+      <line x1="-1" x2="${W + 1}" y1="${20 - corner}" y2="${20 - corner}" stroke="var(--corner)" stroke-width="0.22"/>
+    </svg>
+    <div class="solids">${['Before', 'After'].map((t, slot) => `<figure><div class="img" role="img" aria-label="${t}: the ${mv} and ${ot} solid" style="${tile(f, idx, slot)}"></div><figcaption>${t}</figcaption></figure>`).join('')}</div>
+    <p class="what">${mv}'s stroke ${band[0].toFixed(1)}–${band[1].toFixed(1)} mm moves ${by < 0 ? 'down' : 'up'}: its ${edge === band[1] ? 'top' : 'bottom'} meets ${ot}'s corner at ${corner.toFixed(1)} mm.</p>
+    <div class="votes">${['good', 'bad', 'unsure'].map((x) => `<button type="button" data-k="${x}" aria-pressed="${v === x}">${x[0].toUpperCase() + x.slice(1)}</button>`).join('')}</div>`;
+  el.querySelector('.votes').addEventListener('click', (e) => {
+    const b = e.target.closest('button'); if (!b) return;
+    const nv = marks[k]?.v === b.dataset.k ? '' : b.dataset.k;
+    setMark(k, { font: f.id, moved: mv, corner: ot, by, v: nv });
+    el.dataset.v = nv;
+    el.querySelectorAll('.votes button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.k === nv)));
+    stat();
+  });
+  return el;
+}
+async function setMark(k, rec) {
+  marks[k] = rec;
+  if (!db) { $('save').textContent = 'Marks are not being saved in this view.'; return; }
+  try { await db.doc('marks/' + k).set(rec); $('save').textContent = 'Saved.'; }
+  catch (e) { $('save').textContent = 'Could not save this mark (' + (e?.code || 'error') + ').'; }
+}
+function counts(f) {
+  const ks = f.moves.map((m) => marks[key(f.id, m)]?.v).filter(Boolean);
+  return { n: f.moves.length, marked: ks.length, good: ks.filter((x) => x === 'good').length, bad: ks.filter((x) => x === 'bad').length };
+}
+function stat() {
+  const f = DATA.find((x) => x.id === font), c = counts(f);
+  $('stat').textContent = `${c.n} changes · ${c.marked} marked (${c.good} good, ${c.bad} bad) · ${f.near}/676 pairs still have level edges within 0.6 mm`;
+  renderFonts();
+}
+function renderFonts() {
+  $('fonts').replaceChildren(...DATA.map((f) => {
+    const b = document.createElement('button'), c = counts(f);
+    b.type = 'button'; b.setAttribute('aria-pressed', String(f.id === font));
+    b.textContent = f.name; const s = document.createElement('small'); s.textContent = `${c.marked}/${c.n}`; b.append(s);
+    b.addEventListener('click', () => { font = f.id; try { localStorage.setItem('font', font); } catch {} render(); });
+    return b;
+  }));
+}
+function render() {
+  const f = DATA.find((x) => x.id === font);
+  let ms = f.moves.slice();
+  if ($('unmarked').checked) ms = ms.filter((m) => !marks[key(f.id, m)]?.v);
+  const cap = +$('maxstrain').value / 100;
+  $('maxval').textContent = `${Math.round(cap * 100)}%`;
+  ms = ms.filter((m) => m[5] <= cap + 1e-9);
+  if ($('bysize').checked) ms.sort((a, b) => b[5] - a[5]);
+  const g = $('grid');
+  g.replaceChildren(...ms.map((m) => card(f, m)));
+  if (!ms.length) { const p = document.createElement('p'); p.className = 'empty'; p.textContent = 'Nothing left to mark in this font.'; g.append(p); }
+  stat();
+}
+for (const f of DATA) for (const c in f.letters) f.letters[c].r = f.letters[c].d.split('|');
+$('unmarked').addEventListener('change', render);
+$('bysize').addEventListener('change', render);
+$('maxstrain').addEventListener('input', render);
+render();
+(async () => {
+  db = await window.claude?.use?.('db').catch(() => null) ?? null;
+  if (!db) { $('save').textContent = 'Marks are not being saved in this view.'; return; }
+  db.collection('marks').onSnapshot((snap) => {
+    const docs = snap.docs ?? snap;
+    for (const d of docs) { const rec = d.data ? d.data() : d; const id = d.id ?? rec.id; if (id) marks[id] = rec; }
+    document.querySelectorAll('.card').forEach((el) => {
+      const v = marks[el.dataset.k]?.v ?? ''; el.dataset.v = v;
+      el.querySelectorAll('.votes button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.k === v)));
+    });
+    stat();
+  });
+})();
+</script>

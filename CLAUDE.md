@@ -36,6 +36,8 @@ and/or web) before deciding which to keep.
   `npm run check` runs JS, e2e and Python suites.
 - `fonts/` — bundled OFL fonts from Google Fonts + licenses; `fonts.json` lists
   them (first = default); `fonts/README.md` has the benchmark behind the choice.
+- `scripts/letterform-review/` — builds the arm-to-corner review page (see
+  `resources/research/letterform-tidy.md`).
 - `scripts/benchmark-fonts.js` — score fonts on `test/fixtures/benchmark-words.json`
   (16 triples covering all 26 letters); reuse it when changing ranking/search.
 - `resources/communication/external/` — original research write-ups (as received).

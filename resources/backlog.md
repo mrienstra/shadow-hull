@@ -3,6 +3,13 @@
 Ideas and requests not yet started, newest first. Move items to CHANGELOG.md
 when done. Owner requests are marked (owner).
 
+## Letterform tidying (owner; see resources/research/letterform-tidy.md)
+- Settle the strain limit and the counter/S-terminal cases from the review page.
+- Interactive 3D (orbit) on the review page (owner request).
+- Near-miss level edges (~2/3 of pairs): shift whole strokes, not the gaps.
+- Tidy the other looks (tower stacked/tall, block).
+- Later: tweak both letters towards a compromise shape.
+
 ## Ideas from TextTango (Lucandia/dual_letter_illusion; GPL, so reimplement)
 - Quick-insert buttons for symbols (♥ ⭐ ♪ …) next to the top-shape field.
 - Manual reinforcement override per letter pair (pillar / rod), alongside the

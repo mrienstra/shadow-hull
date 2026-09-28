@@ -106,3 +106,29 @@ test('grid: equal lines, and letters in a column share a centre across rows', as
     } finally { disposeCells(cells); }
   }
 });
+
+test('alignCorners: the F\'s middle arm moves down to the B\'s notch (Bungee); same letters and big changes are left alone', async () => {
+  const { layoutCells, levelHeights, cornerHeights, alignCorners } = await import('../src/core/wordpair.js');
+  const bungee = loadFont(await readFile(new URL('../fonts/Bungee-Regular.ttf', import.meta.url)));
+  const cellOf = (a, b) => {
+    const [c] = layoutCells(wasm, bungee, { rows: [{ a: [a], b: [b] }] }, { height: 20 });
+    c.shapes.front.delete(); c.shapes.right.delete();
+    return c.letters;
+  };
+  const { front: F, right: B } = cellOf('F', 'B');
+  const r = alignCorners(F, B);
+  assert.equal(r.moved.length, 1);
+  const [m] = r.moved;
+  assert.equal(m.side, 'a', 'the F moves, not the B');
+  assert.ok(m.by < 0 && m.by > -0.6, `down a little: ${m.by}`);
+  assert.ok(m.strain < 0.15, `strain ${m.strain}`);
+  assert.equal(r.b, B, 'the B is untouched');
+  // The arm keeps its thickness and its top now meets the notch.
+  const [notch] = cornerHeights(B);
+  const after = levelHeights(r.a), before = levelHeights(F);
+  assert.ok(after.some((z) => Math.abs(z - notch) < 1e-6), 'an arm edge sits at the notch');
+  assert.ok(Math.abs((after[2] - after[1]) - (before[2] - before[1])) < 1e-6, 'arm thickness unchanged');
+  const same = cellOf('B', 'B');
+  assert.equal(alignCorners(same.front, same.right).moved.length, 0, 'same letters: no change');
+  assert.equal(alignCorners(F, B, { maxStrain: 0.05 }).moved.length, 0, 'over the strain limit: no change');
+});
