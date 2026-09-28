@@ -31,6 +31,20 @@
   that one-font designs are unchanged (12 designs, 2 fonts, identical), re-ran
   the suites, and looked at its screenshots.
 
+## 2026-09-28 (tops and bottoms may line up; the thin-spot check counts rounded corners)
+
+- tidyPair: a letter's top or bottom may now move exactly onto a nearly equal
+  edge of the other letter (within 0.3 mm; exact, not a hair beside, since
+  same-facing edges meet safely). No change in FINOLA × BRYAN: there the tops
+  and bottoms already agree.
+- Finding: most of Kanit's "thin spots" are smooth rounded corners. A
+  vertical line just inside a rounded corner passes through a sliver of
+  material before leaving through the curved wall, so the column-based
+  measures (check-thin, columnSlivers, thinRuns) count it as thin. A smooth
+  corner isn't a sharp edge. Next: measure sharpness on the mesh itself
+  (edges where faces meet at an acute angle), then rebuild trimming on that.
+- No subagents used.
+
 ## 2026-09-28 (tested: exact meets + trimming)
 
 - Owner asked to test tidy with exact meets plus trimming. Options added for

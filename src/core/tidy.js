@@ -219,7 +219,9 @@ export function featureNearMisses(lettersA, lettersB, { t = 0.8, eps = 1e-3 } = 
  *     `tol` mm, so one of its edges does that (keeps the band's height);
  *   - middle: a level of each letter, less than `near` apart, both move to
  *     halfway (the two letters meet in the middle).
- * The top and bottom levels never move. Pairs of the same letters are left
+ * The top and bottom levels move only onto an edge of the other letter less
+ * than `endNear` away (letters' tops that nearly agree, e.g. an overshoot,
+ * otherwise leave a thin plate along the top). Pairs of the same letters are left
  * alone. Up to `maxMoves` changes are made, best first, each only if it lowers
  * the cost by at least `minGain`:
  *   cost = slivers + lambda × distortion + mu × heights + guides + clear
@@ -246,7 +248,7 @@ export function featureNearMisses(lettersA, lettersB, { t = 0.8, eps = 1e-3 } = 
 export function tidyPair(lettersA, lettersB, {
   tol = 3, near = 1, maxStrain = 0.3, maxBand = 0.2, strokeWeight = 2, lambda = 3, mu = 1,
   cutWeight = 0.3, minGain = 0.2, t = 0.8, step = 0.05, eps = 0.01, merge = 0.06, maxMoves = 3, trace = null,
-  guides = null, guideWeight = 3, guideTol = 0.25, clearCost = 2, touch = 1,
+  guides = null, guideWeight = 3, guideTol = 0.25, clearCost = 2, touch = 1, endNear = 0.3,
 } = {}) {
   const orig = { a: lettersA, b: lettersB };
   const out = { a: lettersA, b: lettersB, moved: [], knots: { a: [], b: [] } };
@@ -291,6 +293,16 @@ export function tidyPair(lettersA, lettersB, {
       const other = warped(o, C[o]);
       const feats = [...levelHeights(other).map((z) => [z, 'edge']), ...cornerHeights(other).map((z) => [z, 'corner'])];
       const targets = feats.flatMap(([z, k]) => [[z, k], [z + eps, k], [z - eps, k], [z + t, `clear of ${k}`], [z - t, `clear of ${k}`]]);
+      // Top and bottom: only exactly onto a nearly equal edge of the other letter
+      // (tops meet tops: faces the same way, so exact is safe; a hair beside
+      // would leave a hairline plate).
+      for (const i of [0, n - 1]) {
+        for (const [z, k] of feats) {
+          if (k !== 'edge' || Math.abs(z - L[i]) < 0.005 || Math.abs(z - L[i]) > endNear) continue;
+          const N = [...L]; N[i] = z;
+          cands.push({ C: { ...C, [s]: N }, kind: 'level', side: s, levels: [[s, L[i], z]], target: z, targetKind: k });
+        }
+      }
       for (let i = 1; i < n - 1; i++) {
         for (const [z, k] of targets) {
           if (Math.abs(z - L[i]) >= 0.01 && Math.abs(z - L[i]) <= near + t) {
