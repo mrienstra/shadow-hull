@@ -146,11 +146,16 @@ test('tidyPair: picks the F-arm-to-B-notch move in Bungee, only when it reduces 
   const r = tidyPair(F, B);
   assert.equal(r.moved.length, 1);
   const [m] = r.moved;
+  // The F's middle arm shifts (both its edges, keeping its thickness) down to the B's notch.
+  assert.equal(m.kind, 'shift');
   assert.equal(m.side, 'a');
-  assert.equal(m.kind, 'corner');
-  assert.ok(m.by < 0 && m.by > -0.6, `F's arm down a little: ${m.by}`);
+  assert.equal(m.targetKind, 'corner');
+  const [[, lo0, lo1], [, hi0, hi1]] = m.levels;
+  assert.ok(lo1 - lo0 < 0 && lo1 - lo0 > -0.6, `down a little: ${lo1 - lo0}`);
+  assert.ok(Math.abs((hi1 - lo1) - (hi0 - lo0)) < 1e-9, 'arm keeps its thickness');
   assert.ok(Math.abs(m.target - cornerHeights(B)[0]) < 1e-9, 'meets the B\'s notch');
   assert.ok(levelHeights(r.a).some((z) => Math.abs(z - m.target) < 1e-6));
+  assert.equal(r.b, B, 'the B is untouched');
   // The measured knife volume falls, as the move reports.
   const before = columnSlivers(F, B), after = columnSlivers(r.a, B);
   assert.ok(after.knife < before.knife - 0.2, `knife ${before.knife} → ${after.knife}`);
@@ -238,8 +243,8 @@ test('tidyPair: L × A in Bungee (FINOLA × BRYAN) leaves no thin plate (a 0.12 
   const [c] = layoutCells(wasm, bungee, { rows: [{ a: ['L'], b: ['A'], frame: rowFrame(bungee, ['FINOLA', 'BRYAN'], { kiss: -0.06 }) }] }, { height: 20, kiss: -0.06 });
   c.shapes.front.delete(); c.shapes.right.delete();
   const r = tidyPair(c.letters.front, c.letters.right);
-  assert.equal(r.moved.length, 1);
-  const s = columnSlivers(r.a, r.b, { t: 0.3 });
+  assert.ok(r.moved.length >= 1);
+  const s = columnSlivers(r.a, r.b, { t: 0.3, step: 0.05 });
   assert.equal(s.knife, 0, 'no material in runs thinner than 0.3 mm');
   // …and no faces that exactly touch (zero-thickness sheets render as stray triangles).
   assert.equal(s.knifeScore, 0, 'no zero-thickness sheets either');

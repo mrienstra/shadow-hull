@@ -53,7 +53,7 @@ h1 { font: 400 clamp(26px, 5vw, 40px)/1.05 var(--display); margin: 0; letter-spa
 .pair em { font-style: normal; color: var(--moved); }
 .by { font: 500 12px var(--mono); color: var(--muted); font-variant-numeric: tabular-nums; }
 svg { width: 100%; height: auto; display: block; }
-.what { font-size: 12px; color: var(--muted); margin: 0; }
+.what { font-size: 12px; color: var(--muted); margin: 0; padding-left: 1.2em; }
 .scores { font: 400 12px var(--mono); color: var(--muted); margin: 0; font-variant-numeric: tabular-nums; }
 .scores .better { color: var(--good); font-weight: 500; }
 .scores .worse { color: var(--bad); font-weight: 500; }
@@ -95,12 +95,12 @@ button:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 <div class="wrap">
   <header style="display:grid;gap:10px">
     <h1>Arm to corner</h1>
-    <p class="lede">For each pair, the app now tries sliding each <b>stroke</b> of either letter up or down, keeping its thickness, so that one of its edges meets a <b>feature</b> of the other letter: a flat edge, or a pointed corner (like the notch between a B's bowls). It keeps the one change that best reduces knives and cuts without stretching the gaps around the stroke too much, and only if it clearly helps. Only one letter of a pair moves, and pairs of the same letter are left alone. The % on each card is the <b>change</b>: the move as a share of the smaller gap beside the stroke (Bungee's F ← B, the change you liked, is 13%). Tops and bottoms never move; changes over 30% or 3 mm are never made. Every capital pair in each bundled font, 20 mm tall; the 3D views show the pair's solid from the front-right, as the app's 3/4 view does (orange walls follow the left letter, blue the right). Under each card, <b>knives</b> (material in vertical runs under 0.8 mm: slivers and sharp wedges) and <b>cuts</b> (air slots under 0.8 mm) before → after, in mm³: green when the change helps, red when it makes things worse. Mark each change so I can tune the rule.</p>
+    <p class="lede">For each pair of capitals, the app looks for up to three small changes that remove <b>knives</b> (material thinner than 0.8 mm: slivers and sharp wedges) and <b>cuts</b> (air slots thinner than 0.8 mm) without distorting the letters much. A change moves a flat edge of either letter onto a feature of the other (a flat edge, or a pointed corner like the notch between a B's bowls), shifts a whole stroke to do that, or has both letters meet halfway. It prefers lining edges up (the thin part vanishes) over clearing them by 0.8 mm (the thin part thickens), moving the odd letter out rather than one that sits on a line the font's capitals share, and keeping strokes their thickness. Tops and bottoms never move; same-letter pairs are left alone. Changed letters are blue (dashed: as drawn); lines mark the new heights. The % is the largest change in any band's height. The 3D views show the pair's solid from the front-right; click one to orbit it. Under each card, knives and cuts before → after in mm³ (green: better, red: worse). Mark each card so I can tune the rules.</p>
     <div class="legend">
-      <span><i class="sw" style="background:var(--moved)"></i>moved letter, after</span>
-      <span><i class="sw" style="border:2px dashed var(--before)"></i>moved letter, before</span>
-      <span><i class="sw" style="background:var(--other)"></i>the other letter</span>
-      <span><i class="sw" style="background:var(--corner);height:3px"></i>height of the feature it meets</span>
+      <span><i class="sw" style="background:var(--moved)"></i>changed letter, after</span>
+      <span><i class="sw" style="border:2px dashed var(--before)"></i>changed letter, as drawn</span>
+      <span><i class="sw" style="background:var(--other)"></i>unchanged letter</span>
+      <span><i class="sw" style="background:var(--corner);height:3px"></i>new heights</span>
     </div>
   </header>
   <div class="bar">
@@ -141,11 +141,12 @@ let font = DATA[0].id, marks = {}, db = null;
 try { font = localStorage.getItem('font') || font; } catch {}
 if (!DATA.some((f) => f.id === font)) font = DATA[0].id;
 const $ = (id) => document.getElementById(id);
-const key = (f, m) => `${f}_${m[0]}${m[1]}_${String(m[2]).replace('-', 'm').replace('.', 'p')}`;
+const key = (f, m) => `${f}_${m.a}${m.b}`;
 
-// A move takes the band's edges to `to` (or shifts both by `by`, older data).
-function warp(d, lv, band, by, to = [band[0] + by, band[1] + by]) {
-  const knots = lv.map((z) => [z, z === band[0] ? to[0] : z === band[1] ? to[1] : z]);
+// Warp an outline ring through a letter's moved levels: knots [[from, to]] (unmoved levels stay).
+function warp(d, lv, moved) {
+  const to = new Map(moved);
+  const knots = lv.map((z) => [z, to.get(z) ?? z]);
   const map = (z) => {
     if (z <= knots[0][0]) return z;
     for (let k = 1; k < knots.length; k++) {
@@ -162,7 +163,7 @@ function path(rings, dx) {
 }
 // 3D renders: one WebP sheet per font, 4 moves per row, before and after side by side (8 tiles across).
 function tile(f, i, slot) {
-  const rows = Math.ceil(f.moves.length / 4), col = (i % 4) * 2 + slot, row = Math.floor(i / 4);
+  const rows = Math.ceil(f.cards.length / 4), col = (i % 4) * 2 + slot, row = Math.floor(i / 4);
   return `background-image:url('sheets/${f.id}.webp');background-position:${(col / 7) * 100}% ${rows > 1 ? (row / (rows - 1)) * 100 : 0}%`;
 }
 // "Knives 0.67 → 0 mm³": green if it went down, red if up (±0.05 mm³ counts as no change).
@@ -170,34 +171,43 @@ function score(label, a, b) {
   const cls = b < a - 0.05 ? 'better' : b > a + 0.05 ? 'worse' : 'same';
   return `${label} <span class="${cls}">${a.toFixed(2)} → ${b.toFixed(2)}</span> mm³`;
 }
+// One line per change, e.g. "A 6.45 → 6.86 mm: meets C's flat edge".
+function describe(m, ch) {
+  const what = String(m.targetKind);
+  const verb = m.kind === 'middle' ? 'meet halfway' : what.startsWith('clear') ? `clears the other letter's ${what.endsWith('edge') ? 'flat edge' : 'corner'} by 0.8 mm` : `meets the other letter's ${what === 'edge' ? 'flat edge' : 'corner'}`;
+  const lv = m.levels.map(([s, x, y]) => `${ch[s]} ${x.toFixed(2)} → ${y.toFixed(2)}`).join(', ');
+  return `${m.kind === 'shift' ? 'shift ' : ''}${lv} mm: ${verb}`;
+}
+function drawLetter(L, moved, dx) {
+  const changed = moved.length > 0;
+  const after = changed ? L.r.map((r) => warp(r, L.lv, moved)) : L.r;
+  return `<path d="${path(after, dx)}" fill="${changed ? 'var(--moved)' : 'var(--other)'}" fill-rule="nonzero"/>`
+    + (changed ? `<path d="${path(L.r, dx)}" fill="none" stroke="var(--before)" stroke-width="0.34" stroke-dasharray="0.7 0.45" stroke-linejoin="round"/>` : '');
+}
 function card(f, m) {
-  const idx = f.moves.indexOf(m);
-  const [mv, ot, by, band, corner, strain] = m;
-  const to = m[11] ?? [band[0] + by, band[1] + by];
-  const A = f.letters[mv], B = f.letters[ot];
+  const idx = f.cards.indexOf(m);
+  const A = f.letters[m.a], B = f.letters[m.b], ch = { a: m.a, b: m.b };
   const gap = 3, W = A.w + gap + B.w;
-  const after = A.r.map((r) => warp(r, A.lv, band, by, m[11]));
+  const lines = [...new Set(m.moves.flatMap((x) => x.levels.map(([, , y]) => y)))];
   const k = key(f.id, m), v = marks[k]?.v ?? '';
+  const who = [m.ka.length && m.a, m.kb.length && m.b].filter(Boolean).join(' and ');
   const el = document.createElement('article');
   el.className = 'card'; el.dataset.v = v; el.dataset.k = k;
   el.innerHTML = `
-    <div class="head"><span class="pair"><em>${mv}</em> ← ${ot}</span><span class="by">${by < 0 ? '↓' : '↑'} ${Math.abs(by).toFixed(2)} mm · ${Math.round(strain * 100)}%</span></div>
-    <svg viewBox="-1 -1 ${W + 2} 22" role="img" aria-label="${mv} moved ${by < 0 ? 'down' : 'up'} ${Math.abs(by).toFixed(2)} millimetres to meet ${ot}'s ${m[10] ?? 'corner'}">
-      <rect x="0" y="${20 - to[1]}" width="${A.w}" height="${to[1] - to[0]}" fill="var(--moved-soft)"/>
-      <path d="${path(after, 0)}" fill="var(--moved)" fill-rule="nonzero"/>
-      <path d="${path(A.r, 0)}" fill="none" stroke="var(--before)" stroke-width="0.34" stroke-dasharray="0.7 0.45" stroke-linejoin="round"/>
-      <path d="${path(B.r, A.w + gap)}" fill="var(--other)" fill-rule="nonzero"/>
-      <line x1="-1" x2="${W + 1}" y1="${20 - corner}" y2="${20 - corner}" stroke="var(--corner)" stroke-width="0.22"/>
+    <div class="head"><span class="pair">${m.ka.length ? `<em>${m.a}</em>` : m.a} × ${m.kb.length ? `<em>${m.b}</em>` : m.b}</span><span class="by">${m.moves.length} change${m.moves.length > 1 ? 's' : ''} · ${Math.round(m.change * 100)}%</span></div>
+    <svg viewBox="-1 -1 ${W + 2} 22" role="img" aria-label="${who} changed: ${m.moves.map((x) => describe(x, ch)).join('; ')}">
+      ${drawLetter(A, m.ka, 0)}${drawLetter(B, m.kb, A.w + gap)}
+      ${lines.map((z) => `<line x1="-1" x2="${W + 1}" y1="${20 - z}" y2="${20 - z}" stroke="var(--corner)" stroke-width="0.22"/>`).join('')}
     </svg>
-    <button type="button" class="solids" aria-label="Open the ${mv} and ${ot} solid in 3D, before and after" title="Open in 3D">${['Before', 'After'].map((t, slot) => `<span class="fig"><span class="img" style="${tile(f, idx, slot)}"></span><span class="cap">${t}</span></span>`).join('')}</button>
-    <p class="what">${mv}'s band ${band[0].toFixed(1)}–${band[1].toFixed(1)} mm → ${to[0].toFixed(1)}–${to[1].toFixed(1)} mm${Math.abs((to[1] - to[0]) - (band[1] - band[0])) > 0.005 ? ` (${(to[1] - to[0]) > (band[1] - band[0]) ? 'taller' : 'shorter'} by ${Math.abs((to[1] - to[0]) - (band[1] - band[0])).toFixed(2)} mm)` : ''}: ${String(m[10]).startsWith('clear') ? 'clears' : 'meets'} ${ot}'s ${String(m[10]).endsWith('edge') ? 'flat edge' : 'corner'} ${String(m[10]).startsWith('clear') ? 'by 0.8 mm' : ''} (at ${corner.toFixed(1)} mm).</p>
-    <p class="scores">${score('Knives', m[6], m[7])} · ${score('cuts', m[8], m[9])}</p>
+    <button type="button" class="solids" aria-label="Open the ${m.a} and ${m.b} solid in 3D, before and after" title="Open in 3D">${['Before', 'After'].map((t, slot) => `<span class="fig"><span class="img" style="${tile(f, idx, slot)}"></span><span class="cap">${t}</span></span>`).join('')}</button>
+    <ol class="what">${m.moves.map((x) => `<li>${describe(x, ch)}</li>`).join('')}</ol>
+    <p class="scores">${score('Knives', m.k0, m.k1)} · ${score('cuts', m.c0, m.c1)}</p>
     <div class="votes">${['good', 'bad', 'unsure'].map((x) => `<button type="button" data-k="${x}" aria-pressed="${v === x}">${x[0].toUpperCase() + x.slice(1)}</button>`).join('')}</div>`;
   el.querySelector('.solids').addEventListener('click', (e) => open3d(f, m, e.currentTarget));
   el.querySelector('.votes').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
     const nv = marks[k]?.v === b.dataset.k ? '' : b.dataset.k;
-    setMark(k, { font: f.id, moved: mv, corner: ot, by, v: nv });
+    setMark(k, { font: f.id, pair: m.a + m.b, moves: m.moves.map((x) => describe(x, ch)).join('; '), v: nv });
     el.dataset.v = nv;
     el.querySelectorAll('.votes button').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.k === nv)));
     stat();
@@ -211,8 +221,8 @@ async function setMark(k, rec) {
   catch (e) { $('save').textContent = 'Could not save this mark (' + (e?.code || 'error') + ').'; }
 }
 function counts(f) {
-  const ks = f.moves.map((m) => marks[key(f.id, m)]?.v).filter(Boolean);
-  return { n: f.moves.length, marked: ks.length, good: ks.filter((x) => x === 'good').length, bad: ks.filter((x) => x === 'bad').length };
+  const ks = f.cards.map((m) => marks[key(f.id, m)]?.v).filter(Boolean);
+  return { n: f.cards.length, marked: ks.length, good: ks.filter((x) => x === 'good').length, bad: ks.filter((x) => x === 'bad').length };
 }
 function stat() {
   const f = DATA.find((x) => x.id === font), c = counts(f);
@@ -230,13 +240,13 @@ function renderFonts() {
 }
 function render() {
   const f = DATA.find((x) => x.id === font);
-  let ms = f.moves.slice();
+  let ms = f.cards.slice();
   if ($('unmarked').checked) ms = ms.filter((m) => !marks[key(f.id, m)]?.v);
   const cap = +$('maxstrain').value / 100;
   $('maxval').textContent = `${Math.round(cap * 100)}%`;
-  ms = ms.filter((m) => m[5] <= cap + 1e-9);
-  if ($('helps').checked) ms = ms.filter((m) => m[7] < m[6] - 0.05);
-  if ($('bysize').checked) ms.sort((a, b) => b[5] - a[5]);
+  ms = ms.filter((m) => m.change <= cap + 1e-9);
+  if ($('helps').checked) ms = ms.filter((m) => m.k1 < m.k0 - 0.05);
+  if ($('bysize').checked) ms.sort((a, b) => b.change - a.change);
   const g = $('grid');
   g.replaceChildren(...ms.map((m) => card(f, m)));
   if (!ms.length) { const p = document.createElement('p'); p.className = 'empty'; p.textContent = 'Nothing left to mark in this font.'; g.append(p); }
@@ -252,12 +262,11 @@ function setView(v) {
   viewer?.look(v);
 }
 async function open3d(f, m, btn) {
-  const [mv, ot, by, band, , strain] = m;
-  const A = f.letters[mv], B = f.letters[ot], token = ++viewToken;
+  const A = f.letters[m.a], B = f.letters[m.b], token = ++viewToken, ch = { a: m.a, b: m.b };
   opener = btn;
-  $('v-title').innerHTML = `<em>${mv}</em> ← ${ot} <span class="by">${f.name}</span>`;
-  $('v-by').textContent = `${by < 0 ? '↓' : '↑'} ${Math.abs(by).toFixed(2)} mm · ${Math.round(strain * 100)}%`;
-  $('v-foot').innerHTML = `<span><i class="sw" style="background:#e07b53"></i> walls cut by ${mv}'s outline (read from the front)</span><span><i class="sw" style="background:#4c9be8"></i> walls cut by ${ot}'s outline (read from the right side)</span>`;
+  $('v-title').innerHTML = `${m.a} × ${m.b} <span class="by">${f.name}</span>`;
+  $('v-by').textContent = m.moves.map((x) => describe(x, ch)).join(' · ');
+  $('v-foot').innerHTML = `<span><i class="sw" style="background:#e07b53"></i> walls cut by ${m.a}'s outline (read from the front)</span><span><i class="sw" style="background:#4c9be8"></i> walls cut by ${m.b}'s outline (read from the right side)</span>`;
   const d = $('viewer');
   if (!d.open) d.showModal();
   v3status('Building the solids…');
@@ -267,7 +276,8 @@ async function open3d(f, m, btn) {
     if (token !== viewToken || !d.open) return;
     await viewer.show({
       hosts: [$('v-before'), $('v-after')],
-      before: rings(A.r), after: rings(A.r.map((r) => warp(r, A.lv, band, by, m[11]))), side: rings(B.r),
+      before: rings(A.r), after: rings(m.ka.length ? A.r.map((r) => warp(r, A.lv, m.ka)) : A.r),
+      side: { before: rings(B.r), after: rings(m.kb.length ? B.r.map((r) => warp(r, B.lv, m.kb)) : B.r) },
       w: [A.w, B.w], h: 20, view: viewNow,
     });
     if (token !== viewToken || !d.open) { viewer.clear(); return; }

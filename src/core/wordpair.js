@@ -29,7 +29,7 @@
 import { glyphRun, kissOffset, alignedFrames } from './glyph.js';
 import { cellPieces } from './scan.js';
 import { buildComposition, measureComposition, disposeCells } from './compose.js';
-import { alignLevels, alignCorners, tidyPair } from './tidy.js';
+import { alignLevels, alignCorners, tidyPair, fontGuides } from './tidy.js';
 // Letter features and tidying live in tidy.js; re-exported for existing callers.
 export { levelHeights, cornerHeights, alignLevels, alignCorners, tidyPair } from './tidy.js';
 
@@ -185,12 +185,14 @@ export function layoutCells(wasm, font, layout, opts = {}) {
   const { height = 20, gap = 0, lineGap = 0, fit = 'shared', tolerance, tracking, kiss, overlap = 0.3, align = 'left', grid = null, tidy: tidyOpt = null } = opts;
   const fontB = opts.fontB ?? font;
   const split = splitFonts(font, fontB);
-  // Line up each pair's nearly level edges (before spacing, so letters still just touch).
-  // Nudge strokes so each pair's features meet (before spacing, so letters still just touch).
-  const tidy = (a, b) => {
+  // Nudge strokes so each pair's features meet (before spacing, so letters
+  // still just touch). `va`/`vb`: each chunk's vertical placement, to map the
+  // font's shared lines (fontGuides, font units) into the chunk's heights.
+  const guidesOf = (f, v) => (v ? fontGuides(f, (ch) => glyphRun(f, ch)[0]?.contours ?? []).map((y) => (y - v.from) * v.s) : []);
+  const tidy = (a, b, va, vb) => {
     if (!tidyOpt) return { a, b };
     const { mode, tol } = tidyOpt;
-    if (mode === 'pair') return tidyPair(a, b, { tol });
+    if (mode === 'pair') return tidyPair(a, b, { tol, guides: { a: guidesOf(font, va), b: guidesOf(fontB, vb) } });
     if (mode === 'corners') return alignCorners(a, b, { tol, maxStrain: 0.15 });
     return alignLevels(a, b, { tol });
   };
@@ -219,7 +221,7 @@ export function layoutCells(wasm, font, layout, opts = {}) {
       const wa = (ga.xMax - ga.xMin) * sharedA, wb = (gb.xMax - gb.xMin) * sharedB;
       const { a: lettersA, b: lettersB } = tidy(
         ga.glyphs.map((g) => ({ ch: g.ch, pts: placePoints(g.contours, [ga.xMin, va.from], [0, 0], [sharedA, va.s]) })),
-        gb.glyphs.map((g) => ({ ch: g.ch, pts: placePoints(g.contours, [gb.xMin, vb.from], [0, 0], [sharedB, vb.s]) })));
+        gb.glyphs.map((g) => ({ ch: g.ch, pts: placePoints(g.contours, [gb.xMin, vb.from], [0, 0], [sharedB, vb.s]) })), va, vb);
       if (prev && gap === 'kiss') {
         // Just touch the previous cell in each view (per-height edge profiles).
         const dx = kissOffset(prev.a.flatMap((l) => l.pts), lettersA.flatMap((l) => l.pts), overlap);

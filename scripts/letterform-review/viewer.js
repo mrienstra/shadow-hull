@@ -146,13 +146,15 @@ export function look(view) {
 
 /**
  * Show a pair: hosts = [beforeEl, afterEl]; before/after = front outlines,
- * side = side outline (rings of [u, z]); w = [front width, side width]; h = height.
+ * side = side outline (rings of [u, z]) or { before, after }; w = [front width, side width]; h = height.
  * Resolves once both solids are built; throws if manifold cannot load.
  */
 export async function show({ hosts, before, after, side, w, h, view = 'iso' }) {
   const wasm = await manifold();
   const length = 4 * Math.max(w[0], w[1], h) + 1;
-  const meshes = [before, after].map((f) => solid(wasm, f, side, length));
+  // side: one outline for both, or { before, after } when the side letter changes too.
+  const sides = side.before ? [side.before, side.after] : [side, side];
+  const meshes = [before, after].map((f, i) => solid(wasm, f, sides[i], length));
   if (!st || st.hosts[0] !== hosts[0]) setup(hosts);
   clear();
   const centre = new Vector3(w[0] / 2, w[1] / 2, h / 2);

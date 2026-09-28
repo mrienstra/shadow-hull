@@ -32,29 +32,15 @@ function solidOf(la, lb) {
   solid.delete(); disposeCells(cells);
   return out;
 }
+const knots = JSON.parse(readFileSync(OUT + '/knots.json', 'utf8'));
+const { fontLetters } = await import('./letters.mjs');
+const { warpHeights, levelHeights } = await import(R + 'src/core/tidy.js');
 for (const fp of pack) {
   const f = fonts.find((x) => x.id === fp.id);
-  const font = loadFont(readFileSync(R + 'fonts/' + f.file).buffer);
-  const raw = Object.fromEntries([...CAPS].map((c) => [c, glyphRun(font, c)[0].contours]));
-  const ys = Object.values(raw).flat(2).map((p) => p[1]);
-  const y0 = Math.min(...ys), s = H / (Math.max(...ys) - y0);
-  const L = Object.fromEntries(Object.entries(raw).map(([c, cs]) => {
-    const xs = cs.flat().map((p) => p[0]), x0 = Math.min(...xs);
-    return [c, [{ ch: c, pts: cs.map((r) => r.map(([x, y]) => [(x - x0) * s, (y - y0) * s])) }]];
-  }));
-  // Same moves, order and de-duplication as pack.mjs.
-  const seen = new Set(), jobs = [];
-  for (const a of CAPS) for (const b of CAPS) {
-    const res = tidyPair(L[a], L[b], { tol: 0.15 * H });
-    for (const m of res.moved) {
-      const mv = m.side === 'a' ? a : b, ot = m.side === 'a' ? b : a, k = mv + ot + r2(m.by);
-      if (seen.has(k)) continue; seen.add(k);
-      // Render with the moved letter in front (orange), as the page's outlines put it on the left;
-      // the move is the same in a×b and b×a, and the solids are mirror images.
-      jobs.push(m.side === 'a' ? { a, b, ra: res.a, rb: res.b } : { a: b, b: a, ra: res.b, rb: res.a });
-    }
-  }
-  if (jobs.length !== fp.moves.length) throw new Error(`${fp.name}: ${jobs.length} vs ${fp.moves.length}`);
+  const { L } = fontLetters(f);
+  const warp = (ls, ks) => (ks.length ? warpHeights(ls, levelHeights(ls).map((z) => [z, new Map(ks).get(z) ?? z])) : ls);
+  const jobs = knots[fp.id].map(({ a, b, knots: k }) => ({ a, b, ra: warp(L[a], k.a), rb: warp(L[b], k.b) }));
+  if (jobs.length !== fp.cards.length) throw new Error(`${fp.name}: ${jobs.length} vs ${fp.cards.length}`);
   await page.evaluate(([n, c]) => window.startSheet(n, c), [jobs.length, COLS]);
   for (let i = 0; i < jobs.length; i++) {
     const { a, b, ra, rb } = jobs[i];

@@ -31,6 +31,29 @@
   that one-font designs are unchanged (12 designs, 2 fonts, identical), re-ran
   the suites, and looked at its screenshots.
 
+## 2026-09-28 (tidy: owner's review of the Bungee cards)
+
+- Owner's notes on the review page: prefer making a thin section vanish
+  (edges lined up) over thickening it (cleared by 0.8 mm); let the A move
+  (its crossbar bottom, 6.45 mm, is the odd one out: C D E G I L S Z share a
+  line at 6.76–6.81 mm); allow meeting in the middle; allow several changes
+  per pair (J × A). tidyPair is now a greedy search of up to 3 changes over
+  level heights of both letters (level / shift / middle moves), with a
+  reward for fewer distinct heights, a fixed cost for "clear" moves, a cost
+  for moving a level off one of the font's shared lines (`fontGuides`: flat
+  edges shared by ≥ 4 capitals; layoutCells maps them into each chunk), and
+  end bands (serifs) recognised as strokes. Bungee: C/D/I/J/L × A now move
+  the A; F × B unchanged.
+- A hairline sheet (0.012 mm, under 0.1 mm wide) along the A's rounded
+  counter corner escaped the 0.1 mm measuring grid; the final check of the
+  best candidates now uses 0.05 mm. `scripts/check-thin.mjs` ray-casts the
+  finished mesh to find what's still thin, by pair and height (15 s).
+  Left for the owner: A × N keeps a 0.25 mm plate under the N's slot (only a
+  "clear" move fixes it; those are now a fallback).
+- Review page: one card per letter pair (both letters may change), listing
+  each change; 3D viewer takes a changed side letter too.
+- No subagents used.
+
 ## 2026-09-28 (stray triangle: touching faces; clear-of-feature moves)
 
 - Owner still saw a thin triangle in L × A (top view) on the new site. It
