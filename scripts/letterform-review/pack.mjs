@@ -13,7 +13,8 @@ for (const f of fonts) {
   const { L, guides } = fontLetters(f);
   const letters = {};
   for (const [c, [l]] of Object.entries(L)) {
-    letters[c] = { d: l.pts.map((r) => r.map(([u, z]) => `${r1(u)},${r1(z)}`).join(' ')).join('|'), w: r2(Math.max(...l.pts.flat().map((p) => p[0]))), lv: levelHeights(L[c]).map(r2) };
+    // Outlines at 0.01 mm (0.1 mm made curves jaggy in the 3D viewer).
+    letters[c] = { d: l.pts.map((r) => r.map(([u, z]) => `${r2(u)},${r2(z)}`).join(' ')).join('|'), w: r2(Math.max(...l.pts.flat().map((p) => p[0]))), lv: levelHeights(L[c]).map(r2) };
   }
   const cards = [];
   full[f.id] = [];

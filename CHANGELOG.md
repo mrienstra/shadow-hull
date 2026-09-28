@@ -31,6 +31,21 @@
   that one-font designs are unchanged (12 designs, 2 fonts, identical), re-ran
   the suites, and looked at its screenshots.
 
+## 2026-09-28 (tidy: smaller offset; sharper review outlines)
+
+- "Beside a feature" offset 0.05 → 0.01 mm (owner noticed A × L's crossbar
+  bottom slightly overshooting the L's foot; the offset only exists to stop
+  opposite faces touching). The finished default design still has no
+  touching-face sheets or thin spots in L/A (scripts/check-thin.mjs).
+- Review page: outlines stored at 0.01 mm (0.1 mm made curves jaggy in the
+  3D viewer).
+- Tried and reverted: a strong reward for lining edges up (mu 3). It fixes
+  A × G's overshoot (the crossbar bottom goes to the shared line and its top
+  to the G's bar) but also lines up edges that gain nothing (F × B's B
+  bowl moved 0.5 mm) and thins A/N's plate to 0.08 mm. Open question for the
+  owner: accept curve wedges for alignment and trim thin tips afterwards?
+- No subagents used.
+
 ## 2026-09-28 (tidy: owner's review of the Bungee cards)
 
 - Owner's notes on the review page: prefer making a thin section vanish

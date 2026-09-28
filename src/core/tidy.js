@@ -244,8 +244,8 @@ export function featureNearMisses(lettersA, lettersB, { t = 0.8, eps = 1e-3 } = 
  *   knots: { a: [[from, to]], b }, before, after }  (heights in the letters' coordinates)
  */
 export function tidyPair(lettersA, lettersB, {
-  tol = 3, near = 1, maxStrain = 0.3, maxBand = 0.2, strokeWeight = 2, lambda = 3, mu = 0.5,
-  cutWeight = 0.3, minGain = 0.2, t = 0.8, step = 0.05, eps = 0.05, merge = 0.06, maxMoves = 3, trace = null,
+  tol = 3, near = 1, maxStrain = 0.3, maxBand = 0.2, strokeWeight = 2, lambda = 3, mu = 1,
+  cutWeight = 0.3, minGain = 0.2, t = 0.8, step = 0.05, eps = 0.01, merge = 0.06, maxMoves = 3, trace = null,
   guides = null, guideWeight = 3, guideTol = 0.25, clearCost = 2,
 } = {}) {
   const orig = { a: lettersA, b: lettersB };
