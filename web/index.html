@@ -98,6 +98,8 @@
           <label title="Seconds to hold each view">pause <input type="number" id="swing-hold" value="0.6" min="0" max="10" step="0.1"> s</label>
           <label title="Degrees the camera rises (negative: dips below) halfway through the swing; it's 0 (eye level, each word exact) at both ends">max tilt <input type="number" id="swing-tilt" value="0" min="-60" max="60" step="1">°</label>
         </span>
+        <button type="button" id="pin" aria-pressed="false" title="Keep this model, to compare it with the next one in the same view">Pin</button>
+        <button type="button" id="flip" hidden title="Switch between the pinned model and the current one (key: C)">Showing: current</button>
         <label class="check colour-toggle" title="Show the box around the design"><input type="checkbox" id="show-box"> Bounding box</label>
         <label class="check colour-toggle" title="Each face takes the colour of the view whose letter outline it follows: orange = front letter's walls, blue = right, purple = top. The flat face you see head-on is cut by another view's letter, so it shows that view's colour."><input type="checkbox" id="colour-faces"> Colour by view</label>
         <button id="share" title="Copy a link to this page state (mode, text, font, options and the selected design)">Share link</button>

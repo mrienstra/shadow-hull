@@ -99,9 +99,13 @@ function snap(view) {
 
 function applyColour() {
   if (meshObj) meshObj.material = $('#colour-faces').checked ? paletteMaterials : material;
+  if (pinned) pinned.material = $('#colour-faces').checked ? paletteMaterials : material;
 }
 
-function showMesh({ numProp, vertProperties, triVerts, runs = [] }) {
+// keepView: the same design again with a setting changed; keep the camera,
+// zoom and centring so the two can be compared (see Pin).
+function showMesh({ numProp, vertProperties, triVerts, runs = [] }, { keepView = false } = {}) {
+  keepView &&= !!meshObj;
   if (meshObj) { meshObj.geometry.dispose(); scene.remove(meshObj); }
   if (box) { box.geometry.dispose(); scene.remove(box); }
   const geo = new THREE.BufferGeometry();
@@ -116,10 +120,10 @@ function showMesh({ numProp, vertProperties, triVerts, runs = [] }) {
   geo.computeBoundingBox();
   const bb = geo.boundingBox, dims = new THREE.Vector3(), centre = new THREE.Vector3();
   bb.getSize(dims); bb.getCenter(centre);
-  size = Math.max(dims.x, dims.y, dims.z);
+  if (!keepView) { size = Math.max(dims.x, dims.y, dims.z); meshCentre.copy(centre); }
   meshObj = new THREE.Mesh(geo, material);
-  meshObj.position.copy(centre).negate();
-  meshCentre.copy(centre);
+  meshObj.position.copy(meshCentre).negate();
+  showPinned(false);
   applyColour();
   scene.add(meshObj);
   box = new THREE.LineSegments(
@@ -127,9 +131,42 @@ function showMesh({ numProp, vertProperties, triVerts, runs = [] }) {
     new THREE.LineBasicMaterial({ color: 0x888888, transparent: true, opacity: 0.35 }),
   );
   box.visible = $('#show-box').checked;
+  box.position.copy(centre).sub(meshCentre);
   scene.add(box);
-  fitFrustum();
+  if (!keepView) fitFrustum();
 }
+
+// ---- Pin: compare two models in the same view --------------------------------
+// Pin keeps a copy of the shown model; after a change, Flip (or C) swaps
+// between it and the current one without moving the camera.
+let pinned = null, pinnedShown = false;
+function setPin(on) {
+  if (pinned) { scene.remove(pinned); pinned.geometry.dispose(); pinned = null; }
+  if (on && meshObj) {
+    pinned = new THREE.Mesh(meshObj.geometry.clone(), meshObj.material);
+    pinned.position.copy(meshObj.position);
+    pinned.visible = false;
+    scene.add(pinned);
+  }
+  $('#pin').setAttribute('aria-pressed', String(!!pinned));
+  $('#pin').textContent = pinned ? 'Unpin' : 'Pin';
+  $('#flip').hidden = !pinned;
+  showPinned(false);
+}
+function showPinned(on) {
+  pinnedShown = !!(on && pinned);
+  if (pinned) pinned.visible = pinnedShown;
+  if (meshObj) meshObj.visible = !pinnedShown;
+  $('#flip').textContent = pinnedShown ? 'Showing: pinned' : 'Showing: current';
+  $('#flip').setAttribute('aria-pressed', String(pinnedShown));
+}
+$('#pin').addEventListener('click', () => setPin(!pinned));
+$('#flip').addEventListener('click', () => showPinned(!pinnedShown));
+addEventListener('keydown', (e) => {
+  if (e.key !== 'c' && e.key !== 'C') return;
+  if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+  if (pinned) showPinned(!pinnedShown);
+});
 
 // ---- Swing: ping-pong between the front and side views -----------------------
 // The camera circles the vertical axis between the two exact horizontal views,
@@ -610,7 +647,9 @@ function renderKnobs(lookId) {
   host.append(bools);
 }
 
-const FINISH = new Set(['stand', 'turn']);
+// Knobs that only change how the selected design is built, not which designs
+// are found: rebuild it (same view) instead of searching again.
+const FINISH = new Set(['stand', 'turn', 'trim']);
 let knobTimer = null;
 function setKnob(name, value) {
   knobValues[name] = value;
@@ -662,6 +701,8 @@ function setLook(id, { generate = true } = {}) {
   $('#shadow-panels').replaceChildren();
   $('#print-check').textContent = '';
   $('#download').disabled = true;
+  setPin(false);
+  selectWordDesign.viewKey = null;
   if (meshObj) { scene.remove(meshObj); meshObj = null; }
   if (box) { scene.remove(box); box = null; }
   if (words) {
@@ -721,7 +762,7 @@ function generateWords(more = false) {
     }
   });
 }
-const stripFinish = ({ stand, turn, ...r }) => r;
+const stripFinish = ({ stand, turn, trim, ...r }) => r;
 
 let selectedItem = null, sharedRecipe = null;
 function selectWordDesign(item, button) {
@@ -749,12 +790,17 @@ function selectWordDesign(item, button) {
     stl = m.stl;
     wordDownloadName = `${currentWords.join('-')}-${currentLook}-${item.title.replace(/[^\w]+/g, '-')}.stl`.toLowerCase().replace(/-+/g, '-');
     $('#download').disabled = false;
-    showMesh({ ...view.mesh, runs: view.runs });
+    // Same look and words as what's shown: a setting changed, so keep the view.
+    const viewKey = `${currentLook}|${currentWords.join('|')}`;
+    const keepView = viewKey === selectWordDesign.viewKey && !!meshObj;
+    selectWordDesign.viewKey = viewKey;
+    if (!keepView && pinned) setPin(false);
+    showMesh({ ...view.mesh, runs: view.runs }, { keepView });
     showWordShadows(view, item);
-    if (swing) setSwing(true); else snap('iso');
+    if (swing) setSwing(true); else if (!keepView) snap('iso');
   });
-  // The finish (stand, turn) comes from the current knobs, not the listed recipe.
-  const finish = { stand: !!knobValues.stand, turn: !!knobValues.turn };
+  // The finish (stand, turn, trim) comes from the current knobs, not the listed recipe.
+  const finish = { stand: !!knobValues.stand, turn: !!knobValues.turn, trim: !!knobValues.trim };
   builder.postMessage({ type: 'build', id, wordA: currentWords[0], wordB: currentWords[1], recipe: { ...item.recipe, ...finish }, ...fontSource() });
 }
 
@@ -863,7 +909,7 @@ function pumpThumbs() {
     }
     pumpThumbs();
   };
-  const finish = { stand: !!knobValues.stand, turn: !!knobValues.turn };
+  const finish = { stand: !!knobValues.stand, turn: !!knobValues.turn, trim: !!knobValues.trim };
   thumbWorker.postMessage({ type: 'build', id: 0, meshOnly: true, wordA: currentWords[0], wordB: currentWords[1], recipe: { ...job.item.recipe, ...finish }, ...fontSource() });
 }
 function renderThumb({ numProp, vertProperties, triVerts }) {

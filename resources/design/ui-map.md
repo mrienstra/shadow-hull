@@ -46,7 +46,9 @@ angles (text) · Generate / Everything / Stop · list grouped by section.
 
 **Viewer (both):** Front / Right-or-Side / Top / 3/4 · colour by view ·
 Share link · Download STL. **Shadows panel:** show missing parts · pieces and
-size line · (words) stats line · one panel per view.
+size line · (words) stats line · one panel per view. Pin / Flip (C): compare the
+pinned model with the current one in the same view; a setting change keeps
+the view (only new words or a new look reset it).
 
 ## 3. What applies to what (Two words)
 

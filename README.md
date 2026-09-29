@@ -49,7 +49,9 @@ node scripts/explore-words.js Finola Bryan     # HTML report of every look's var
 ```
 
 The web page keeps its state in the URL, so "Share link" gives a link that
-reopens the same design.
+reopens the same design. To compare two versions of a design, press **Pin**,
+change a setting (the view stays put), then **Flip** (or press C) to switch
+between the pinned and the current model.
 
 ## Extras: recording a tour
 

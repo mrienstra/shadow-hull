@@ -31,6 +31,18 @@
   that one-font designs are unchanged (12 designs, 2 fonts, identical), re-ran
   the suites, and looked at its screenshots.
 
+## 2026-09-28 (compare in place: keep the view, Pin and Flip)
+
+- Owner: small differences were hard to see because a setting change reset
+  the view after a delay. Now a rebuild of the same look and words keeps the
+  camera, zoom and centring (new words or a new look still reset them).
+  "Trim knife edges" is a finish setting like the stand: it rebuilds only the
+  shown design, no new search. New **Pin** / **Flip** (key C) in the viewer
+  toolbar: pin the shown model, change something, flip between the two in the
+  same view. e2e: flipping back to the pinned model is pixel-identical to
+  before the change; new words clear the pin.
+- No subagents used.
+
 ## 2026-09-28 (trim knife edges by chamfering; on by default)
 
 - "Trim knife edges" now chamfers every convex edge sharper than 60° where
