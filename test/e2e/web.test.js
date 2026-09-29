@@ -288,23 +288,28 @@ test('pin and flip: a setting change keeps the view, and the pinned model shows 
   assert.equal(await page.isVisible('#flip'), false, 'no flip button until something is pinned');
   await page.click('#pin');
   assert.equal(await page.textContent('#flip'), 'Showing: current');
+  assert.match(await page.textContent('#compare-label'), /same settings as pinned/);
   // "Trim knife edges" only rebuilds the shown design (no new search) and keeps the view.
   const status = await page.textContent('#words-status');
   await page.uncheck('input[name="trim"]');
   await page.waitForFunction(() => JSON.parse(new URLSearchParams(location.hash.slice(1)).get('k') ?? '{}').trim === false);
   await page.waitForTimeout(3000);
   assert.equal(await page.textContent('#words-status'), status, 'no new search');
-  await page.click('#flip');
+  // Straight after the checkbox, C flips (focus on a checkbox isn't typing).
+  await page.keyboard.press('c');
   assert.equal(await page.textContent('#flip'), 'Showing: pinned');
+  // The label in the view says which model this is and how it differs.
+  assert.match(await page.textContent('#compare-label'), /Pinned.*Trim knife edges: on/);
   await page.waitForTimeout(200);
   assert.equal(await frame(), before, 'the pinned model, in the same view, pixel for pixel');
-  await page.keyboard.press('c');
+  await page.click('#flip');
   assert.equal(await page.textContent('#flip'), 'Showing: current');
+  assert.match(await page.textContent('#compare-label'), /Current.*Trim knife edges: off/);
   // New words: the view resets and the pin goes.
   await page.fill('[name=wordB]', 'Bryce');
   await page.click('#words-go');
   await wordsDone(page);
-  await page.waitForFunction(() => document.querySelector('#flip').hidden, null, { timeout: 60_000 });
+  await page.waitForFunction(() => document.querySelector('#flip').hidden && document.querySelector('#compare-label').hidden, null, { timeout: 60_000 });
   assert.deepEqual(errors, []);
   await page.close();
 });

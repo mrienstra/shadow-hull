@@ -139,9 +139,51 @@ function showMesh({ numProp, vertProperties, triVerts, runs = [] }, { keepView =
 // ---- Pin: compare two models in the same view --------------------------------
 // Pin keeps a copy of the shown model; after a change, Flip (or C) swaps
 // between it and the current one without moving the camera.
-let pinned = null, pinnedShown = false;
+let pinned = null, pinnedShown = false, pinnedState = null;
+// A label in the view says which model is shown and how the two differ
+// (settings, fonts, design), so the two are never confused.
+const compareLabel = Object.assign(document.createElement('div'), { id: 'compare-label', className: 'compare-label', hidden: true });
+viewport.append(compareLabel);
+function compareState() {
+  const fontName = uploadedFont ? 'uploaded font' : googleFont ? `${googleFont.family} ${googleFont.weight}` : (FONTS.find((f) => f.id === fontChoice.value)?.name ?? fontChoice.value);
+  const side = !sideFont ? 'same as front' : sideFont.kind === 'bundled' ? (FONTS.find((f) => f.id === sideFont.id)?.name ?? sideFont.id) : sideFont.kind === 'google' ? `${sideFont.family} ${sideFont.weight}` : (sideFont.name ?? 'uploaded font');
+  return { knobs: { ...knobValues }, font: fontName, side, design: selectedItem?.title ?? '' };
+}
+function compareDiff(a, b) {
+  const out = [];
+  const defs = LOOK[currentLook]?.knobs ?? {};
+  const short = (s) => s.replace(/ \(.*\)$/, '');
+  const val = (name, v) => {
+    const d = defs[name];
+    if (d?.type === 'bool') return v ? 'on' : 'off';
+    if (d?.type === 'choice') return String(d.labels?.[v] ?? v);
+    return v === '' || v == null ? 'none' : String(v);
+  };
+  for (const k of new Set([...Object.keys(a.knobs), ...Object.keys(b.knobs)])) {
+    if (a.knobs[k] !== b.knobs[k]) out.push([short(BOOL_LABELS[k] ?? KNOB_LABELS[k] ?? k), val(k, a.knobs[k]), val(k, b.knobs[k])]);
+  }
+  if (a.font !== b.font) out.push(['Font', a.font, b.font]);
+  if (a.side !== b.side) out.push(['Side word font', a.side, b.side]);
+  if (a.design !== b.design) out.push(['Design', a.design, b.design]);
+  return out;
+}
+function updateCompare() {
+  compareLabel.hidden = !pinned;
+  if (!pinned) return;
+  const diff = compareDiff(pinnedState, compareState());
+  const which = pinnedShown ? 'pinned' : 'current';
+  compareLabel.className = `compare-label ${which}`;
+  compareLabel.replaceChildren(
+    Object.assign(document.createElement('strong'), { textContent: pinnedShown ? 'Pinned' : 'Current' }),
+    ...(diff.length ? diff.map(([label, a, b]) => Object.assign(document.createElement('span'), { textContent: `${label}: ${pinnedShown ? a : b}` }))
+      : [Object.assign(document.createElement('span'), { textContent: 'same settings as pinned' })]),
+  );
+  // Short and fixed-length, so the toolbar never re-wraps (that would resize the view).
+  $('#flip').textContent = `Showing: ${which}`;
+}
 function setPin(on) {
   if (pinned) { scene.remove(pinned); pinned.geometry.dispose(); pinned = null; }
+  pinnedState = on && meshObj ? compareState() : null;
   if (on && meshObj) {
     pinned = new THREE.Mesh(meshObj.geometry.clone(), meshObj.material);
     pinned.position.copy(meshObj.position);
@@ -157,14 +199,16 @@ function showPinned(on) {
   pinnedShown = !!(on && pinned);
   if (pinned) pinned.visible = pinnedShown;
   if (meshObj) meshObj.visible = !pinnedShown;
-  $('#flip').textContent = pinnedShown ? 'Showing: pinned' : 'Showing: current';
   $('#flip').setAttribute('aria-pressed', String(pinnedShown));
+  updateCompare();
 }
 $('#pin').addEventListener('click', () => setPin(!pinned));
 $('#flip').addEventListener('click', () => showPinned(!pinnedShown));
 addEventListener('keydown', (e) => {
   if (e.key !== 'c' && e.key !== 'C') return;
-  if (e.metaKey || e.ctrlKey || e.altKey || e.target.closest?.('input, textarea, select, [contenteditable]')) return;
+  // Not while typing (a checkbox or button just clicked is fine: that's how you change a setting).
+  const typing = e.target.closest?.('textarea, select, [contenteditable]') || (e.target.matches?.('input') && !['checkbox', 'radio', 'button', 'submit', 'range'].includes(e.target.type));
+  if (e.metaKey || e.ctrlKey || e.altKey || typing) return;
   if (pinned) showPinned(!pinnedShown);
 });
 
@@ -1104,6 +1148,7 @@ function writeHash() {
   }
   if (new URLSearchParams(location.hash.slice(1)).get('tour') === '1') h.set('tour', '1'); // keep tour mode
   history.replaceState(null, '', `#${h}`);
+  updateCompare();
 }
 
 // Which look an older recipe belongs to (for links from before the look menu).

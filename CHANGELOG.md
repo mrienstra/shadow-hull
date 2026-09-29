@@ -31,6 +31,18 @@
   that one-font designs are unchanged (12 designs, 2 fonts, identical), re-ran
   the suites, and looked at its screenshots.
 
+## 2026-09-28 (which model is which, when comparing)
+
+- Owner: when comparing, it could be unclear which state is shown. While a
+  model is pinned, a label in the corner of the view says "Pinned" (amber)
+  or "Current" (blue) and lists what differs between the two (settings,
+  font, side font, design), with that model's value: e.g. "Trim knife
+  edges: on". C also works right after clicking a checkbox (only typing in
+  text fields is ignored). The Flip button keeps a short, fixed-width label:
+  a longer one re-wrapped the toolbar and resized the view (caught by the
+  pixel-exact e2e test).
+- No subagents used.
+
 ## 2026-09-28 (compare in place: keep the view, Pin and Flip)
 
 - Owner: small differences were hard to see because a setting change reset
