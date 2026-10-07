@@ -31,6 +31,24 @@
   that one-font designs are unchanged (12 designs, 2 fonts, identical), re-ran
   the suites, and looked at its screenshots.
 
+## 2026-10-06 (smoother chamfers; trim threshold as a setting)
+
+- Owner: chamfers along curved knife edges were rough (each short segment
+  cut on its own, with its own depth and direction; a step where they
+  ended). Now sharp edges are joined into chains and each chain is cut as one
+  band: depth, face directions and normals per vertex (averaged over its two
+  segments), so neighbouring pieces share corners; the depth fades to zero
+  over the last 10° before the threshold, so there's no step. Knife edges
+  under 60° in FINOLA × BRYAN: Bungee 12.7 → 0 mm (was 2.1), Alfa Slab One
+  21.2 → 0, Archivo Black 55.1 → 0.8, Sigmar One 18.8 → 3.3 (its leftover
+  is a zero-thickness sheet, which chamfering can't fix). Shadows and pieces
+  unchanged.
+- "Trim knife edges sharper than": Off / 30° / 45° / 60° (default) / 75°
+  (owner request). Older links' on / off map to 60° / off.
+- scripts/closeup/: renders close-ups of a design (several directions, one
+  row per setting variant), for checking geometry by eye.
+- No subagents used.
+
 ## 2026-09-28 (which model is which, when comparing)
 
 - Owner: when comparing, it could be unclear which state is shown. While a

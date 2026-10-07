@@ -626,8 +626,8 @@ function renderLookMenu() {
 }
 
 // Knob widgets, generated from the look's definition.
-const BOOL_LABELS = { stretch: 'Allow stretching letters', compact: 'Prefer compact', stand: 'Display stand', tidy: 'Tidy slivers (nudge strokes so letters meet cleanly)', trim: 'Trim knife edges (blunt edges sharper than 60°)', turn: 'Turn 45° for display', mono: 'Monospaced (letters widened to their column)' };
-const KNOB_LABELS = { spacing: 'Spacing', case: 'Letters', rows: 'Rows', style: 'Style', shape: 'Shape seen from above', angle: 'Angle between the two words', supports: 'Support rods (thin joins between pieces)' };
+const BOOL_LABELS = { stretch: 'Allow stretching letters', compact: 'Prefer compact', stand: 'Display stand', tidy: 'Tidy slivers (nudge strokes so letters meet cleanly)', turn: 'Turn 45° for display', mono: 'Monospaced (letters widened to their column)' };
+const KNOB_LABELS = { spacing: 'Spacing', case: 'Letters', rows: 'Rows', style: 'Style', shape: 'Shape seen from above', angle: 'Angle between the two words', supports: 'Support rods (thin joins between pieces)', trim: 'Trim knife edges sharper than' };
 const SHAPES = ['❤', '♥', '⭐', '☀', '♣', '♠', '♦', '♪', '😀', '🐱'];
 let knobValues = {};
 function renderKnobs(lookId) {
@@ -844,7 +844,7 @@ function selectWordDesign(item, button) {
     if (swing) setSwing(true); else if (!keepView) snap('iso');
   });
   // The finish (stand, turn, trim) comes from the current knobs, not the listed recipe.
-  const finish = { stand: !!knobValues.stand, turn: !!knobValues.turn, trim: !!knobValues.trim };
+  const finish = { stand: !!knobValues.stand, turn: !!knobValues.turn, trim: knobValues.trim === true ? 60 : (+knobValues.trim || 0) };
   builder.postMessage({ type: 'build', id, wordA: currentWords[0], wordB: currentWords[1], recipe: { ...item.recipe, ...finish }, ...fontSource() });
 }
 
@@ -953,7 +953,7 @@ function pumpThumbs() {
     }
     pumpThumbs();
   };
-  const finish = { stand: !!knobValues.stand, turn: !!knobValues.turn, trim: !!knobValues.trim };
+  const finish = { stand: !!knobValues.stand, turn: !!knobValues.turn, trim: knobValues.trim === true ? 60 : (+knobValues.trim || 0) };
   thumbWorker.postMessage({ type: 'build', id: 0, meshOnly: true, wordA: currentWords[0], wordB: currentWords[1], recipe: { ...job.item.recipe, ...finish }, ...fontSource() });
 }
 function renderThumb({ numProp, vertProperties, triVerts }) {

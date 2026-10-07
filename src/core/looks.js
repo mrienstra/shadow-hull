@@ -50,7 +50,7 @@ export function* generateLook(ctx, wordA, wordB, lookId, given = {}, { more = fa
   // Supports: with 'none', joins may only use hidden hull blocks (and the
   // stand); designs that stay in pieces then rank lower (quality −0.5 per piece).
   const join = k.supports === 'none' ? 'hull' : 'hull+bridges';
-  const extra = { ...(k.supports === 'none' ? { supports: 'none' } : {}), ...(k.compact ? { weights: COMPACT_WEIGHTS } : {}), ...(k.trim ? { trim: true } : {}) };
+  const extra = { ...(k.supports === 'none' ? { supports: 'none' } : {}), ...(k.compact ? { weights: COMPACT_WEIGHTS } : {}), ...(k.trim ? { trim: k.trim === true ? 60 : k.trim } : {}) };
   const out = (title, text, recipe, metrics, note = '') => ({ look: lookId, title, text, note, recipe: { ...recipe, ...extra, ...finish(k) }, metrics });
 
   const tidy = k.tidy ? { mode: 'pair', tol: 0.15 * height } : null;

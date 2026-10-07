@@ -291,20 +291,20 @@ test('pin and flip: a setting change keeps the view, and the pinned model shows 
   assert.match(await page.textContent('#compare-label'), /same settings as pinned/);
   // "Trim knife edges" only rebuilds the shown design (no new search) and keeps the view.
   const status = await page.textContent('#words-status');
-  await page.uncheck('input[name="trim"]');
-  await page.waitForFunction(() => JSON.parse(new URLSearchParams(location.hash.slice(1)).get('k') ?? '{}').trim === false);
+  await page.locator('.seg[data-knob="trim"] button', { hasText: 'Off' }).click();
+  await page.waitForFunction(() => JSON.parse(new URLSearchParams(location.hash.slice(1)).get('k') ?? '{}').trim === 0);
   await page.waitForTimeout(3000);
   assert.equal(await page.textContent('#words-status'), status, 'no new search');
-  // Straight after the checkbox, C flips (focus on a checkbox isn't typing).
+  // Straight after clicking a setting, C flips (focus on a button isn't typing).
   await page.keyboard.press('c');
   assert.equal(await page.textContent('#flip'), 'Showing: pinned');
   // The label in the view says which model this is and how it differs.
-  assert.match(await page.textContent('#compare-label'), /Pinned.*Trim knife edges: on/);
+  assert.match(await page.textContent('#compare-label'), /Pinned.*Trim knife edges sharper than: 60°/);
   await page.waitForTimeout(200);
   assert.equal(await frame(), before, 'the pinned model, in the same view, pixel for pixel');
   await page.click('#flip');
   assert.equal(await page.textContent('#flip'), 'Showing: current');
-  assert.match(await page.textContent('#compare-label'), /Current.*Trim knife edges: off/);
+  assert.match(await page.textContent('#compare-label'), /Current.*Trim knife edges sharper than: Off/);
   // New words: the view resets and the pin goes.
   await page.fill('[name=wordB]', 'Bryce');
   await page.click('#words-go');

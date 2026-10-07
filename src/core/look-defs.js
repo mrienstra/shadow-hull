@@ -11,6 +11,9 @@ const bool = (def) => ({ type: 'bool', default: def });
 // Tidy: line up edges of a pair's letters that nearly meet (moving each by a
 // fraction of a millimetre), so the solid has no thin slivers there.
 // Default 'none' and no stand (owner's choice): gapped looks then stay in separate pieces, and the page says so.
+// Trim knife edges sharper than this angle (0 = off); see sharp.js trimSharp.
+// Older links stored true / false: true means 60°.
+const trimAngle = () => choice([0, 30, 45, 60, 75], 60, { 0: 'Off', 30: '30°', 45: '45°', 60: '60°', 75: '75°' });
 const supports = () => choice(['allowed', 'none'], 'none', { allowed: 'Allowed where needed', none: 'None' });
 
 export const LOOKS = [
@@ -24,7 +27,7 @@ export const LOOKS = [
     blurb: 'One shape per pair of letters, standing in a row: one word from the left, the other from the right.',
     knobs: {
       spacing: choice(['gapped', 'touching'], 'gapped'), case: choice(['upper', 'mixed', 'lower', 'title'], 'upper', CASES),
-      stretch: bool(false), tidy: bool(true), trim: bool(true), supports: supports(), stand: bool(false), turn: bool(true),
+      stretch: bool(false), tidy: bool(true), trim: trimAngle(), supports: supports(), stand: bool(false), turn: bool(true),
     },
   },
   {
@@ -32,7 +35,7 @@ export const LOOKS = [
     blurb: 'The row of pairs broken into two or three lines, stacked.',
     knobs: {
       rows: choice([2, 3], 2), spacing: choice(['gapped', 'touching'], 'gapped'), case: choice(['upper', 'mixed', 'lower', 'title'], 'upper', CASES),
-      stretch: bool(false), tidy: bool(true), compact: bool(false), trim: bool(true), supports: supports(), stand: bool(false), turn: bool(false),
+      stretch: bool(false), tidy: bool(true), compact: bool(false), trim: trimAngle(), supports: supports(), stand: bool(false), turn: bool(false),
     },
   },
   {
@@ -40,7 +43,7 @@ export const LOOKS = [
     blurb: 'Letters in equal rows and aligned columns (FIN / OLA).',
     knobs: {
       rows: choice([2, 3], 2), mono: bool(false), case: choice(['upper', 'mixed', 'lower', 'title'], 'upper', CASES),
-      stretch: bool(false), tidy: bool(true), compact: bool(false), trim: bool(true), supports: supports(), stand: bool(false), turn: bool(false),
+      stretch: bool(false), tidy: bool(true), compact: bool(false), trim: trimAngle(), supports: supports(), stand: bool(false), turn: bool(false),
     },
   },
   {
@@ -49,7 +52,7 @@ export const LOOKS = [
     knobs: {
       style: choice(['stacked', 'pairs', 'tall'], 'stacked', { stacked: 'Stacked (shorter word’s letters taller)', pairs: 'One pair per level', tall: 'One tall letter' }),
       spacing: choice(['touching', 'gapped'], 'touching'), shape: { type: 'text', default: '' },
-      stretch: bool(false), trim: bool(true), supports: supports(), stand: bool(false), turn: bool(false),
+      stretch: bool(false), trim: trimAngle(), supports: supports(), stand: bool(false), turn: bool(false),
     },
   },
   {
@@ -57,7 +60,7 @@ export const LOOKS = [
     blurb: 'Both whole words cut through one block; optionally shaped from above (e.g. ❤) or read at an angle.',
     knobs: {
       case: choice(['upper', 'lower', 'title'], 'upper', CASES), shape: { type: 'text', default: '' },
-      angle: choice([90, 75, 60, 45], 90, { 90: '90° (front and side)', 75: '75°', 60: '60°', 45: '45°' }), trim: bool(true), supports: supports(), stand: bool(false), turn: bool(false),
+      angle: choice([90, 75, 60, 45], 90, { 90: '90° (front and side)', 75: '75°', 60: '60°', 45: '45°' }), trim: trimAngle(), supports: supports(), stand: bool(false), turn: bool(false),
     },
   },
 ];
@@ -68,6 +71,8 @@ export function lookKnobs(lookId, given = {}) {
   const look = LOOK[lookId];
   const out = {};
   for (const [k, def] of Object.entries(look.knobs)) out[k] = given[k] ?? def.default;
+  // Older links stored trim as on / off.
+  if (typeof out.trim === 'boolean') out.trim = out.trim ? 60 : 0;
   return out;
 }
 

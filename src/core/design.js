@@ -87,8 +87,9 @@ export function designQuality(m, w = QUALITY_WEIGHTS) {
  * @returns { cells, solid (letters only), joined, metrics, dispose() }
  */
 export function finishDesign(wasm, cells, solid, { join = 'hull+bridges', rods = {}, height = 20, stretch = 0, imbalance = 0, frames, weights, trim = 0 } = {}) {
-  // Trim knife edges first (letters only), so everything is measured on the trimmed solid.
-  if (trim > 0) { const trimmed = trimSharp(wasm, solid, { t: trim }); solid.delete(); solid = trimmed; }
+  // Trim knife edges sharper than `trim` degrees first (letters only), so
+  // everything is measured on the trimmed solid.
+  if (trim > 0) { const trimmed = trimSharp(wasm, solid, { maxAngle: trim }); solid.delete(); solid = trimmed; }
   const base = measureComposition(wasm, solid, cells, { frames });
   const vis = letterVisibility(wasm, cells, { height });
   let joined = solid, bridges = [], blocks = [];

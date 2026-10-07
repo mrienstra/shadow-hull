@@ -1,0 +1,34 @@
+<!doctype html><meta charset="utf-8"><body style="margin:0">
+<script type="module">
+// Render page for scripts/closeup/render.mjs: draws a mesh (coloured by view,
+// as the app does) from several directions into one strip.
+import * as THREE from 'three';
+const T = 700;
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(1); renderer.setSize(T, T);
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8888aa, 1.6));
+const sun = new THREE.DirectionalLight(0xffffff, 1.6); sun.position.set(2, -3, 4); scene.add(sun);
+const COL = { front: 0xe07b53, right: 0x4c9be8, top: 0x9b6fd6, box: 0xb7b1a6, connector: 0x6f6f6f };
+const ORDER = [...Object.keys(COL), null];
+const mats = [...Object.values(COL), 0xc8a27a].map((color) => new THREE.MeshStandardMaterial({ color, roughness: 0.65, metalness: 0, flatShading: true }));
+const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
+window.shots = ({ pos, idx, runs }, centre, radius, dirs) => {
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(pos), 3));
+  geo.setIndex(new THREE.BufferAttribute(new Uint32Array(idx), 1));
+  for (const r of runs) geo.addGroup(r.start, r.count, ORDER.indexOf(r.label in COL ? r.label : null));
+  const mesh = new THREE.Mesh(geo, mats); scene.add(mesh);
+  const sheet = document.createElement('canvas'); sheet.width = T * dirs.length; sheet.height = T;
+  const ctx = sheet.getContext('2d');
+  dirs.forEach(([d, up], i) => {
+    const c = new THREE.Vector3(...centre);
+    cam.up.set(...up); cam.position.copy(c).addScaledVector(new THREE.Vector3(...d).normalize(), 200); cam.lookAt(c);
+    Object.assign(cam, { left: -radius, right: radius, top: radius, bottom: -radius }); cam.updateProjectionMatrix();
+    renderer.render(scene, cam); ctx.drawImage(renderer.domElement, i * T, 0);
+  });
+  scene.remove(mesh); geo.dispose();
+  return sheet.toDataURL('image/png');
+};
+window.ready = true;
+</script>

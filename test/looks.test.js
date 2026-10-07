@@ -23,7 +23,7 @@ test('every look has a label, blurb and knobs with defaults', () => {
     assert.ok(l.label && l.blurb, l.id);
     for (const [k, def] of Object.entries(l.knobs)) assert.ok('default' in def, `${l.id}.${k}`);
   }
-  assert.deepEqual(lookKnobs('row', { spacing: 'touching' }), { spacing: 'touching', case: 'upper', stretch: false, tidy: true, trim: true, supports: 'none', stand: false, turn: true });
+  assert.deepEqual(lookKnobs('row', { spacing: 'touching' }), { spacing: 'touching', case: 'upper', stretch: false, tidy: true, trim: 60, supports: 'none', stand: false, turn: true });
 });
 
 // The ui-map's list of looks → how each is reached now, and what it must produce.
